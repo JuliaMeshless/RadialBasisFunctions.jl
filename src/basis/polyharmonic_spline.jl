@@ -1,3 +1,9 @@
+struct ℒRadialBasisFunction{F<:Function}
+    f::F
+end
+(ℒrbf::ℒRadialBasisFunction)(x, xᵢ) = ℒrbf.f(x, xᵢ)
+(Directionalℒrbf::ℒRadialBasisFunction)(x, xᵢ, v) = Directionalℒrbf.f(x, xᵢ, v)
+(Direcional²ℒrbf::ℒRadialBasisFunction)(x, xᵢ, v1, v2) = Direcional²ℒrbf.f(x, xᵢ, v1, v2)
 ########################################################################################
 # Polyharmonic Spline
 
@@ -38,13 +44,43 @@ struct PHS1{T<:Int} <: AbstractPHS
 end
 
 (phs::PHS1)(x, xᵢ) = euclidean(x, xᵢ)
-function ∂(::PHS1, dim::Int)
-    ∂ℒ(x, xᵢ) = (x[dim] - xᵢ[dim]) / (euclidean(x, xᵢ) + AVOID_INF)
-    return ∂ℒ
+function ∂(::PHS1, dim::Int; Hermite::Bool=false)
+    if Hermite
+        ∂₂ℒ(x, xᵢ) = -(x[dim] - xᵢ[dim]) / (euclidean(x, xᵢ) + AVOID_INF)
+        return ∂₂ℒ
+    else
+        ∂ℒ(x, xᵢ) = (x[dim] - xᵢ[dim]) / (euclidean(x, xᵢ) + AVOID_INF)
+        return ∂ℒ
+    end
 end
-function ∇(::PHS1)
-    ∇ℒ(x, xᵢ) = (x .- xᵢ) / euclidean(x, xᵢ)
-    return ∇ℒ
+function ∇(::PHS1; Hermite::Bool=false)
+    if Hermite
+        ∇₂ℒ(x, xᵢ) = -(x .- xᵢ) / euclidean(x, xᵢ)
+        return ∇₂ℒ
+    else
+        ∇ℒ(x, xᵢ) = (x .- xᵢ) / euclidean(x, xᵢ)
+        return ∇ℒ
+    end
+end
+function directional∂(::PHS1, v::AbstractVector; Hermite::Bool=false)
+    if Hermite
+        function directional₂ℒ(x, xᵢ)
+            return LinearAlgebra.dot(v, -(x .- xᵢ)) / (euclidean(x, xᵢ) + AVOID_INF)
+        end
+        return directional₂ℒ
+    else
+        function directionalℒ(x, xᵢ)
+            return LinearAlgebra.dot(v, (x .- xᵢ)) / (euclidean(x, xᵢ) + AVOID_INF)
+        end
+        return directionalℒ
+    end
+end
+function directional∂²(::PHS1, v1::AbstractVector, v2::AbstractVector)
+    function directional₂ℒ(x, xᵢ)
+        return - LinearAlgebra.dot(v1, v2) / (euclidean(x, xᵢ) + AVOID_INF) +
+                 LinearAlgebra.dot(v1, x .- xᵢ) * LinearAlgebra.dot(v2, x .- xᵢ) / (sqeuclidean(x, xᵢ) + AVOID_INF)
+    end
+    return directional₂ℒ
 end
 function ∂²(::PHS1, dim::Int)
     function ∂²ℒ(x, xᵢ)
@@ -76,13 +112,47 @@ struct PHS3{T<:Int} <: AbstractPHS
 end
 
 (phs::PHS3)(x, xᵢ) = euclidean(x, xᵢ)^3
-function ∂(::PHS3, dim::Int)
-    ∂ℒ(x, xᵢ) = 3 * (x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)
-    return ∂ℒ
+
+function ∂(::PHS3, dim::Int; Hermite::Bool=false)
+    if Hermite
+        ∂₂ℒ(x, xᵢ) = 3 * -(x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)
+    return ∂₂ℒ
+    else
+        ∂ℒ(x, xᵢ) = 3 * (x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)
+        return ∂ℒ
+    end
+
 end
-function ∇(::PHS3)
-    ∇ℒ(x, xᵢ) = 3 * (x .- xᵢ) * euclidean(x, xᵢ)
-    return ∇ℒ
+function ∇(::PHS3; Hermite::Bool=false)
+    if Hermite
+        ∇₂ℒ(x, xᵢ) = 3 * -(x .- xᵢ) * euclidean(x, xᵢ)
+        return ∇₂ℒ
+    else
+        ∇ℒ(x, xᵢ) = 3 * (x .- xᵢ) * euclidean(x, xᵢ)
+        return ∇ℒ
+    end
+
+end
+function directional∂(::PHS3, v::AbstractVector; Hermite::Bool=false)
+    if Hermite
+        function directional₂ℒ(x, xᵢ)
+            return LinearAlgebra.dot(v, -(x .- xᵢ)) * euclidean(x, xᵢ)
+        end
+        return directional₂ℒ
+    else
+        function directionalℒ(x, xᵢ)
+            return LinearAlgebra.dot(v, (x .- xᵢ)) * euclidean(x, xᵢ)
+        end
+        return directionalℒ
+    end
+end
+function directional∂²(::PHS3, v1::AbstractVector, v2::AbstractVector)
+    function directional₂ℒ(x, xᵢ)
+        r = euclidean(x, xᵢ)
+        return - LinearAlgebra.dot(v1, v2) * r +
+                 LinearAlgebra.dot(v1, x .- xᵢ) * LinearAlgebra.dot(v2, x .- xᵢ) * r / (sqeuclidean(x, xᵢ) + AVOID_INF)
+    end
+    return directional₂ℒ
 end
 function ∂²(::PHS3, dim::Int)
     function ∂²ℒ(x, xᵢ)
@@ -114,13 +184,44 @@ struct PHS5{T<:Int} <: AbstractPHS
 end
 
 (phs::PHS5)(x, xᵢ) = euclidean(x, xᵢ)^5
-function ∂(::PHS5, dim::Int)
-    ∂ℒ(x, xᵢ) = 5 * (x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)^3
-    return ∂ℒ
+function ∂(::PHS5, dim::Int; Hermite::Bool=false)
+    if Hermite
+        ∂₂ℒ(x, xᵢ) = 5 * -(x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)^3
+        return ∂₂ℒ
+    else
+        ∂ℒ(x, xᵢ) = 5 * (x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)^3
+        return ∂ℒ
+    end
 end
-function ∇(::PHS5)
-    ∇ℒ(x, xᵢ) = 5 * (x .- xᵢ) * euclidean(x, xᵢ)^3
-    return ∇ℒ
+function ∇(::PHS5; Hermite::Bool=false)
+    if Hermite
+        ∇₂ℒ(x, xᵢ) = 5 * -(x .- xᵢ) * euclidean(x, xᵢ)^3
+        return ∇₂ℒ
+    else
+        ∇ℒ(x, xᵢ) = 5 * (x .- xᵢ) * euclidean(x, xᵢ)^3
+        return ∇ℒ
+    end
+end
+function directional∂(::PHS5, v::AbstractVector; Hermite::Bool=false)
+    if Hermite
+        function directional₂ℒ(x, xᵢ)
+            return LinearAlgebra.dot(v, -(x .- xᵢ)) * euclidean(x, xᵢ)^3
+        end
+        return directional₂ℒ
+    else
+        function directionalℒ(x, xᵢ)
+            return LinearAlgebra.dot(v, (x .- xᵢ)) * euclidean(x, xᵢ)^3
+        end
+        return directionalℒ
+    end
+end
+function directional∂²(::PHS5, v1::AbstractVector, v2::AbstractVector)
+    function directional₂ℒ(x, xᵢ)
+        r = euclidean(x, xᵢ)
+        return - LinearAlgebra.dot(v1, v2) * r^3 +
+                 LinearAlgebra.dot(v1, x .- xᵢ) * LinearAlgebra.dot(v2, x .- xᵢ) * r^3 / (sqeuclidean(x, xᵢ) + AVOID_INF)
+    end
+    return directional₂ℒ
 end
 function ∂²(::PHS5, dim::Int)
     function ∂²ℒ(x, xᵢ)
@@ -149,14 +250,25 @@ struct PHS7{T<:Int} <: AbstractPHS
 end
 
 (phs::PHS7)(x, xᵢ) = euclidean(x, xᵢ)^7
-function ∂(::PHS7, dim::Int)
-    ∂ℒ(x, xᵢ) = 7 * (x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)^5
-    return ∂ℒ
+function ∂(::PHS7, dim::Int; Hermite::Bool=false)
+    if Hermite
+        ∂₂ℒ(x, xᵢ) = 7 * -(x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)^5
+        return ℒRadialBasisFunction(∂₂ℒ)
+    else
+        ∂ℒ(x, xᵢ) = 7 * (x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)^5
+        return ∂ℒ
+    end
 end
-function ∇(::PHS7)
-    ∇ℒ(x, xᵢ) = 7 * (x .- xᵢ) * euclidean(x, xᵢ)^5
-    return ∇ℒ
+function ∇(::PHS7; Hermite::Bool=false)
+    if Hermite
+        ∇₂ℒ(x, xᵢ) = 7 * -(x .- xᵢ) * euclidean(x, xᵢ)^5
+        return ℒRadialBasisFunction(∇₂ℒ)
+    else
+        ∇ℒ(x, xᵢ) = 7 * (x .- xᵢ) * euclidean(x, xᵢ)^5
+        return ∇ℒ
+    end
 end
+
 function ∂²(::PHS7, dim::Int)
     function ∂²ℒ(x, xᵢ)
         return 7 * euclidean(x, xᵢ)^3 * (5 * (x[dim] - xᵢ[dim])^2 + sqeuclidean(x, xᵢ))

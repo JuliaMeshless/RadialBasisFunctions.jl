@@ -99,6 +99,42 @@ function _build_collocation_matrix!(
     return nothing
 end
 
+function _build_collocation_matrix_Hermite!(
+    A::Symmetric, data::AbstractVector, data_info, basis::B, mon::MonomialBasis{Dim,Deg}, k::K
+) where {B<:AbstractRadialBasis,K<:Int,Dim,Deg}
+    # radial basis section
+    AA = parent(A)
+    N = size(A, 2)
+    @inbounds for j in 1:k, i in 1:j
+        _calculate_matrix_entry!(AA, i, j, data, data_info, basis)
+    end
+
+    # monomial augmentation
+    if Deg > -1
+        @inbounds for i in 1:k
+            a = view(AA, i, (k + 1):N)
+            mon(a, data[i])
+        end
+    end
+
+    return nothing
+end
+
+function _calculate_matrix_entry!(A, i, j, data, data_info, basis)
+    is_Neumann_i = data_info.is_Neumann[i]
+    is_Neumann_j = data_info.is_Neumann[j]
+    if !is_Neumann_i && !is_Neumann_j
+        A[i, j] = basis(data[i], data[j])
+    elseif is_Neumann_i && !is_Neumann_j
+        A[i, j] = basis(data[i], data[j]) #to be modified
+    elseif !is_Neumann_i && is_Neumann_j
+        A[i, j] = basis(data[i], data[j]) #to be modified
+    elseif is_Neumann_i && is_Neumann_j
+        A[i, j] = basis(data[i], data[j]) #to be modified
+    end
+    return nothing
+end
+
 function _build_rhs!(
     b, ℒrbf, ℒmon, data::AbstractVector{TD}, eval_point::TE, basis::B, k::K
 ) where {TD,TE,B<:AbstractRadialBasis,K<:Int}
