@@ -2,8 +2,8 @@ struct ℒRadialBasisFunction{F<:Function}
     f::F
 end
 (ℒrbf::ℒRadialBasisFunction)(x, xᵢ) = ℒrbf.f(x, xᵢ)
-(Directionalℒrbf::ℒRadialBasisFunction)(x, xᵢ, v) = Directionalℒrbf.f(x, xᵢ, v)
-(Direcional²ℒrbf::ℒRadialBasisFunction)(x, xᵢ, v1, v2) = Direcional²ℒrbf.f(x, xᵢ, v1, v2)
+(Neumannℒrbf::ℒRadialBasisFunction)(x, xᵢ, normal) = Neumannℒrbf.f(x, xᵢ, normal)
+# (Direcional²ℒrbf::ℒRadialBasisFunction)(x, xᵢ, v1, v2) = Direcional²ℒrbf.f(x, xᵢ, v1, v2)
 ########################################################################################
 # Polyharmonic Spline
 
@@ -44,23 +44,27 @@ struct PHS1{T<:Int} <: AbstractPHS
 end
 
 (phs::PHS1)(x, xᵢ) = euclidean(x, xᵢ)
-function ∂(::PHS1, dim::Int; Hermite::Bool=false)
-    if Hermite
-        ∂₂ℒ(x, xᵢ) = -(x[dim] - xᵢ[dim]) / (euclidean(x, xᵢ) + AVOID_INF)
-        return ∂₂ℒ
-    else
-        ∂ℒ(x, xᵢ) = (x[dim] - xᵢ[dim]) / (euclidean(x, xᵢ) + AVOID_INF)
-        return ∂ℒ
-    end
+function ∂(::PHS1, dim::Int)
+    ∂ℒ(x, xᵢ) = (x[dim] - xᵢ[dim]) / (euclidean(x, xᵢ) + AVOID_INF)
+    return ℒRadialBasisFunction(∂ℒ)
 end
-function ∇(::PHS1; Hermite::Bool=false)
-    if Hermite
-        ∇₂ℒ(x, xᵢ) = -(x .- xᵢ) / euclidean(x, xᵢ)
-        return ∇₂ℒ
-    else
-        ∇ℒ(x, xᵢ) = (x .- xᵢ) / euclidean(x, xᵢ)
-        return ∇ℒ
-    end
+function ∂(::PHS1, dim::Int, normal) #must check
+    function ∂₂ℒ(x, xᵢ, normal)
+        dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
+        r = euclidean(x, xᵢ)
+        return -normal[dim] / (r + AVOID_INF) + dot_normal * (x[dim] - xᵢ[dim]) / (r^3 + AVOID_INF)
+    return ℒRadialBasisFunction(∂₂ℒ)
+end
+function ∇(::PHS1)
+    ∇ℒ(x, xᵢ) = (x .- xᵢ) / euclidean(x, xᵢ)
+    return ℒRadialBasisFunction(∇ℒ)
+end
+function ∇(::PHS1, normal) #must check
+    function ∇₂ℒ(x, xᵢ, normal)
+        dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
+        r = euclidean(x, xᵢ)
+        return -normal / (r + AVOID_INF) + dot_normal * (x .- xᵢ) / (r^3 + AVOID_INF)
+    return ℒRadialBasisFunction(∇₂ℒ)
 end
 function directional∂(::PHS1, v::AbstractVector; Hermite::Bool=false)
     if Hermite
@@ -87,7 +91,17 @@ function ∂²(::PHS1, dim::Int)
         return (-(x[dim] - xᵢ[dim])^2 + sqeuclidean(x, xᵢ)) /
                (euclidean(x, xᵢ)^3 + AVOID_INF)
     end
-    return ∂²ℒ
+    return ℒRadialBasisFunction(∂²ℒ)
+end
+function ∂²(::PHS1, dim::Int, normal) #must check
+    function ∂²ℒ(x, xᵢ, normal)
+        n_d = normal[dim]
+        Δ_d = x[dim] - xᵢ[dim]
+        dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
+        r = euclidean(x, xᵢ)
+        return (2*n_d*Δ_d + dot_normal*(1-3*Δ_d/(r^2 + AVOID_INF))) / (r^3 + AVOID_INF)
+    end
+    return ℒRadialBasisFunction(∂²ℒ)
 end
 function ∇²(::PHS1)
     function ∇²ℒ(x, xᵢ)
@@ -95,9 +109,16 @@ function ∇²(::PHS1)
             (-(x .- xᵢ) .^ 2 .+ sqeuclidean(x, xᵢ)) / (euclidean(x, xᵢ)^3 + AVOID_INF)
         )
     end
-    return ∇²ℒ
+    return ℒRadialBasisFunction(∇²ℒ)
 end
-
+function ∇²(::PHS1, normal)
+    function ∇²ℒ(x, xᵢ, normal)
+        r = euclidean(x, xᵢ)
+        dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
+        return 2 * dot_normal / (r^3 + AVOID_INF)
+    end
+    return ℒRadialBasisFunction(∇²ℒ)
+end
 """
     struct PHS3{T<:Int} <: AbstractPHS
 
@@ -112,36 +133,40 @@ struct PHS3{T<:Int} <: AbstractPHS
 end
 
 (phs::PHS3)(x, xᵢ) = euclidean(x, xᵢ)^3
-
-function ∂(::PHS3, dim::Int; Hermite::Bool=false)
-    if Hermite
-        ∂₂ℒ(x, xᵢ) = 3 * -(x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)
-    return ∂₂ℒ
-    else
-        ∂ℒ(x, xᵢ) = 3 * (x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)
-        return ∂ℒ
-    end
-
+function ∂(::PHS3, dim::Int)
+    ∂ℒ(x, xᵢ) = 3 * (x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)
+    return ℒRadialBasisFunction(∂ℒ)
 end
-function ∇(::PHS3; Hermite::Bool=false)
-    if Hermite
-        ∇₂ℒ(x, xᵢ) = 3 * -(x .- xᵢ) * euclidean(x, xᵢ)
-        return ∇₂ℒ
-    else
-        ∇ℒ(x, xᵢ) = 3 * (x .- xᵢ) * euclidean(x, xᵢ)
-        return ∇ℒ
+function ∂(::PHS3, dim::Int, normal) #must check
+    function ∂₂ℒ(x, xᵢ, normal)
+        n_d = normal[dim]
+        Δ_d = x[dim] - xᵢ[dim]
+        dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
+        r = euclidean(x, xᵢ)
+        return -3*(n_d*r + dot_normal*Δ_d/(r + AVOID_INF))
     end
-
+    return ℒRadialBasisFunction(∂₂ℒ)
+end
+function ∇(::PHS3)
+    ∇ℒ(x, xᵢ) = 3 * (x .- xᵢ) * euclidean(x, xᵢ)
+    return ℒRadialBasisFunction(∇ℒ)
+end
+function ∇(::PHS3, normal) #must check
+    function ∇₂ℒ(x, xᵢ, normal)
+        dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
+        return -3*(normal*r .+ dot_normal*(x .- xᵢ)./(r + AVOID_INF))
+    end
+    return ℒRadialBasisFunction(∇₂ℒ)
 end
 function directional∂(::PHS3, v::AbstractVector; Hermite::Bool=false)
     if Hermite
         function directional₂ℒ(x, xᵢ)
-            return LinearAlgebra.dot(v, -(x .- xᵢ)) * euclidean(x, xᵢ)
+            return 3*LinearAlgebra.dot(v, -(x .- xᵢ)) * euclidean(x, xᵢ)
         end
         return directional₂ℒ
     else
         function directionalℒ(x, xᵢ)
-            return LinearAlgebra.dot(v, (x .- xᵢ)) * euclidean(x, xᵢ)
+            return 3*LinearAlgebra.dot(v, (x .- xᵢ)) * euclidean(x, xᵢ)
         end
         return directionalℒ
     end
@@ -149,27 +174,55 @@ end
 function directional∂²(::PHS3, v1::AbstractVector, v2::AbstractVector)
     function directional₂ℒ(x, xᵢ)
         r = euclidean(x, xᵢ)
-        return - LinearAlgebra.dot(v1, v2) * r +
-                 LinearAlgebra.dot(v1, x .- xᵢ) * LinearAlgebra.dot(v2, x .- xᵢ) * r / (sqeuclidean(x, xᵢ) + AVOID_INF)
+        dot_v1_v2 = LinearAlgebra.dot(v1, v2)
+        dot_v1_r = LinearAlgebra.dot(v1, x .- xᵢ)
+        dot_v2_r = LinearAlgebra.dot(v2, x .- xᵢ)
+        return -3*(dot_v1_v2 * r + dot_v1_r * dot_v2_r / (r + AVOID_INF))
     end
     return directional₂ℒ
 end
 function ∂²(::PHS3, dim::Int)
     function ∂²ℒ(x, xᵢ)
-        return 3 * (sqeuclidean(x, xᵢ) + (x[dim] - xᵢ[dim])^2) /
-               (euclidean(x, xᵢ) + AVOID_INF)
+        r = euclidean(x, xᵢ)
+        return 3 * (r + (x[dim] - xᵢ[dim])^2 / (r+AVOID_INF))
+    end
+    return ℒRadialBasisFunction(∂²ℒ)
+end
+function ∂²(::PHS3, dim::Int, normal) #must check
+    function ∂²ℒ(x, xᵢ, normal)
+        n_d = normal[dim]
+        Δ_d = x[dim] - xᵢ[dim]
+        dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
+        r = euclidean(x, xᵢ)
+        return -3*(2*n_d + dot_normal - dot_normal*Δ_d^2/(r^2 + AVOID_INF))/(r + AVOID_INF)
+    end
+    return ℒRadialBasisFunction(∂²ℒ)
+end
+function ∂²(::PHS3, dim::Int, normal) #must check
+    function ∂²ℒ(x, xᵢ, normal)
+        n_d = normal[dim]
+        Δ_d = x[dim] - xᵢ[dim]
+        dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
+        r = euclidean(x, xᵢ)
+        return -3*(2*n_d + dot_normal - dot_normal*Δ_d^2/(r^2 + AVOID_INF))/(r + AVOID_INF)
     end
     return ∂²ℒ
 end
 function ∇²(::PHS3)
     function ∇²ℒ(x, xᵢ)
-        return sum(
-            3 * (sqeuclidean(x, xᵢ) .+ (x .- xᵢ) .^ 2) / (euclidean(x, xᵢ) + AVOID_INF)
-        )
+        return 12*euclidean(x, xᵢ)
+        # return sum(
+        #     3 * (sqeuclidean(x, xᵢ) .+ (x .- xᵢ) .^ 2) / (euclidean(x, xᵢ) + AVOID_INF)
+        # )
     end
-    return ∇²ℒ
+    return ℒRadialBasisFunction(∇²ℒ)
 end
-
+function ∇²(::PHS3, normal) #must check
+    function ∇²ℒ(x, xᵢ, normal)
+        return -6*LinearAlgebra.dot(normal, x .- xᵢ) / (euclidean(x, xᵢ) + AVOID_INF)
+    end
+    return ℒRadialBasisFunction(∇²ℒ)
+end
 """
     struct PHS5{T<:Int} <: AbstractPHS
 
@@ -182,35 +235,42 @@ struct PHS5{T<:Int} <: AbstractPHS
         return new{T}(poly_deg)
     end
 end
-
 (phs::PHS5)(x, xᵢ) = euclidean(x, xᵢ)^5
-function ∂(::PHS5, dim::Int; Hermite::Bool=false)
-    if Hermite
-        ∂₂ℒ(x, xᵢ) = 5 * -(x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)^3
-        return ∂₂ℒ
-    else
-        ∂ℒ(x, xᵢ) = 5 * (x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)^3
-        return ∂ℒ
-    end
+
+function ∂(::PHS5, dim::Int)
+    ∂ℒ(x, xᵢ) = 5 * (x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)^3
+    return ℒRadialBasisFunction(∂ℒ)
 end
-function ∇(::PHS5; Hermite::Bool=false)
-    if Hermite
-        ∇₂ℒ(x, xᵢ) = 5 * -(x .- xᵢ) * euclidean(x, xᵢ)^3
-        return ∇₂ℒ
-    else
-        ∇ℒ(x, xᵢ) = 5 * (x .- xᵢ) * euclidean(x, xᵢ)^3
-        return ∇ℒ
+function ∂(::PHS5, dim::Int, normal)
+    function ∂ℒ(x, xᵢ, normal)
+        n_d = normal[dim]
+        Δ_d = x[dim] - xᵢ[dim]
+        dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
+        r = euclidean(x, xᵢ)
+        return -5*(n_d*r^3 + 3*dot_normal*Δ_d*r)
     end
+    return ℒRadialBasisFunction(∂ℒ)
+end
+function ∇(::PHS5)
+    ∇ℒ(x, xᵢ) = 5 * (x .- xᵢ) * euclidean(x, xᵢ)^3
+    return ℒRadialBasisFunction(∇ℒ)
+end
+function ∇(::PHS5, normal)
+    function ∇ℒ(x, xᵢ, normal)
+        dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
+        return -5*(normal*r^3 + 3*dot_normal*(x .- xᵢ)*r)
+    end
+    return ℒRadialBasisFunction(∇ℒ)
 end
 function directional∂(::PHS5, v::AbstractVector; Hermite::Bool=false)
     if Hermite
         function directional₂ℒ(x, xᵢ)
-            return LinearAlgebra.dot(v, -(x .- xᵢ)) * euclidean(x, xᵢ)^3
+            return 5*LinearAlgebra.dot(v, -(x .- xᵢ)) * euclidean(x, xᵢ)^3
         end
         return directional₂ℒ
     else
         function directionalℒ(x, xᵢ)
-            return LinearAlgebra.dot(v, (x .- xᵢ)) * euclidean(x, xᵢ)^3
+            return 5*LinearAlgebra.dot(v, (x .- xᵢ)) * euclidean(x, xᵢ)^3
         end
         return directionalℒ
     end
@@ -218,24 +278,56 @@ end
 function directional∂²(::PHS5, v1::AbstractVector, v2::AbstractVector)
     function directional₂ℒ(x, xᵢ)
         r = euclidean(x, xᵢ)
-        return - LinearAlgebra.dot(v1, v2) * r^3 +
-                 LinearAlgebra.dot(v1, x .- xᵢ) * LinearAlgebra.dot(v2, x .- xᵢ) * r^3 / (sqeuclidean(x, xᵢ) + AVOID_INF)
+        dot_v1_v2 = LinearAlgebra.dot(v1, v2)
+        dot_v1_r = LinearAlgebra.dot(v1, x .- xᵢ)
+        dot_v2_r = LinearAlgebra.dot(v2, x .- xᵢ)
+        return -5*(dot_v1_v2*r^3 + 3*dot_v1_r*dot_v2_r*r)
     end
     return directional₂ℒ
 end
 function ∂²(::PHS5, dim::Int)
     function ∂²ℒ(x, xᵢ)
-        return 5 * euclidean(x, xᵢ) * (3 * (x[dim] - xᵢ[dim])^2 + sqeuclidean(x, xᵢ))
+        r = euclidean(x, xᵢ)
+        r² = sqeuclidean(x, xᵢ)
+        return 5 * r * (3 * (x[dim] - xᵢ[dim])^2 + r²)
+    end
+    return ℒRadialBasisFunction(∂²ℒ)
+end
+function ∂²(::PHS5, dim::Int, normal) #must check
+    function ∂²ℒ(x, xᵢ, normal)
+        n_d = normal[dim]
+        Δ_d = x[dim] - xᵢ[dim]
+        dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
+        r = euclidean(x, xᵢ)
+        return -5*(6*n_d*Δ_d*r + 3*dot_normal*(r + Δ_d^2/(r + AVOID_INF)))
+    end
+    return ℒRadialBasisFunction(∂²ℒ)
+end
+function ∂²(::PHS5, dim::Int, normal) #must check
+    function ∂²ℒ(x, xᵢ, normal)
+        n_d = normal[dim]
+        Δ_d = x[dim] - xᵢ[dim]
+        dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
+        r = euclidean(x, xᵢ)
+        return -5*(6*n_d*Δ_d*r + 3*dot_normal*(r + Δ_d^2/(r + AVOID_INF)))
     end
     return ∂²ℒ
 end
 function ∇²(::PHS5)
     function ∇²ℒ(x, xᵢ)
-        return sum(5 * euclidean(x, xᵢ) * (3 * (x .- xᵢ) .^ 2 .+ sqeuclidean(x, xᵢ)))
+        return 30*euclidean(x, xᵢ)^3
+        # return sum(5 * euclidean(x, xᵢ) * (3 * (x .- xᵢ) .^ 2 .+ sqeuclidean(x, xᵢ)))
     end
-    return ∇²ℒ
+    return ℒRadialBasisFunction(∇²ℒ)
 end
-
+function ∇²(::PHS5, normal) #must check
+    function ∇²ℒ(x, xᵢ, normal)
+        r = euclidean(x, xᵢ)
+        dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
+        return -5*(18)*dot_normal*r
+    end
+    return ℒRadialBasisFunction(∇²ℒ)
+end
 """
     struct PHS7{T<:Int} <: AbstractPHS
 
@@ -250,34 +342,91 @@ struct PHS7{T<:Int} <: AbstractPHS
 end
 
 (phs::PHS7)(x, xᵢ) = euclidean(x, xᵢ)^7
-function ∂(::PHS7, dim::Int; Hermite::Bool=false)
-    if Hermite
-        ∂₂ℒ(x, xᵢ) = 7 * -(x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)^5
-        return ℒRadialBasisFunction(∂₂ℒ)
-    else
-        ∂ℒ(x, xᵢ) = 7 * (x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)^5
-        return ∂ℒ
-    end
-end
-function ∇(::PHS7; Hermite::Bool=false)
-    if Hermite
-        ∇₂ℒ(x, xᵢ) = 7 * -(x .- xᵢ) * euclidean(x, xᵢ)^5
-        return ℒRadialBasisFunction(∇₂ℒ)
-    else
-        ∇ℒ(x, xᵢ) = 7 * (x .- xᵢ) * euclidean(x, xᵢ)^5
-        return ∇ℒ
-    end
-end
 
+function ∂(::PHS7, dim::Int)
+    ∂ℒ(x, xᵢ) = 7 * (x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)^5
+    return ℒRadialBasisFunction(∂ℒ)
+end
+function ∂(::PHS7, dim::Int, normal)
+    function ∂ℒ(x, xᵢ, normal)
+        r = euclidean(x, xᵢ)
+        dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
+        Δ_d = x[dim] - xᵢ[dim]
+        return -7*(normal[dim]*r^5 + 5*r^3*Δ_d*dot_normal)
+    end
+    return ℒRadialBasisFunction(∂ℒ)
+end
+function ∇(::PHS7)
+    ∇ℒ(x, xᵢ) = 7 * (x .- xᵢ) * euclidean(x, xᵢ)^5
+    return ℒRadialBasisFunction(∇ℒ)
+end
+function ∇(::PHS7, normal)
+    function ∇ℒ(x, xᵢ, normal)
+        r = euclidean(x, xᵢ)
+        dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
+        return -7*(r^5*normal .+ 5*r^3*dot_normal*(x .- xᵢ))
+    end
+    return ℒRadialBasisFunction(∇ℒ)
+end
+function directional∂(::PHS7, v::AbstractVector; Hermite::Bool=false)
+    if Hermite
+        function directional₂ℒ(x, xᵢ)
+            return 7 * LinearAlgebra.dot(v, -(x .- xᵢ)) * euclidean(x, xᵢ)^5
+        end
+        return ℒRadialBasisFunction(directional₂ℒ)
+    else
+        function directionalℒ(x, xᵢ)
+            return LinearAlgebra.dot(v, (x .- xᵢ)) * euclidean(x, xᵢ)^5
+        end
+        return ℒRadialBasisFunction(directionalℒ)
+    end
+end
+function directional∂²(::PHS7, v1::AbstractVector, v2::AbstractVector)
+    function directional₂ℒ(x, xᵢ)
+        r = euclidean(x, xᵢ)
+        dot_v1_v2 = LinearAlgebra.dot(v1, v2)
+        dot_v1_r = LinearAlgebra.dot(v1, x .- xᵢ)
+        dot_v2_r = LinearAlgebra.dot(v2, x .- xᵢ)
+        return -7*(dot_v1_v2*r^5 + 5*dot_v1_r*dot_v2_r*r^3)
+    end
+    return ℒRadialBasisFunction(directional₂ℒ)
+end
 function ∂²(::PHS7, dim::Int)
     function ∂²ℒ(x, xᵢ)
         return 7 * euclidean(x, xᵢ)^3 * (5 * (x[dim] - xᵢ[dim])^2 + sqeuclidean(x, xᵢ))
     end
-    return ∂²ℒ
+    return ℒRadialBasisFunction(∂²ℒ)
+end
+function ∂²(::PHS7, dim::Int, normal) #must check
+    function ∂²ℒ(x, xᵢ, normal)
+        n_d = normal[dim]
+        Δ_d = x[dim] - xᵢ[dim]
+        dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
+        r = euclidean(x, xᵢ)
+        return -7*(10*n_d*dot_normal*r^3 + 5*dot_normal(3*r*Δ_d^2 + r^3))
+    end
+    return ℒRadialBasisFunction(∂²ℒ)
 end
 function ∇²(::PHS7)
     function ∇²ℒ(x, xᵢ)
-        return sum(7 * euclidean(x, xᵢ)^3 * (5 * (x .- xᵢ) .^ 2 .+ sqeuclidean(x, xᵢ)))
+        return 56*euclidean(x, xᵢ)^5
+        # return sum(7 * euclidean(x, xᵢ)^3 * (5 * (x .- xᵢ) .^ 2 .+ sqeuclidean(x, xᵢ)))
+    end
+    return ℒRadialBasisFunction(∇²ℒ)
+end
+function ∇²(::PHS7, normal) #must check
+    function ∇²ℒ(x, xᵢ, normal)
+        r = euclidean(x, xᵢ)
+        dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
+        return -7*(40*dot_normal*r^3)
+    end
+    return ℒRadialBasisFunction(∇²ℒ)
+end
+function ∇²(::PHS7, normal) #must check
+    function ∇²ℒ(x, xᵢ, normal)
+        r = euclidean(x, xᵢ)
+        dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
+        return -7*(40*dot_normal*r^3)
     end
     return ∇²ℒ
 end

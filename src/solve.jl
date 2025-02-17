@@ -126,11 +126,15 @@ function _calculate_matrix_entry!(A, i, j, data, data_info, basis)
     if !is_Neumann_i && !is_Neumann_j
         A[i, j] = basis(data[i], data[j])
     elseif is_Neumann_i && !is_Neumann_j
-        A[i, j] = basis(data[i], data[j]) #to be modified
+        n = data_info.normal[i]
+        A[i, j] = directional∂(basis,n)(data[i], data[j])
     elseif !is_Neumann_i && is_Neumann_j
-        A[i, j] = basis(data[i], data[j]) #to be modified
+        n = data_info.normal[j]
+        A[i, j] = directional∂(basis,n,Hermite=true)(data[i], data[j])
     elseif is_Neumann_i && is_Neumann_j
-        A[i, j] = basis(data[i], data[j]) #to be modified
+        ni = data_info.normal[i]
+        nj = data_info.normal[j]
+        A[i, j] = directional∂²(basis, ni, nj)(data[i], data[j])
     end
     return nothing
 end
@@ -171,6 +175,24 @@ function _build_rhs!(
             bmono = view(b, (k + 1):N, j)
             ℒ(bmono, eval_point)
         end
+    end
+
+    return nothing
+end
+
+function _build_rhs!(
+    b::AbstractVector, ℒrbf, ℒmon, data::AbstractVector{TD}, data_info, eval_point::TE, basis::B, k::K
+) where {TD,TE,B<:AbstractRadialBasis,K<:Int}
+    # radial basis section
+    @inbounds for i in eachindex(data)
+        b[i] = ℒrbf(eval_point, data[i], Hermite=data_info.is_Neumann[i])
+    end
+
+    # monomial augmentation
+    if basis.poly_deg > -1
+        N = length(b)
+        bmono = view(b, (k + 1):N)
+        ℒmon(bmono, eval_point)
     end
 
     return nothing
