@@ -120,6 +120,11 @@ function _build_collocation_matrix_Hermite!(
     return nothing
 end
 
+function _calculate_matrix_entry!(A, i, j, data, basis)
+    A[i, j] = basis(data[i], data[j])
+    return nothing
+end
+
 function _calculate_matrix_entry!(A, i, j, data, data_info, basis)
     is_Neumann_i = data_info.is_Neumann[i]
     is_Neumann_j = data_info.is_Neumann[j]
@@ -128,9 +133,11 @@ function _calculate_matrix_entry!(A, i, j, data, data_info, basis)
     elseif is_Neumann_i && !is_Neumann_j
         n = data_info.normal[i]
         A[i, j] = directional∂(basis,n)(data[i], data[j])
+        #A[i,j] = LinearAlgebra.dot(n, ∇(basis)(data[i], data[j]))
     elseif !is_Neumann_i && is_Neumann_j
         n = data_info.normal[j]
         A[i, j] = directional∂(basis,n,Hermite=true)(data[i], data[j])
+        #A[i,j] = LinearAlgebra.dot(n, -∇(basis)(data[i], data[j]))
     elseif is_Neumann_i && is_Neumann_j
         ni = data_info.normal[i]
         nj = data_info.normal[j]
@@ -185,7 +192,11 @@ function _build_rhs!(
 ) where {TD,TE,B<:AbstractRadialBasis,K<:Int}
     # radial basis section
     @inbounds for i in eachindex(data)
-        b[i] = ℒrbf(eval_point, data[i], Hermite=data_info.is_Neumann[i])
+        if data_info.is_Neumann[i]
+            b[i] = ℒrbf(eval_point, data[i], data_info.normal[i])
+        else
+            b[i] = ℒrbf(eval_point, data[i])
+        end
     end
 
     # monomial augmentation
