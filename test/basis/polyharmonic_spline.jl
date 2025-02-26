@@ -1,6 +1,8 @@
 using RadialBasisFunctions
 import RadialBasisFunctions as RBF
 using StaticArraysCore
+using LinearAlgebra
+import Zygote as Zyg
 
 @testset "Constructors and Printing" begin
     phs = PHS()
@@ -41,6 +43,15 @@ end
         @test ∂rbf(x₁, x₂) ≈ -1 / sqrt(5)
         @test all(∇rbf(x₁, x₂) .≈ (-1 / sqrt(5), -2 / sqrt(5)))
         @test ∂²rbf(x₁, x₂) ≈ 4 / (5 * sqrt(5))
+    end
+
+    @testset "Hermite" begin
+        normal = SVector(1.0, 1)
+        ∂rbf = RBF.∂(phs, 1, normal)
+        ∇rbf = RBF.∇(phs, normal)
+
+        @test ∂rbf(x₁, x₂, normal) ≈ LinearAlgebra.dot(Zyg.gradient(x_2->∂rbf(x₁,x_2), x₂)[1],normal)
+        # @test ∇rbf(x₁, x₂, normal)[1] ≈ LinearAlgebra.dot(Zyg.gradient(x_2->∇rbf(x₁,x_2), x₂)[1],normal)
     end
 end
 

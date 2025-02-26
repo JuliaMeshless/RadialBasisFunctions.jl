@@ -3,7 +3,6 @@ struct ℒRadialBasisFunction{F<:Function}
 end
 (ℒrbf::ℒRadialBasisFunction)(x, xᵢ) = ℒrbf.f(x, xᵢ)
 (Neumannℒrbf::ℒRadialBasisFunction)(x, xᵢ, normal) = Neumannℒrbf.f(x, xᵢ, normal)
-# (Direcional²ℒrbf::ℒRadialBasisFunction)(x, xᵢ, v1, v2) = Direcional²ℒrbf.f(x, xᵢ, v1, v2)
 ########################################################################################
 # Polyharmonic Spline
 
@@ -53,6 +52,7 @@ function ∂(::PHS1, dim::Int, normal) #must check
         dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
         r = euclidean(x, xᵢ)
         return -normal[dim] / (r + AVOID_INF) + dot_normal * (x[dim] - xᵢ[dim]) / (r^3 + AVOID_INF)
+    end
     return ℒRadialBasisFunction(∂₂ℒ)
 end
 function ∇(::PHS1)
@@ -64,21 +64,22 @@ function ∇(::PHS1, normal) #must check
         dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
         r = euclidean(x, xᵢ)
         return -normal / (r + AVOID_INF) + dot_normal * (x .- xᵢ) / (r^3 + AVOID_INF)
+    end
     return ℒRadialBasisFunction(∇₂ℒ)
 end
-function directional∂(::PHS1, v::AbstractVector; Hermite::Bool=false)
-    if Hermite
-        function directional₂ℒ(x, xᵢ)
-            return LinearAlgebra.dot(v, -(x .- xᵢ)) / (euclidean(x, xᵢ) + AVOID_INF)
-        end
-        return directional₂ℒ
-    else
-        function directionalℒ(x, xᵢ)
-            return LinearAlgebra.dot(v, (x .- xᵢ)) / (euclidean(x, xᵢ) + AVOID_INF)
-        end
-        return directionalℒ
-    end
-end
+# function directional∂(::PHS1, v::AbstractVector; Hermite::Bool=false)
+#     if Hermite
+#         function directional₂ℒ(x, xᵢ)
+#             return LinearAlgebra.dot(v, -(x .- xᵢ)) / (euclidean(x, xᵢ) + AVOID_INF)
+#         end
+#         return ℒRadialBasisFunction(directional₂ℒ)
+#     else
+#         function directionalℒ(x, xᵢ)
+#             return LinearAlgebra.dot(v, (x .- xᵢ)) / (euclidean(x, xᵢ) + AVOID_INF)
+#         end
+#         return ℒRadialBasisFunction(directionalℒ)
+#     end
+# end
 function directional∂²(::PHS1, v1::AbstractVector, v2::AbstractVector)
     function directional₂ℒ(x, xᵢ)
         return - LinearAlgebra.dot(v1, v2) / (euclidean(x, xᵢ) + AVOID_INF) +
@@ -158,19 +159,19 @@ function ∇(::PHS3, normal) #must check
     end
     return ℒRadialBasisFunction(∇₂ℒ)
 end
-function directional∂(::PHS3, v::AbstractVector; Hermite::Bool=false)
-    if Hermite
-        function directional₂ℒ(x, xᵢ)
-            return 3*LinearAlgebra.dot(v, -(x .- xᵢ)) * euclidean(x, xᵢ)
-        end
-        return directional₂ℒ
-    else
-        function directionalℒ(x, xᵢ)
-            return 3*LinearAlgebra.dot(v, (x .- xᵢ)) * euclidean(x, xᵢ)
-        end
-        return directionalℒ
-    end
-end
+# function directional∂(::PHS3, v::AbstractVector; Hermite::Bool=false)
+#     if Hermite
+#         function directional₂ℒ(x, xᵢ)
+#             return 3*LinearAlgebra.dot(v, -(x .- xᵢ)) * euclidean(x, xᵢ)
+#         end
+#         return ℒRadialBasisFunction(directional₂ℒ)
+#     else
+#         function directionalℒ(x, xᵢ)
+#             return 3*LinearAlgebra.dot(v, (x .- xᵢ)) * euclidean(x, xᵢ)
+#         end
+#         return ℒRadialBasisFunction(directionalℒ)
+#     end
+# end
 function directional∂²(::PHS3, v1::AbstractVector, v2::AbstractVector)
     function directional₂ℒ(x, xᵢ)
         r = euclidean(x, xᵢ)
@@ -262,19 +263,19 @@ function ∇(::PHS5, normal)
     end
     return ℒRadialBasisFunction(∇ℒ)
 end
-function directional∂(::PHS5, v::AbstractVector; Hermite::Bool=false)
-    if Hermite
-        function directional₂ℒ(x, xᵢ)
-            return 5*LinearAlgebra.dot(v, -(x .- xᵢ)) * euclidean(x, xᵢ)^3
-        end
-        return directional₂ℒ
-    else
-        function directionalℒ(x, xᵢ)
-            return 5*LinearAlgebra.dot(v, (x .- xᵢ)) * euclidean(x, xᵢ)^3
-        end
-        return directionalℒ
-    end
-end
+# function directional∂(::PHS5, v::AbstractVector; Hermite::Bool=false)
+#     if Hermite
+#         function directional₂ℒ(x, xᵢ)
+#             return 5*LinearAlgebra.dot(v, -(x .- xᵢ)) * euclidean(x, xᵢ)^3
+#         end
+#         return ℒRadialBasisFunction(directional₂ℒ)
+#     else
+#         function directionalℒ(x, xᵢ)
+#             return 5*LinearAlgebra.dot(v, (x .- xᵢ)) * euclidean(x, xᵢ)^3
+#         end
+#         return ℒRadialBasisFunction(directionalℒ)
+#     end
+# end
 function directional∂²(::PHS5, v1::AbstractVector, v2::AbstractVector)
     function directional₂ℒ(x, xᵢ)
         r = euclidean(x, xᵢ)
@@ -368,19 +369,19 @@ function ∇(::PHS7, normal)
     end
     return ℒRadialBasisFunction(∇ℒ)
 end
-function directional∂(::PHS7, v::AbstractVector; Hermite::Bool=false)
-    if Hermite
-        function directional₂ℒ(x, xᵢ)
-            return 7 * LinearAlgebra.dot(v, -(x .- xᵢ)) * euclidean(x, xᵢ)^5
-        end
-        return ℒRadialBasisFunction(directional₂ℒ)
-    else
-        function directionalℒ(x, xᵢ)
-            return LinearAlgebra.dot(v, (x .- xᵢ)) * euclidean(x, xᵢ)^5
-        end
-        return ℒRadialBasisFunction(directionalℒ)
-    end
-end
+# function directional∂(::PHS7, v::AbstractVector; Hermite::Bool=false)
+#     if Hermite
+#         function directional₂ℒ(x, xᵢ)
+#             return 7 * LinearAlgebra.dot(v, -(x .- xᵢ)) * euclidean(x, xᵢ)^5
+#         end
+#         return ℒRadialBasisFunction(directional₂ℒ)
+#     else
+#         function directionalℒ(x, xᵢ)
+#             return LinearAlgebra.dot(v, (x .- xᵢ)) * euclidean(x, xᵢ)^5
+#         end
+#         return ℒRadialBasisFunction(directionalℒ)
+#     end
+# end
 function directional∂²(::PHS7, v1::AbstractVector, v2::AbstractVector)
     function directional₂ℒ(x, xᵢ)
         r = euclidean(x, xᵢ)

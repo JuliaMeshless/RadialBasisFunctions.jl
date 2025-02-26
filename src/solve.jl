@@ -132,12 +132,10 @@ function _calculate_matrix_entry!(A, i, j, data, data_info, basis)
         A[i, j] = basis(data[i], data[j])
     elseif is_Neumann_i && !is_Neumann_j
         n = data_info.normal[i]
-        A[i, j] = directional∂(basis,n)(data[i], data[j])
-        #A[i,j] = LinearAlgebra.dot(n, ∇(basis)(data[i], data[j]))
+        A[i,j] = LinearAlgebra.dot(n, ∇(basis)(data[i], data[j]))
     elseif !is_Neumann_i && is_Neumann_j
         n = data_info.normal[j]
-        A[i, j] = directional∂(basis,n,Hermite=true)(data[i], data[j])
-        #A[i,j] = LinearAlgebra.dot(n, -∇(basis)(data[i], data[j]))
+        A[i,j] = LinearAlgebra.dot(n, -∇(basis)(data[i], data[j]))
     elseif is_Neumann_i && is_Neumann_j
         ni = data_info.normal[i]
         nj = data_info.normal[j]
