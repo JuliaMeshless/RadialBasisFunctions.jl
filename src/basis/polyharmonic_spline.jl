@@ -47,7 +47,7 @@ function ∂(::PHS1, dim::Int)
     ∂ℒ(x, xᵢ) = (x[dim] - xᵢ[dim]) / (euclidean(x, xᵢ) + AVOID_INF)
     return ℒRadialBasisFunction(∂ℒ)
 end
-function ∂(::PHS1, dim::Int, normal) #must check
+function ∂(::PHS1, dim::Int, normal::AbstractVector) #must check
     function ∂₂ℒ(x, xᵢ, normal)
         dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
         r = euclidean(x, xᵢ)
@@ -60,7 +60,7 @@ function ∇(::PHS1)
     ∇ℒ(x, xᵢ) = (x .- xᵢ) / euclidean(x, xᵢ)
     return ℒRadialBasisFunction(∇ℒ)
 end
-function ∇(::PHS1, normal) #must check
+function ∇(::PHS1, normal::AbstractVector) #must check
     function ∇₂ℒ(x, xᵢ, normal)
         dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
         r = euclidean(x, xᵢ)
@@ -83,7 +83,7 @@ function ∂²(::PHS1, dim::Int)
     end
     return ℒRadialBasisFunction(∂²ℒ)
 end
-function ∂²(::PHS1, dim::Int, normal) #must check
+function ∂²(::PHS1, dim::Int, normal::AbstractVector) #must check
     function ∂²ℒ(x, xᵢ, normal)
         n_d = normal[dim]
         Δ_d = x[dim] - xᵢ[dim]
@@ -102,7 +102,7 @@ function ∇²(::PHS1)
     end
     return ℒRadialBasisFunction(∇²ℒ)
 end
-function ∇²(::PHS1, normal)
+function ∇²(::PHS1, normal::AbstractVector)
     function ∇²ℒ(x, xᵢ, normal)
         r = euclidean(x, xᵢ)
         dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
@@ -128,7 +128,7 @@ function ∂(::PHS3, dim::Int)
     ∂ℒ(x, xᵢ) = 3 * (x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)
     return ℒRadialBasisFunction(∂ℒ)
 end
-function ∂(::PHS3, dim::Int, normal) #must check
+function ∂(::PHS3, dim::Int, normal::AbstractVector) #must check
     function ∂₂ℒ(x, xᵢ, normal)
         n_d = normal[dim]
         Δ_d = x[dim] - xᵢ[dim]
@@ -142,7 +142,7 @@ function ∇(::PHS3)
     ∇ℒ(x, xᵢ) = 3 * (x .- xᵢ) * euclidean(x, xᵢ)
     return ℒRadialBasisFunction(∇ℒ)
 end
-function ∇(::PHS3, normal) #must check
+function ∇(::PHS3, normal::AbstractVector) #must check
     function ∇₂ℒ(x, xᵢ, normal)
         dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
         return -3 * (normal * r .+ dot_normal * (x .- xᵢ) ./ (r + AVOID_INF))
@@ -166,7 +166,7 @@ function ∂²(::PHS3, dim::Int)
     end
     return ℒRadialBasisFunction(∂²ℒ)
 end
-function ∂²(::PHS3, dim::Int, normal) #must check
+function ∂²(::PHS3, dim::Int, normal::AbstractVector) #must check
     function ∂²ℒ(x, xᵢ, normal)
         n_d = normal[dim]
         Δ_d = x[dim] - xᵢ[dim]
@@ -186,7 +186,7 @@ function ∇²(::PHS3)
     end
     return ℒRadialBasisFunction(∇²ℒ)
 end
-function ∇²(::PHS3, normal) #must check
+function ∇²(::PHS3, normal::AbstractVector) #must check
     function ∇²ℒ(x, xᵢ, normal)
         return -6 * LinearAlgebra.dot(normal, x .- xᵢ) / (euclidean(x, xᵢ) + AVOID_INF)
     end
@@ -210,7 +210,7 @@ function ∂(::PHS5, dim::Int)
     ∂ℒ(x, xᵢ) = 5 * (x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)^3
     return ℒRadialBasisFunction(∂ℒ)
 end
-function ∂(::PHS5, dim::Int, normal)
+function ∂(::PHS5, dim::Int, normal::AbstractVector)
     function ∂ℒ(x, xᵢ, normal)
         n_d = normal[dim]
         Δ_d = x[dim] - xᵢ[dim]
@@ -224,7 +224,7 @@ function ∇(::PHS5)
     ∇ℒ(x, xᵢ) = 5 * (x .- xᵢ) * euclidean(x, xᵢ)^3
     return ℒRadialBasisFunction(∇ℒ)
 end
-function ∇(::PHS5, normal)
+function ∇(::PHS5, normal::AbstractVector)
     function ∇ℒ(x, xᵢ, normal)
         dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
         return -5 * (normal * r^3 + 3 * dot_normal * (x .- xᵢ) * r)
@@ -249,7 +249,7 @@ function ∂²(::PHS5, dim::Int)
     end
     return ℒRadialBasisFunction(∂²ℒ)
 end
-function ∂²(::PHS5, dim::Int, normal) #must check
+function ∂²(::PHS5, dim::Int, normal::AbstractVector) #must check
     function ∂²ℒ(x, xᵢ, normal)
         n_d = normal[dim]
         Δ_d = x[dim] - xᵢ[dim]
@@ -276,7 +276,7 @@ function ∇²(::PHS5)
     end
     return ℒRadialBasisFunction(∇²ℒ)
 end
-function ∇²(::PHS5, normal) #must check
+function ∇²(::PHS5, normal::AbstractVector) #must check
     function ∇²ℒ(x, xᵢ, normal)
         r = euclidean(x, xᵢ)
         dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
@@ -303,7 +303,7 @@ function ∂(::PHS7, dim::Int)
     ∂ℒ(x, xᵢ) = 7 * (x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)^5
     return ℒRadialBasisFunction(∂ℒ)
 end
-function ∂(::PHS7, dim::Int, normal)
+function ∂(::PHS7, dim::Int, normal::AbstractVector)
     function ∂ℒ(x, xᵢ, normal)
         r = euclidean(x, xᵢ)
         dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
@@ -316,7 +316,7 @@ function ∇(::PHS7)
     ∇ℒ(x, xᵢ) = 7 * (x .- xᵢ) * euclidean(x, xᵢ)^5
     return ℒRadialBasisFunction(∇ℒ)
 end
-function ∇(::PHS7, normal)
+function ∇(::PHS7, normal::AbstractVector)
     function ∇ℒ(x, xᵢ, normal)
         r = euclidean(x, xᵢ)
         dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
@@ -340,7 +340,7 @@ function ∂²(::PHS7, dim::Int)
     end
     return ℒRadialBasisFunction(∂²ℒ)
 end
-function ∂²(::PHS7, dim::Int, normal) #must check
+function ∂²(::PHS7, dim::Int, normal::AbstractVector) #must check
     function ∂²ℒ(x, xᵢ, normal)
         n_d = normal[dim]
         Δ_d = x[dim] - xᵢ[dim]
@@ -357,7 +357,7 @@ function ∇²(::PHS7)
     end
     return ℒRadialBasisFunction(∇²ℒ)
 end
-function ∇²(::PHS7, normal) #must check
+function ∇²(::PHS7, normal::AbstractVector) #must check
     function ∇²ℒ(x, xᵢ, normal)
         r = euclidean(x, xᵢ)
         dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
