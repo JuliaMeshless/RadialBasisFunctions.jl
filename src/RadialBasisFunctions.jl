@@ -27,6 +27,9 @@ export update_weights!, is_cache_valid
 
 include("solve.jl")
 
+include("operators/custom.jl")
+export Custom
+
 include("operators/partial.jl")
 export Partial, partial
 

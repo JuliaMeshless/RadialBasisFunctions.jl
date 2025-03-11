@@ -33,6 +33,6 @@ end
 end
 
 @testset "Printing" begin
-    ∇ = Laplacian(identity)
+    ∇ = Laplacian()
     @test RadialBasisFunctions.print_op(∇) == "Laplacian (∇²f)"
 end

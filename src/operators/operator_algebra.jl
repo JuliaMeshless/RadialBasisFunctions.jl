@@ -1,9 +1,9 @@
-#for op in (:+, :-)
-#    @eval function Base.$op(a::ℒRadialBasisFunction, b::ℒRadialBasisFunction)
-#        additive_ℒRBF(x, xᵢ) = Base.$op(a(x, xᵢ), b(x, xᵢ))
-#        return ℒRadialBasisFunction(additive_ℒRBF)
-#    end
-#end
+for op in (:+, :-)
+    @eval function Base.$op(op1::AbstractOperator, op2::AbstractOperator)
+        additive_ℒ(basis) = Base.$op(op1(basis), op2(basis))
+        return Custom(additive_ℒ)
+    end
+end
 
 for op in (:+, :-)
     @eval function Base.$op(
@@ -21,7 +21,8 @@ for op in (:+, :-)
     @eval function Base.$op(op1::RadialBasisOperator, op2::RadialBasisOperator)
         _check_compatible(op1, op2)
         k = _update_stencil(op1, op2)
-        ℒ(x) = Base.$op(op1.ℒ(x), op2.ℒ(x))
+        ℒ = Base.$op(op1.ℒ, op2.ℒ)
+        @show ℒ
         return RadialBasisOperator(ℒ, op1.data, op1.basis; k=k, adjl=op1.adjl)
     end
 end
