@@ -47,6 +47,6 @@ end
 end
 
 @testset "Printing" begin
-    ∇v = Directional((1, 2), (3, 4))
+    ∇v = Directional{2}(SVector(1.0, 1.0))
     @test RadialBasisFunctions.print_op(∇v) == "Directional Derivative (∇f⋅v)"
 end

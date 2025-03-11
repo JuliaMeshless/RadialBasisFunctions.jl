@@ -3,9 +3,13 @@
 
 Operator for the directional derivative, or the inner product of the gradient and a direction vector.
 """
-struct Directional{L<:NTuple,T} <: ScalarValuedOperator
-    ℒ::L
+struct Directional{Dim,T} <: ScalarValuedOperator
     v::T
+end
+Directional{Dim}(v) where {Dim} = Directional{Dim,typeof(v)}(v)
+
+function (op::Directional{Dim})(basis) where {Dim}
+    return ntuple(dim -> ∂(basis, dim), Dim)
 end
 
 """
@@ -20,8 +24,8 @@ function directional(
     k::T=autoselect_k(data, basis),
     adjl=find_neighbors(data, k),
 ) where {B<:AbstractRadialBasis,T<:Int}
-    f = ntuple(dim -> Base.Fix2(∂, dim), length(first(data)))
-    ℒ = Directional(f, v)
+    Dim = length(first(data))
+    ℒ = Directional{Dim}(v)
     return RadialBasisOperator(ℒ, data, basis; k=k, adjl=adjl)
 end
 
@@ -38,65 +42,34 @@ function directional(
     k::T=autoselect_k(data, basis),
     adjl=find_neighbors(data, eval_points, k),
 ) where {B<:AbstractRadialBasis,T<:Int}
-    f = ntuple(dim -> Base.Fix2(∂, dim), length(first(data)))
-    ℒ = Directional(f, v)
+    Dim = length(first(data))
+    ℒ = Directional{Dim}(v)
     return RadialBasisOperator(ℒ, data, eval_points, basis; k=k, adjl=adjl)
 end
 
-function RadialBasisOperator(
-    ℒ::Directional,
-    data::AbstractVector,
-    basis::B=PHS(3; poly_deg=2);
-    k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, k),
-) where {T<:Int,B<:AbstractRadialBasis}
-    weights = _build_weights(ℒ, data, data, adjl, basis)
-    return RadialBasisOperator(ℒ, weights, data, data, adjl, basis)
-end
-
-function RadialBasisOperator(
-    ℒ::Directional,
-    data::AbstractVector{TD},
-    eval_points::AbstractVector{TE},
-    basis::B=PHS(3; poly_deg=2);
-    k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, eval_points, k),
-) where {TD,TE,T<:Int,B<:AbstractRadialBasis}
-    weights = _build_weights(ℒ, data, eval_points, adjl, basis)
-    return RadialBasisOperator(ℒ, weights, data, eval_points, adjl, basis)
-end
-
-function _build_weights(ℒ::Directional, data, eval_points, adjl, basis)
+function _build_weights(ℒ::Directional{Dim}, data, eval_points, adjl, basis) where {Dim}
     v = ℒ.v
-    N = length(first(data))
-    @assert length(v) == N || length(v) == length(data) "wrong size for v"
-    if length(v) == N
-        return mapreduce(+, enumerate(ℒ)) do (i, ℒ)
-            _build_weights(ℒ, data, eval_points, adjl, basis) * v[i]
-        end
-    else
-        vv = ntuple(i -> getindex.(v, i), N)
-        return mapreduce(+, enumerate(ℒ)) do (i, ℒ)
-            Diagonal(vv[i]) * _build_weights(ℒ, data, eval_points, adjl, basis)
-        end
+    if !(length(v) == Dim || length(v) == length(data))
+        throw(
+            DomainError(
+                "The direction vector for Directional() should match either the dimension of the input or the number of input points. The direction vector length is $(length(v)) while there are $(length(data)) points with a dimension of $Dim",
+            ),
+        )
     end
-end
+    weights = _build_weights(Gradient{Dim}(), data, eval_points, adjl, basis)
 
-function update_weights!(op::RadialBasisOperator{<:Directional})
-    v = op.ℒ.v
-    N = length(first(op.data))
-    if length(v) == N
-        op.weights .= mapreduce(+, enumerate(op.ℒ)) do (i, ℒ)
-            _build_weights(ℒ, op) * v[i]
+    if length(v) == Dim
+        return mapreduce(+, zip(weights, v)) do zipped
+            w, vᵢ = zipped
+            w * vᵢ
         end
     else
-        vv = ntuple(i -> getindex.(v, i), N)
-        op.weights .= mapreduce(+, enumerate(op.ℒ)) do (i, ℒ)
-            Diagonal(vv[i]) * _build_weights(ℒ, op)
+        vv = ntuple(i -> getindex.(v, i), Dim)
+        return mapreduce(+, zip(weights, vv)) do zipped
+            w, vᵢ = zipped
+            Diagonal(vᵢ) * w
         end
     end
-    validate_cache!(op)
-    return nothing
 end
 
 # pretty printing
