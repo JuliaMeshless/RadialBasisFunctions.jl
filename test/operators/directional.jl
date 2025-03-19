@@ -46,6 +46,21 @@ end
     @test mean_percent_error(∇v(y), exact) < 10
 end
 
+@testset "Incompatible Geometrical  Vector" begin
+    # wrong geometrical vector dimension
+    v = SVector(2.0, 1.0, 0.5)
+    v /= norm(v)
+    @test_throws DomainError directional(x, v)
+
+    # number of geometrical vectors don't match number of points when using a different
+    # geometrical vector for each point
+    v = map(1:(length(x) - 1)) do i
+        v = SVector{2}(rand(2))
+        return v /= norm(v)
+    end
+    @test_throws DomainError directional(x, v)
+end
+
 @testset "Printing" begin
     ∇v = Directional{2}(SVector(1.0, 1.0))
     @test RadialBasisFunctions.print_op(∇v) == "Directional Derivative (∇f⋅v)"

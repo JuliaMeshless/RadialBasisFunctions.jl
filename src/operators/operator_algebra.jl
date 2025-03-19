@@ -22,25 +22,13 @@ for op in (:+, :-)
     end
 end
 
-for op in (:+, :-)
-    @eval function Base.$op(
-        a::ℒMonomialBasis{Dim,Deg}, b::ℒMonomialBasis{Dim,Deg}
-    ) where {Dim,Deg}
-        function additive_ℒMon(m, x)
-            m .= Base.$op.(a(x), b(x))
-            return nothing
-        end
-        return ℒMonomialBasis(Dim, Deg, additive_ℒMon)
-    end
-end
-
 function _check_compatible(op1::RadialBasisOperator, op2::RadialBasisOperator)
-    if !all(op1.data .≈ op2.data)
+    if (length(op1.data) != length(op2.data)) || !all(op1.data .≈ op2.data)
         throw(
             ArgumentError("Can not add operators that were not built with the same data.")
         )
     end
-    if !all(op1.adjl .≈ op2.adjl)
+    if op1.adjl != op2.adjl
         throw(ArgumentError("Can not add operators that do not have the same stencils."))
     end
 end

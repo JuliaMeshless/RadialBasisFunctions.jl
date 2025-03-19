@@ -2,6 +2,7 @@ using BenchmarkTools
 using RadialBasisFunctions
 using StaticArraysCore
 using HaltonSequences
+using LinearAlgebra
 
 f(x) = 1 + sin(4 * x[1]) + cos(3 * x[1]) + sin(2 * x[2])
 N = 100_000

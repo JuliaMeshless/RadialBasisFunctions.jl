@@ -1,5 +1,5 @@
 """
-    Directional <: ScalarValuedOperator
+    Directional{Dim,T} <: ScalarValuedOperator
 
 Operator for the directional derivative, or the inner product of the gradient and a direction vector.
 """
@@ -7,10 +7,6 @@ struct Directional{Dim,T} <: ScalarValuedOperator
     v::T
 end
 Directional{Dim}(v) where {Dim} = Directional{Dim,typeof(v)}(v)
-
-function (op::Directional{Dim})(basis) where {Dim}
-    return ntuple(dim -> ∂(basis, dim), Dim)
-end
 
 """
     function directional(data, v, basis; k=autoselect_k(data, basis))
@@ -52,7 +48,7 @@ function _build_weights(ℒ::Directional{Dim}, data, eval_points, adjl, basis) w
     if !(length(v) == Dim || length(v) == length(data))
         throw(
             DomainError(
-                "The direction vector for Directional() should match either the dimension of the input or the number of input points. The direction vector length is $(length(v)) while there are $(length(data)) points with a dimension of $Dim",
+                "The geometrical vector for Directional() should match either the dimension of the input or the number of input points. The geometrical vector length is $(length(v)) while there are $(length(data)) points with a dimension of $Dim",
             ),
         )
     end
