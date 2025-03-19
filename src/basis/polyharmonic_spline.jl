@@ -31,7 +31,7 @@ Polyharmonic spline radial basis function:``ϕ(r) = r``
 """
 struct PHS1{T<:Int} <: AbstractPHS
     poly_deg::T
-    function PHS1(poly_deg::T=2) where {T<:Int}
+    function PHS1(poly_deg::T) where {T<:Int}
         check_poly_deg(poly_deg)
         return new{T}(poly_deg)
     end
@@ -69,7 +69,7 @@ Polyharmonic spline radial basis function:``ϕ(r) = r^3``
 """
 struct PHS3{T<:Int} <: AbstractPHS
     poly_deg::T
-    function PHS3(poly_deg::T=2) where {T<:Int}
+    function PHS3(poly_deg::T) where {T<:Int}
         check_poly_deg(poly_deg)
         return new{T}(poly_deg)
     end
@@ -107,7 +107,7 @@ Polyharmonic spline radial basis function:``ϕ(r) = r^5``
 """
 struct PHS5{T<:Int} <: AbstractPHS
     poly_deg::T
-    function PHS5(poly_deg::T=2) where {T<:Int}
+    function PHS5(poly_deg::T) where {T<:Int}
         check_poly_deg(poly_deg)
         return new{T}(poly_deg)
     end
@@ -142,7 +142,7 @@ Polyharmonic spline radial basis function:``ϕ(r) = r^7``
 """
 struct PHS7{T<:Int} <: AbstractPHS
     poly_deg::T
-    function PHS7(poly_deg::T=2) where {T<:Int}
+    function PHS7(poly_deg::T) where {T<:Int}
         check_poly_deg(poly_deg)
         return new{T}(poly_deg)
     end
