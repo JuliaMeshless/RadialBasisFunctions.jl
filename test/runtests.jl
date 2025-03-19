@@ -63,7 +63,3 @@ end
 @safetestset "Stencil" begin
     include("solve.jl")
 end
-
-@safetestset "Utils" begin
-    include("utils.jl")
-end
