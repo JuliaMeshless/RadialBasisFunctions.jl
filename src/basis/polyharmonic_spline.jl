@@ -24,12 +24,6 @@ function PHS(n::T=3; poly_deg::T=2) where {T<:Int}
     return PHS7(poly_deg)
 end
 
-for phs in (:PHS1, :PHS3, :PHS5, :PHS7)
-    @eval function $phs(; poly_deg::Int=2)
-        return $phs(poly_deg)
-    end
-end
-
 """
     struct PHS1{T<:Int} <: AbstractPHS
 
@@ -174,6 +168,13 @@ function ∇²(::PHS7)
         return sum(7 * euclidean(x, xᵢ)^3 * (5 * (x .- xᵢ) .^ 2 .+ sqeuclidean(x, xᵢ)))
     end
     return ∇²ℒ
+end
+
+# convient constructors using keyword arguments
+for phs in (:PHS1, :PHS3, :PHS5, :PHS7)
+    @eval function $phs(; poly_deg::Int=2)
+        return $phs(poly_deg)
+    end
 end
 
 function Base.show(io::IO, rbf::R) where {R<:AbstractPHS}
