@@ -40,6 +40,10 @@ end
     include("operators/laplacian.jl")
 end
 
+@safetestset "Custom" begin
+    include("operators/custom.jl")
+end
+
 @safetestset "Interpolation" begin
     include("operators/interpolation.jl")
 end

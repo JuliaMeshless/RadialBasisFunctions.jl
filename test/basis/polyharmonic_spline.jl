@@ -22,6 +22,11 @@ end
     x₁ = SVector(1.0, 2)
     x₂ = SVector(2.0, 4)
     phs = PHS(1; poly_deg=-1)
+    @test phs isa PHS1
+    @test phs.poly_deg == -1
+    phs = PHS1(; poly_deg=-1)
+    @test phs isa PHS1
+    @test phs.poly_deg == -1
 
     @testset "Distances" begin
         @test phs(x₁, x₂) ≈ sqrt((x₁[1] - x₂[1])^2 + (x₁[2] - x₂[2])^2)^1
@@ -43,6 +48,11 @@ end
     x₁ = SVector(1.0, 2)
     x₂ = SVector(2.0, 4)
     phs = PHS(3; poly_deg=-1)
+    @test phs isa PHS3
+    @test phs.poly_deg == -1
+    phs = PHS3(; poly_deg=-1)
+    @test phs isa PHS3
+    @test phs.poly_deg == -1
 
     @testset "Distances" begin
         @test phs(x₁, x₂) ≈ sqrt((x₁[1] - x₂[1])^2 + (x₁[2] - x₂[2])^2)^3
@@ -64,6 +74,11 @@ end
     x₁ = SVector(1.0, 2)
     x₂ = SVector(2.0, 4)
     phs = PHS(5; poly_deg=-1)
+    @test phs isa PHS5
+    @test phs.poly_deg == -1
+    phs = PHS5(; poly_deg=-1)
+    @test phs isa PHS5
+    @test phs.poly_deg == -1
 
     @testset "Distances" begin
         @test phs(x₁, x₂) ≈ sqrt((x₁[1] - x₂[1])^2 + (x₁[2] - x₂[2])^2)^5
@@ -85,6 +100,11 @@ end
     x₁ = SVector(1.0, 2)
     x₂ = SVector(2.0, 4)
     phs = PHS(7; poly_deg=-1)
+    @test phs isa PHS7
+    @test phs.poly_deg == -1
+    phs = PHS7(; poly_deg=-1)
+    @test phs isa PHS7
+    @test phs.poly_deg == -1
     @testset "Distances" begin
         @test phs(x₁, x₂) ≈ sqrt((x₁[1] - x₂[1])^2 + (x₁[2] - x₂[2])^2)^7
     end
