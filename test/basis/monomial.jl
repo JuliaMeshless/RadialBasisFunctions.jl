@@ -37,7 +37,7 @@ end
         @test all(isapprox.(m(x), [1, 2]))
 
         # in-place evaluation
-        b = ones(_get_underlying_type(x), 2)
+        b = ones(2)
         m(b, x)
         @test all(isapprox.(b, [1, 2]))
 
