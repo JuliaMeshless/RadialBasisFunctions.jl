@@ -3,9 +3,8 @@
 
 Operator for the sum of the second derivatives w.r.t. each independent variable.
 """
-struct Laplacian{L<:Function} <: ScalarValuedOperator
-    ℒ::L
-end
+struct Laplacian <: ScalarValuedOperator end
+(::Laplacian)(basis) = ∇²(basis)
 
 # convienience constructors
 function laplacian(
@@ -14,8 +13,7 @@ function laplacian(
     k::T=autoselect_k(data, basis),
     adjl=find_neighbors(data, k),
 ) where {T<:Int,B<:AbstractRadialBasis}
-    ℒ = Laplacian(∇²)
-    return RadialBasisOperator(ℒ, data, basis; k=k, adjl=adjl)
+    return RadialBasisOperator(Laplacian(), data, basis; k=k, adjl=adjl)
 end
 
 function laplacian(
@@ -25,8 +23,7 @@ function laplacian(
     k::T=autoselect_k(data, basis),
     adjl=find_neighbors(data, eval_points, k),
 ) where {T<:Int,B<:AbstractRadialBasis}
-    ℒ = Laplacian(∇²)
-    return RadialBasisOperator(ℒ, data, eval_points, basis; k=k, adjl=adjl)
+    return RadialBasisOperator(Laplacian(), data, eval_points, basis; k=k, adjl=adjl)
 end
 
 # pretty printing

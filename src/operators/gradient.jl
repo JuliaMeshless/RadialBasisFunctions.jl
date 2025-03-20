@@ -1,10 +1,12 @@
 """
-    Gradient <: VectorValuedOperator
+    Gradient{Dim} <: VectorValuedOperator
 
 Builds an operator for the gradient of a function.
 """
-struct Gradient{L<:NTuple} <: VectorValuedOperator
-    ℒ::L
+struct Gradient{Dim} <: VectorValuedOperator{Dim} end
+
+function (op::Gradient{Dim})(basis) where {Dim}
+    return ntuple(dim -> ∂(basis, dim), Dim)
 end
 
 # convienience constructors
@@ -19,8 +21,8 @@ function gradient(
     k::T=autoselect_k(data, basis),
     adjl=find_neighbors(data, k),
 ) where {B<:AbstractRadialBasis,T<:Int}
-    f = ntuple(dim -> Base.Fix2(∂, dim), length(first(data)))
-    ℒ = Gradient(f)
+    Dim = length(first(data))
+    ℒ = Gradient{Dim}()
     return RadialBasisOperator(ℒ, data, basis; k=k, adjl=adjl)
 end
 
@@ -36,8 +38,8 @@ function gradient(
     k::T=autoselect_k(data, basis),
     adjl=find_neighbors(data, eval_points, k),
 ) where {B<:AbstractRadialBasis,T<:Int}
-    f = ntuple(dim -> Base.Fix2(∂, dim), length(first(data)))
-    ℒ = Gradient(f)
+    Dim = length(first(data))
+    ℒ = Gradient{Dim}()
     return RadialBasisOperator(ℒ, data, eval_points, basis; k=k, adjl=adjl)
 end
 

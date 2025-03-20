@@ -32,6 +32,6 @@ end
 end
 
 @testset "Printing" begin
-    ∇ = Gradient((1, 2))
+    ∇ = Gradient{2}()
     @test RadialBasisFunctions.print_op(∇) == "Gradient (∇f)"
 end

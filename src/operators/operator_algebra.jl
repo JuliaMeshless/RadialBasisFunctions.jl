@@ -1,38 +1,34 @@
 for op in (:+, :-)
-    @eval function Base.$op(a::ℒRadialBasisFunction, b::ℒRadialBasisFunction)
-        additive_ℒRBF(x, xᵢ) = Base.$op(a(x, xᵢ), b(x, xᵢ))
-        return ℒRadialBasisFunction(additive_ℒRBF)
-    end
-end
-
-for op in (:+, :-)
-    @eval function Base.$op(
-        a::ℒMonomialBasis{Dim,Deg}, b::ℒMonomialBasis{Dim,Deg}
-    ) where {Dim,Deg}
-        function additive_ℒMon(m, x)
-            m .= Base.$op.(a(x), b(x))
-            return nothing
-        end
-        return ℒMonomialBasis(Dim, Deg, additive_ℒMon)
-    end
-end
-
-for op in (:+, :-)
     @eval function Base.$op(op1::RadialBasisOperator, op2::RadialBasisOperator)
         _check_compatible(op1, op2)
         k = _update_stencil(op1, op2)
-        ℒ(x) = Base.$op(op1.ℒ(x), op2.ℒ(x))
+        ℒ = Base.$op(op1.ℒ, op2.ℒ)
         return RadialBasisOperator(ℒ, op1.data, op1.basis; k=k, adjl=op1.adjl)
     end
 end
 
+for op in (:+, :-)
+    @eval function Base.$op(op1::AbstractOperator, op2::AbstractOperator)
+        function additive_ℒ(basis)
+            return additive_ℒrbf(x1, x2) = Base.$op(op1(basis)(x1, x2), op2(basis)(x1, x2))
+        end
+        function additive_ℒ(basis::MonomialBasis)
+            function additive_ℒMon(b, x)
+                b .= Base.$op(op1(basis)(x), op2(basis)(x))
+                return nothing
+            end
+        end
+        return Custom(additive_ℒ)
+    end
+end
+
 function _check_compatible(op1::RadialBasisOperator, op2::RadialBasisOperator)
-    if !all(op1.data .≈ op2.data)
+    if (length(op1.data) != length(op2.data)) || !all(op1.data .≈ op2.data)
         throw(
             ArgumentError("Can not add operators that were not built with the same data.")
         )
     end
-    if !all(op1.adjl .≈ op2.adjl)
+    if op1.adjl != op2.adjl
         throw(ArgumentError("Can not add operators that do not have the same stencils."))
     end
 end

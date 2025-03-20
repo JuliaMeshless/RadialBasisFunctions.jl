@@ -40,18 +40,18 @@ end
 (phs::PHS1)(x, xᵢ) = euclidean(x, xᵢ)
 function ∂(::PHS1, dim::Int)
     ∂ℒ(x, xᵢ) = (x[dim] - xᵢ[dim]) / (euclidean(x, xᵢ) + AVOID_INF)
-    return ℒRadialBasisFunction(∂ℒ)
+    return ∂ℒ
 end
 function ∇(::PHS1)
     ∇ℒ(x, xᵢ) = (x .- xᵢ) / euclidean(x, xᵢ)
-    return ℒRadialBasisFunction(∇ℒ)
+    return ∇ℒ
 end
 function ∂²(::PHS1, dim::Int)
     function ∂²ℒ(x, xᵢ)
         return (-(x[dim] - xᵢ[dim])^2 + sqeuclidean(x, xᵢ)) /
                (euclidean(x, xᵢ)^3 + AVOID_INF)
     end
-    return ℒRadialBasisFunction(∂²ℒ)
+    return ∂²ℒ
 end
 function ∇²(::PHS1)
     function ∇²ℒ(x, xᵢ)
@@ -59,7 +59,7 @@ function ∇²(::PHS1)
             (-(x .- xᵢ) .^ 2 .+ sqeuclidean(x, xᵢ)) / (euclidean(x, xᵢ)^3 + AVOID_INF)
         )
     end
-    return ℒRadialBasisFunction(∇²ℒ)
+    return ∇²ℒ
 end
 
 """
@@ -78,18 +78,18 @@ end
 (phs::PHS3)(x, xᵢ) = euclidean(x, xᵢ)^3
 function ∂(::PHS3, dim::Int)
     ∂ℒ(x, xᵢ) = 3 * (x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)
-    return ℒRadialBasisFunction(∂ℒ)
+    return ∂ℒ
 end
 function ∇(::PHS3)
     ∇ℒ(x, xᵢ) = 3 * (x .- xᵢ) * euclidean(x, xᵢ)
-    return ℒRadialBasisFunction(∇ℒ)
+    return ∇ℒ
 end
 function ∂²(::PHS3, dim::Int)
     function ∂²ℒ(x, xᵢ)
         return 3 * (sqeuclidean(x, xᵢ) + (x[dim] - xᵢ[dim])^2) /
                (euclidean(x, xᵢ) + AVOID_INF)
     end
-    return ℒRadialBasisFunction(∂²ℒ)
+    return ∂²ℒ
 end
 function ∇²(::PHS3)
     function ∇²ℒ(x, xᵢ)
@@ -97,7 +97,7 @@ function ∇²(::PHS3)
             3 * (sqeuclidean(x, xᵢ) .+ (x .- xᵢ) .^ 2) / (euclidean(x, xᵢ) + AVOID_INF)
         )
     end
-    return ℒRadialBasisFunction(∇²ℒ)
+    return ∇²ℒ
 end
 
 """
@@ -116,23 +116,23 @@ end
 (phs::PHS5)(x, xᵢ) = euclidean(x, xᵢ)^5
 function ∂(::PHS5, dim::Int)
     ∂ℒ(x, xᵢ) = 5 * (x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)^3
-    return ℒRadialBasisFunction(∂ℒ)
+    return ∂ℒ
 end
 function ∇(::PHS5)
     ∇ℒ(x, xᵢ) = 5 * (x .- xᵢ) * euclidean(x, xᵢ)^3
-    return ℒRadialBasisFunction(∇ℒ)
+    return ∇ℒ
 end
 function ∂²(::PHS5, dim::Int)
     function ∂²ℒ(x, xᵢ)
         return 5 * euclidean(x, xᵢ) * (3 * (x[dim] - xᵢ[dim])^2 + sqeuclidean(x, xᵢ))
     end
-    return ℒRadialBasisFunction(∂²ℒ)
+    return ∂²ℒ
 end
 function ∇²(::PHS5)
     function ∇²ℒ(x, xᵢ)
         return sum(5 * euclidean(x, xᵢ) * (3 * (x .- xᵢ) .^ 2 .+ sqeuclidean(x, xᵢ)))
     end
-    return ℒRadialBasisFunction(∇²ℒ)
+    return ∇²ℒ
 end
 
 """
@@ -151,23 +151,30 @@ end
 (phs::PHS7)(x, xᵢ) = euclidean(x, xᵢ)^7
 function ∂(::PHS7, dim::Int)
     ∂ℒ(x, xᵢ) = 7 * (x[dim] - xᵢ[dim]) * euclidean(x, xᵢ)^5
-    return ℒRadialBasisFunction(∂ℒ)
+    return ∂ℒ
 end
 function ∇(::PHS7)
     ∇ℒ(x, xᵢ) = 7 * (x .- xᵢ) * euclidean(x, xᵢ)^5
-    return ℒRadialBasisFunction(∇ℒ)
+    return ∇ℒ
 end
 function ∂²(::PHS7, dim::Int)
     function ∂²ℒ(x, xᵢ)
         return 7 * euclidean(x, xᵢ)^3 * (5 * (x[dim] - xᵢ[dim])^2 + sqeuclidean(x, xᵢ))
     end
-    return ℒRadialBasisFunction(∂²ℒ)
+    return ∂²ℒ
 end
 function ∇²(::PHS7)
     function ∇²ℒ(x, xᵢ)
         return sum(7 * euclidean(x, xᵢ)^3 * (5 * (x .- xᵢ) .^ 2 .+ sqeuclidean(x, xᵢ)))
     end
-    return ℒRadialBasisFunction(∇²ℒ)
+    return ∇²ℒ
+end
+
+# convient constructors using keyword arguments
+for phs in (:PHS1, :PHS3, :PHS5, :PHS7)
+    @eval function $phs(; poly_deg::Int=2)
+        return $phs(poly_deg)
+    end
 end
 
 function Base.show(io::IO, rbf::R) where {R<:AbstractPHS}

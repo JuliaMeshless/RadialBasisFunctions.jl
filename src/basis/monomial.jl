@@ -36,7 +36,7 @@ for Dim in (:1, :2, :3)
 end
 
 function _get_monomial_basis(::Val{1}, ::Val{N}) where {N}
-    return function basis!(b, x)
+    function basis!(b, x)
         b[1] = one(_get_underlying_type(x))
         if N > 0
             for n in 1:N
@@ -45,6 +45,8 @@ function _get_monomial_basis(::Val{1}, ::Val{N}) where {N}
         end
         return nothing
     end
+    basis!(b, x::AbstractVector) = basis!(b, x[1])
+    return basis!
 end
 
 function _get_monomial_basis(::Val{2}, ::Val{1})

@@ -75,6 +75,6 @@ end
 end
 
 @testset "Printing" begin
-    ∂ = Partial(identity, 1, 2)
+    ∂ = Partial(1, 2)
     @test RadialBasisFunctions.print_op(∂) == "∂ⁿf/∂xᵢ (n = 1, i = 2)"
 end

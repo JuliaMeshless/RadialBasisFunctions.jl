@@ -22,3 +22,16 @@ dxdy = dx + dy
 
 dxdy = dx - dy
 @test mean_percent_error(dxdy(y), df_dx.(x) .- df_dy.(x)) < 1e-6
+
+# test compatibility with other operators
+dy = partial(x[1:500], 1, 2)
+@test_throws ArgumentError dx + dy
+
+dy = partial(x, 1, 2; adjl=dx.adjl[1:500])
+@test_throws ArgumentError dx + dy
+
+adjl = copy(dx.adjl)
+adjl[1] = dx.adjl[2]
+adjl[2] = dx.adjl[1]
+dy = partial(x, 1, 2; adjl=adjl)
+@test_throws ArgumentError dx + dy

@@ -40,6 +40,10 @@ end
     include("operators/laplacian.jl")
 end
 
+@safetestset "Custom" begin
+    include("operators/custom.jl")
+end
+
 @safetestset "Interpolation" begin
     include("operators/interpolation.jl")
 end
@@ -58,8 +62,4 @@ end
 
 @safetestset "Stencil" begin
     include("solve.jl")
-end
-
-@safetestset "Utils" begin
-    include("utils.jl")
 end

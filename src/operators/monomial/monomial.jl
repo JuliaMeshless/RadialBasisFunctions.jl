@@ -1,8 +1,3 @@
-struct ℒRadialBasisFunction{F<:Function}
-    f::F
-end
-(ℒrbf::ℒRadialBasisFunction)(x, xᵢ) = ℒrbf.f(x, xᵢ)
-
 struct ℒMonomialBasis{Dim,Deg,F<:Function}
     f::F
     function ℒMonomialBasis(dim::T, deg::T, f) where {T<:Int}

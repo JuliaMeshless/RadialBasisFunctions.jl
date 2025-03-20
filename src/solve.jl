@@ -29,12 +29,12 @@ function _build_weights(data, eval_points, adjl, basis, ℒrbf, ℒmon, mon)
     Na = length(adjl)
     I = zeros(Int, k * Na)
     J = reduce(vcat, adjl)
-    V = zeros(TD, k * Na)
+    V = zeros(TD, k * Na, _num_ops(ℒrbf))
 
     # create work arrays
     n = sum(sizes)
     A = Symmetric[Symmetric(zeros(TD, n, n), :U) for _ in 1:nchunks]
-    b = Vector[zeros(TD, n) for _ in 1:nchunks]
+    b = [_prepare_b(ℒrbf, TD, n) for _ in 1:nchunks]
     d = Vector{Vector{eltype(data)}}(undef, nchunks)
 
     # build stencil for each data point and store in global weight matrix
@@ -42,18 +42,29 @@ function _build_weights(data, eval_points, adjl, basis, ℒrbf, ℒmon, mon)
         for i in xrange
             I[((i - 1) * k + 1):(i * k)] .= i
             d[ichunk] = data[adjl[i]]
-            V[((i - 1) * k + 1):(i * k)] = @views _build_stencil!(
+            V[((i - 1) * k + 1):(i * k), :] = @views _build_stencil!(
                 A[ichunk], b[ichunk], ℒrbf, ℒmon, d[ichunk], eval_points[i], basis, mon, k
             )
         end
     end
 
-    return sparse(I, J, V, length(adjl), length(data))
+    nrows = length(adjl)
+    ncols = length(data)
+    if size(V, 2) == 1
+        return sparse(I, J, V[:, 1], nrows, ncols)
+    else
+        return ntuple(i -> sparse(I, J, V[:, i], nrows, ncols), size(V, 2))
+    end
 end
+
+_num_ops(_) = 1
+_num_ops(ℒ::Tuple) = length(ℒ)
+_prepare_b(_, T, n) = zeros(T, n)
+_prepare_b(ℒ::Tuple, T, n) = zeros(T, n, length(ℒ))
 
 function _build_stencil!(
     A::Symmetric,
-    b::Vector,
+    b,
     ℒrbf,
     ℒmon,
     data::AbstractVector{TD},
@@ -64,7 +75,7 @@ function _build_stencil!(
 ) where {TD,TE,B<:AbstractRadialBasis}
     _build_collocation_matrix!(A, data, basis, mon, k)
     _build_rhs!(b, ℒrbf, ℒmon, data, eval_point, basis, k)
-    return (A \ b)[1:k]
+    return (A \ b)[1:k, :]
 end
 
 function _build_collocation_matrix!(
@@ -89,7 +100,7 @@ function _build_collocation_matrix!(
 end
 
 function _build_rhs!(
-    b::AbstractVector, ℒrbf, ℒmon, data::AbstractVector{TD}, eval_point::TE, basis::B, k::K
+    b, ℒrbf, ℒmon, data::AbstractVector{TD}, eval_point::TE, basis::B, k::K
 ) where {TD,TE,B<:AbstractRadialBasis,K<:Int}
     # radial basis section
     @inbounds for i in eachindex(data)
@@ -101,6 +112,29 @@ function _build_rhs!(
         N = length(b)
         bmono = view(b, (k + 1):N)
         ℒmon(bmono, eval_point)
+    end
+
+    return nothing
+end
+
+function _build_rhs!(
+    b, ℒrbf::Tuple, ℒmon::Tuple, data::AbstractVector{TD}, eval_point::TE, basis::B, k::K
+) where {TD,TE,B<:AbstractRadialBasis,K<:Int}
+    @assert size(b, 2) == length(ℒrbf) == length(ℒmon) "b, ℒrbf, ℒmon must have the same length"
+    # radial basis section
+    for (j, ℒ) in enumerate(ℒrbf)
+        @inbounds for i in eachindex(data)
+            b[i, j] = ℒ(eval_point, data[i])
+        end
+    end
+
+    # monomial augmentation
+    if basis.poly_deg > -1
+        N = size(b, 1)
+        for (j, ℒ) in enumerate(ℒmon)
+            bmono = view(b, (k + 1):N, j)
+            ℒ(bmono, eval_point)
+        end
     end
 
     return nothing

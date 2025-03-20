@@ -36,6 +36,11 @@ end
         # standard evaluation
         @test all(isapprox.(m(x), [1, 2]))
 
+        # in-place evaluation
+        b = ones(2)
+        m(b, x)
+        @test all(isapprox.(b, [1, 2]))
+
         # derivatives
         @test all(isapprox.(RBF.∂(m, 1)(x), [0, 1]))
         @test all(isapprox.(RBF.∂²(m, 1)(x), [0, 0]))
