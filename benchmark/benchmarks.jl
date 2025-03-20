@@ -45,21 +45,30 @@ end
 
 x1 = SVector{3}(rand(3))
 x2 = SVector{3}(rand(3))
-for basis in (IMQ, Gaussian, PHS1, PHS3, PHS5, PHS7)
-    for poly_deg in 0:2
-        b = basis(; poly_deg=poly_deg)
-        SUITE["RBF"]["$basis"]["$poly_deg"]["∂"] = @benchmarkable rbf($x1, $x2) setup = (
-            rbf = RadialBasisFunctions.∂($b, 1)
-        )
-        SUITE["RBF"]["$basis"]["$poly_deg"]["∂²"] = @benchmarkable rbf($x1, $x2) setup = (
-            rbf = RadialBasisFunctions.∂²($b, 1)
-        )
-        SUITE["RBF"]["$basis"]["$poly_deg"]["∇"] = @benchmarkable rbf($x1, $x2) setup = (
-            rbf = RadialBasisFunctions.∇($b)
-        )
-        SUITE["RBF"]["$basis"]["$poly_deg"]["∇²"] = @benchmarkable rbf($x1, $x2) setup = (
-            rbf = RadialBasisFunctions.∇²($b)
-        )
+
+function benchmark_basis(SUITE, basis, poly_deg, x1, x2)
+    SUITE["RBF"]["$basis"]["$poly_deg"]["∂"] = @benchmarkable rbf($x1, $x2) setup = (
+        rbf = RadialBasisFunctions.∂($basis, 1)
+    )
+    SUITE["RBF"]["$basis"]["$poly_deg"]["∂²"] = @benchmarkable rbf($x1, $x2) setup = (
+        rbf = RadialBasisFunctions.∂²($basis, 1)
+    )
+    SUITE["RBF"]["$basis"]["$poly_deg"]["∇"] = @benchmarkable rbf($x1, $x2) setup = (
+        rbf = RadialBasisFunctions.∇($basis)
+    )
+    return SUITE["RBF"]["$basis"]["$poly_deg"]["∇²"] = @benchmarkable rbf($x1, $x2) setup = (
+        rbf = RadialBasisFunctions.∇²($basis)
+    )
+end
+
+for poly_deg in 0:2
+    for basis in (IMQ, Gaussian)
+        rbf = basis(; poly_deg=poly_deg)
+        benchmark_basis(SUITE, rbf, poly_deg, x1, x2)
+    end
+    for basis in (PHS1, PHS3, PHS5, PHS7)
+        rbf = basis(poly_deg)
+        benchmark_basis(SUITE, rbf, poly_deg, x1, x2)
     end
 end
 
