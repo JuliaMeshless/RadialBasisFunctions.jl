@@ -5,6 +5,7 @@
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/dev)
 [![License File](https://img.shields.io/badge/license-MIT-blue)](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/blob/master/LICENSE)
 [![DOI](https://zenodo.org/badge/634682663.svg)](https://zenodo.org/badge/latestdoi/634682663)
+[![codecov](https://codecov.io/gh/JuliaMeshless/RadialBasisFunctions.jl/graph/badge.svg?token=S3BQ5FIULZ)](https://codecov.io/gh/JuliaMeshless/RadialBasisFunctions.jl)
 
 This package intends to provide tools for all things regarding Radial Basis Functions (RBF). 
 
