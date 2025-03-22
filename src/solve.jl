@@ -99,48 +99,8 @@ function _build_collocation_matrix!(
     return nothing
 end
 
-function _build_collocation_matrix_Hermite!(
-    A::Symmetric, data::AbstractVector, data_info, basis::B, mon::MonomialBasis{Dim,Deg}, k::K
-) where {B<:AbstractRadialBasis,K<:Int,Dim,Deg}
-    # radial basis section
-    AA = parent(A)
-    N = size(A, 2)
-    @inbounds for j in 1:k, i in 1:j
-        _calculate_matrix_entry!(AA, i, j, data, data_info, basis)
-    end
-
-    # monomial augmentation
-    if Deg > -1
-        @inbounds for i in 1:k
-            a = view(AA, i, (k + 1):N)
-            mon(a, data[i])
-        end
-    end
-
-    return nothing
-end
-
 function _calculate_matrix_entry!(A, i, j, data, basis)
     A[i, j] = basis(data[i], data[j])
-    return nothing
-end
-
-function _calculate_matrix_entry!(A, i, j, data, data_info, basis)
-    is_Neumann_i = data_info.is_Neumann[i]
-    is_Neumann_j = data_info.is_Neumann[j]
-    if !is_Neumann_i && !is_Neumann_j
-        A[i, j] = basis(data[i], data[j])
-    elseif is_Neumann_i && !is_Neumann_j
-        n = data_info.normal[i]
-        A[i,j] = LinearAlgebra.dot(n, ∇(basis)(data[i], data[j]))
-    elseif !is_Neumann_i && is_Neumann_j
-        n = data_info.normal[j]
-        A[i,j] = LinearAlgebra.dot(n, -∇(basis)(data[i], data[j]))
-    elseif is_Neumann_i && is_Neumann_j
-        ni = data_info.normal[i]
-        nj = data_info.normal[j]
-        A[i, j] = directional∂²(basis, ni, nj)(data[i], data[j])
-    end
     return nothing
 end
 
@@ -180,28 +140,6 @@ function _build_rhs!(
             bmono = view(b, (k + 1):N, j)
             ℒ(bmono, eval_point)
         end
-    end
-
-    return nothing
-end
-
-function _build_rhs!(
-    b::AbstractVector, ℒrbf, ℒmon, data::AbstractVector{TD}, data_info, eval_point::TE, basis::B, k::K
-) where {TD,TE,B<:AbstractRadialBasis,K<:Int}
-    # radial basis section
-    @inbounds for i in eachindex(data)
-        if data_info.is_Neumann[i]
-            b[i] = ℒrbf(eval_point, data[i], data_info.normal[i])
-        else
-            b[i] = ℒrbf(eval_point, data[i])
-        end
-    end
-
-    # monomial augmentation
-    if basis.poly_deg > -1
-        N = length(b)
-        bmono = view(b, (k + 1):N)
-        ℒmon(bmono, eval_point)
     end
 
     return nothing
