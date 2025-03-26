@@ -368,6 +368,19 @@ function ∇²(::PHS7, normal) #must check
     return ∇²ℒ
 end
 
+# I'm adding this because of the test.. any better idea?
+function ∂_Hermite(phs::AbstractPHS, dim::Int)
+    # Create a function that can handle both regular and Neumann cases
+    function Hermite_deriv(x, xᵢ, normal=nothing)
+        if normal === nothing || all(normal .== 0)
+            return (∂(phs, dim))(x, xᵢ)
+        else
+            return (∂(phs, dim, normal))(x, xᵢ)
+        end
+    end
+    return Hermite_deriv
+end
+
 # convient constructors using keyword arguments
 for phs in (:PHS1, :PHS3, :PHS5, :PHS7)
     @eval function $phs(; poly_deg::Int=2)

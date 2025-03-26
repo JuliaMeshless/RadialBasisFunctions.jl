@@ -9,7 +9,7 @@ struct StencilData{T}
     rhs_v::Matrix{T}                      # Local coefficients for boundary nodes
     
     # Constructor to initialize all fields
-    function StencilData{T}(n::Int, k::Int, num_ops::Int, ℒrbf, dim::Int) where {T}
+    function StencilData{T}(n::Int, k::Int, num_ops::Int, dim::Int) where {T}
 
         A = Symmetric(zeros(T, n, n), :U)
         b = zeros(T, n, num_ops)
@@ -25,8 +25,8 @@ struct StencilData{T}
 end
 
 #convenience constructor
-function StencilData(T::Type, data_dim::Int, n::Int, k::Int, num_ops::Int, ℒrbf)
-    return StencilData{T}(n, k, num_ops, ℒrbf, data_dim)
+function StencilData(T::Type, data_dim::Int, n::Int, k::Int, num_ops::Int)
+    return StencilData{T}(n, k, num_ops, data_dim)
 end
 
 
@@ -88,7 +88,7 @@ function _update_stencil!(
     _build_collocation_matrix_Hermite!(stencil.A, stencil.d, stencil, basis, mon, k)
     _build_rhs!(stencil.b, ℒrbf, ℒmon, stencil.d, stencil, eval_point, basis, k)
     
-    # Solve system for each operator
+    # Solve system for each operator (this can easily be improved by using LDL algo)
     weights = (stencil.A \ stencil.b)[1:k, :]
     
     # Store weights in appropriate matrices

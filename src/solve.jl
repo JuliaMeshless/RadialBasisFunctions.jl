@@ -57,11 +57,6 @@ function _build_weights(data, eval_points, adjl, basis, ℒrbf, ℒmon, mon)
     end
 end
 
-_num_ops(_) = 1
-_num_ops(ℒ::Tuple) = length(ℒ)
-_prepare_b(_, T, n) = zeros(T, n)
-_prepare_b(ℒ::Tuple, T, n) = zeros(T, n, length(ℒ))
-
 function _build_stencil!(
     A::Symmetric,
     b,

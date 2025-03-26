@@ -1,18 +1,15 @@
-function _build_weights(data, normals, boundary_flag, is_Neumann, adjl, basis, ℒrbf, ℒmon)
+function _build_weights(data, normals, boundary_flag, is_Neumann, adjl, basis, ℒrbf, ℒmon, mon)
 
     nchunks = Threads.nthreads()
     TD = eltype(first(data))
     dim = length(first(data))
     nmon = binomial(dim + basis.poly_deg, basis.poly_deg)
     k = length(first(adjl))
-    sizes = (k, nmon)
-    n = sum(sizes)
-    num_ops = _num_ops(ℒrbf)
 
     (I_lhs, J_lhs, V_lhs),(I_rhs, J_rhs, V_rhs) = _preallocate_IJV_matrices(
         adjl, data, boundary_flag, ℒrbf)
     
-    stencil_data = [StencilData(TD, dim, n, k, num_ops, ℒrbf) for _ in 1:nchunks]
+    stencil_data = [StencilData(TD, dim, k+nmon, k, _num_ops(ℒrbf)) for _ in 1:nchunks]
     
     # Get thread offsets
     lhs_offsets, rhs_offsets = _calculate_thread_offsets(adjl, boundary_flag, nchunks)
@@ -24,12 +21,11 @@ function _build_weights(data, normals, boundary_flag, is_Neumann, adjl, basis, �
         
         for i in xrange
             if !boundary_flag[i]
-                local_adjl = adjl[i]
                 
                 # Update stencil and compute weights in a single call
                 _update_stencil!(
                     stencil_data[ichunk],
-                    local_adjl,
+                    adjl[i],
                     data,
                     boundary_flag,
                     is_Neumann,
@@ -44,7 +40,7 @@ function _build_weights(data, normals, boundary_flag, is_Neumann, adjl, basis, �
                 
                 # Copy results from stencil_data to global matrices
                 lhs_idx, rhs_idx = _write_coefficients_to_global_matrices!(
-                    V_lhs, V_rhs, stencil_data[ichunk], local_adjl, boundary_flag, lhs_idx, rhs_idx
+                    V_lhs, V_rhs, stencil_data[ichunk], adjl[i], boundary_flag, lhs_idx, rhs_idx
                 )
             end
         end
