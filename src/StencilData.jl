@@ -115,6 +115,7 @@ function _build_collocation_matrix_Hermite!(
     end
 
     # monomial augmentation
+    #this should handle Neumann BCs
     if Deg > -1
         @inbounds for i in 1:k
             a = view(AA, i, (k + 1):n)
