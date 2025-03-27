@@ -363,21 +363,26 @@ function ∇²(::PHS7, normal) #must check
     function ∇²ℒ(x, xᵢ, normal)
         r = euclidean(x, xᵢ)
         dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-        return -7*(40*dot_normal*r^3)
+        return -7 * (40 * dot_normal * r^3)
     end
     return ∇²ℒ
 end
 
 # I'm adding this because of the test.. any better idea?
 function ∂_Hermite(phs::AbstractPHS, dim::Int)
-    # Create a function that can handle both regular and Neumann cases
+    regular_op = ∂(phs, dim)  # Regular derivative operator
+    
     function Hermite_deriv(x, xᵢ, normal=nothing)
         if normal === nothing || all(normal .== 0)
-            return (∂(phs, dim))(x, xᵢ)
+            # Regular derivative case
+            return regular_op(x, xᵢ)
         else
-            return (∂(phs, dim, normal))(x, xᵢ)
+            # Neumann derivative case
+            neumann_op = ∂(phs, dim, normal)
+            return neumann_op(x, xᵢ, normal)  # Must include normal here!
         end
     end
+    
     return Hermite_deriv
 end
 

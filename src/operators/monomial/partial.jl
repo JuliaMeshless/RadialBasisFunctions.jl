@@ -339,3 +339,35 @@ function ∂²(::MonomialBasis{3,2}, ::Val{3})
     end
     return ℒMonomialBasis(3, 2, basis!)
 end
+
+# Add normal derivative functionality
+function ∂_normal(mb::MonomialBasis{Dim,Deg}, normal::AbstractVector) where {Dim,Deg}
+    function basis!(b, x)
+        T = eltype(x)
+        
+        for i in eachindex(b)
+            b[i] = zero(T)
+        end
+        
+        tmp = zeros(T, length(b)) #allocating (TODO: optimize)
+        for d in 1:Dim
+            if !iszero(normal[d])
+                # Get the partial derivative operator
+                op = ∂(mb, d)
+                
+                # Apply partial derivative
+                fill!(tmp, zero(T))
+                op.f(tmp, x)
+                
+                # Add scaled contribution to result
+                for i in eachindex(b)
+                    b[i] += normal[d] * tmp[i]
+                end
+            end
+        end
+        
+        return nothing
+    end
+    
+    return ℒMonomialBasis(Dim, Deg, basis!)
+end

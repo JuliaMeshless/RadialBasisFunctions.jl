@@ -1,5 +1,5 @@
 struct StencilData{T}
-    A::Symmetric{T, Matrix{T}}            # Local system matrix
+    A::Symmetric{T,Matrix{T}}            # Local system matrix
     b::Matrix{T}                          # Local RHS matrix (one column per operator)
     d::Vector{Vector{T}}                  # Local data points (now using the same type T)
     is_boundary::Vector{Bool}             # Whether nodes are on boundary
@@ -7,7 +7,7 @@ struct StencilData{T}
     normal::Vector{Vector{T}}             # Normal vectors (meaningful for Neumann points)
     lhs_v::Matrix{T}                      # Local coefficients for internal nodes
     rhs_v::Matrix{T}                      # Local coefficients for boundary nodes
-    
+
     # Constructor to initialize all fields
     function StencilData{T}(n::Int, k::Int, num_ops::Int, dim::Int) where {T}
 
@@ -19,8 +19,8 @@ struct StencilData{T}
         normal = [zeros(T, dim) for _ in 1:k]
         lhs_v = zeros(T, k, num_ops)
         rhs_v = zeros(T, k, num_ops)
-        
-        new(A, b, d, is_boundary, is_Neumann, normal, lhs_v, rhs_v)
+
+        return new(A, b, d, is_boundary, is_Neumann, normal, lhs_v, rhs_v)
     end
 end
 
@@ -28,7 +28,6 @@ end
 function StencilData(T::Type, data_dim::Int, n::Int, k::Int, num_ops::Int)
     return StencilData{T}(n, k, num_ops, data_dim)
 end
-
 
 """
     _update_stencil!(
@@ -61,9 +60,8 @@ function _update_stencil!(
     eval_point,
     basis::B,
     mon::MonomialBasis{Dim,Deg},
-    k::Int
-) where {T, B<:AbstractRadialBasis, Dim, Deg}
-    # Reset values
+    k::Int,
+) where {T,B<:AbstractRadialBasis,Dim,Deg}
     fill!(stencil.lhs_v, 0)
     fill!(stencil.rhs_v, 0)
     fill!(parent(stencil.A), 0)
@@ -103,30 +101,32 @@ function _update_stencil!(
     return nothing
 end
 
-
 function _build_collocation_matrix_Hermite!(
-    A::Symmetric, data::AbstractVector, stencil::StencilData, basis::B, mon::MonomialBasis{Dim,Deg}, k::K
+    A::Symmetric, 
+    data::AbstractVector, 
+    stencil::StencilData, 
+    basis::B, 
+    mon::MonomialBasis{Dim,Deg}, 
+    k::K
 ) where {B<:AbstractRadialBasis,K<:Int,Dim,Deg}
     # radial basis section
     AA = parent(A)
     n = size(A, 2)
     @inbounds for j in 1:k, i in 1:j
-        _calculate_matrix_entry!(AA, i, j, data, stencil, basis)
+        _calculate_matrix_entry_RBF!(AA, i, j, data, stencil, basis)
     end
 
     # monomial augmentation
-    #this should handle Neumann BCs
     if Deg > -1
         @inbounds for i in 1:k
-            a = view(AA, i, (k + 1):n)
-            mon(a, data[i])
+            _calculate_matrix_entry_poly!(AA,i,k + 1,n,data[i],stencil.is_Neumann[i],stencil.normal[i],mon)
         end
     end
 
     return nothing
 end
 
-function _calculate_matrix_entry!(A, i, j, data, stencil::StencilData, basis)
+function _calculate_matrix_entry_RBF!(A, i, j, data, stencil::StencilData, basis)
     is_Neumann_i = stencil.is_Neumann[i]
     is_Neumann_j = stencil.is_Neumann[j]
     if !is_Neumann_i && !is_Neumann_j
@@ -145,6 +145,22 @@ function _calculate_matrix_entry!(A, i, j, data, stencil::StencilData, basis)
     return nothing
 end
 
+function _calculate_matrix_entry_poly!(A, row, col_start, col_end, data_point, is_Neumann, normal, mon)
+    # Get view of the polynomial part for this row
+    a = view(A, row, col_start:col_end)
+    
+    if is_Neumann
+        # For Neumann boundary points, use normal derivative
+        # This uses the ∂_normal function we created earlier
+        ∂_normal(mon, normal)(a, data_point)
+    else
+        # For regular points, use standard polynomial evaluation
+        mon(a, data_point)
+    end
+    
+    return nothing
+end
+
 function _build_rhs!(
     b::Matrix{T}, 
     ℒrbf::Tuple, 
@@ -153,7 +169,7 @@ function _build_rhs!(
     stencil::StencilData, 
     eval_point, 
     basis::B, 
-    k::Int
+    k::Int,
 ) where {T, B<:AbstractRadialBasis}
     @assert size(b, 2) == length(ℒrbf) == length(ℒmon) "b, ℒrbf, and ℒmon must have the same length"
     
@@ -189,8 +205,8 @@ function _build_rhs!(
     stencil::StencilData, 
     eval_point, 
     basis::B, 
-    k::Int
+    k::Int,
 ) where {T, B<:AbstractRadialBasis}
     # Wrap single operators in a tuple and call the tuple version
-    _build_rhs!(b, (ℒrbf,), (ℒmon,), data, stencil, eval_point, basis, k)
+    return _build_rhs!(b, (ℒrbf,), (ℒmon,), data, stencil, eval_point, basis, k)
 end

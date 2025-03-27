@@ -82,15 +82,44 @@ function _preallocate_IJV_matrices(adjl, data, boundary_flag, ℒrbf)
     J_rhs = zeros(Int, rhs_count)
     V_rhs = zeros(TD, rhs_count, num_ops)
     
-    # Fill arrays directly
-    for (idx, (i, j)) in enumerate(lhs_pairs)
-        I_lhs[idx] = i
-        J_lhs[idx] = j
+    # Create mapping from global indices to internal/boundary-specific indices
+    internal_idx = zeros(Int, length(boundary_flag))
+    boundary_idx = zeros(Int, length(boundary_flag))
+    int_count = 1
+    bnd_count = 1
+    
+    for i in eachindex(boundary_flag)
+        if !boundary_flag[i]
+            internal_idx[i] = int_count
+            int_count += 1
+        else
+            boundary_idx[i] = bnd_count
+            bnd_count += 1
+        end
     end
     
-    for (idx, (i, j)) in enumerate(rhs_pairs)
-        I_rhs[idx] = i
-        J_rhs[idx] = j
+    # Fill indices
+    lhs_idx = 1
+    rhs_idx = 1
+    
+    for i in eachindex(adjl)
+        if !boundary_flag[i]  # If node i is internal
+            i_internal = internal_idx[i]  # Remap to internal index
+            
+            for j in adjl[i]  # For each neighbor
+                if !boundary_flag[j]  # Internal neighbor
+                    j_internal = internal_idx[j]  # Remap to internal index
+                    I_lhs[lhs_idx] = i_internal
+                    J_lhs[lhs_idx] = j_internal
+                    lhs_idx += 1
+                else  # Boundary neighbor
+                    j_boundary = boundary_idx[j]  # Remap to boundary index
+                    I_rhs[rhs_idx] = i_internal
+                    J_rhs[rhs_idx] = j_boundary
+                    rhs_idx += 1
+                end
+            end
+        end
     end
     
     return (I_lhs, J_lhs, V_lhs), (I_rhs, J_rhs, V_rhs)
