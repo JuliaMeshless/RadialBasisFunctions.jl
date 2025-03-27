@@ -63,3 +63,7 @@ end
 @safetestset "Stencil" begin
     include("solve.jl")
 end
+
+@safetestset "Solve with Hermite" begin
+    include("solve_with_Hermite.jl")
+end
