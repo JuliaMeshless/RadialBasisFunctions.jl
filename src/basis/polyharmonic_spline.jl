@@ -259,7 +259,7 @@ function ∂²(::PHS5, dim::Int, normal) #must check
         Δ_d = x[dim] - xᵢ[dim]
         dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
         r = euclidean(x, xᵢ)
-        return -5*(6*n_d*Δ_d*r + 3*dot_normal*(r + Δ_d^2/(r + AVOID_INF)))
+        return -5 * (6 * n_d * Δ_d * r + 3 * dot_normal * (r + Δ_d^2 / (r + AVOID_INF)))
     end
     return ∂²ℒ
 end
@@ -371,7 +371,7 @@ end
 # I'm adding this because of the test.. any better idea?
 function ∂_Hermite(phs::AbstractPHS, dim::Int)
     regular_op = ∂(phs, dim)  # Regular derivative operator
-    
+
     function Hermite_deriv(x, xᵢ, normal=nothing)
         if normal === nothing || all(normal .== 0)
             # Regular derivative case
@@ -382,7 +382,7 @@ function ∂_Hermite(phs::AbstractPHS, dim::Int)
             return neumann_op(x, xᵢ, normal)  # Must include normal here!
         end
     end
-    
+
     return Hermite_deriv
 end
 

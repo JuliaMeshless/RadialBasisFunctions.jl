@@ -51,7 +51,7 @@ end
         ∂rbf_n = RBF.∂(phs, 1, normal)
         ∇rbf = RBF.∇(phs, normal)
 
-        @test ∂rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2->∂rbf(x₁,x_2), x₂) ⋅ normal)
+        @test ∂rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
         # @test ∇rbf(x₁, x₂, normal)[1] ≈ LinearAlgebra.dot(Zyg.gradient(x_2->∇rbf(x₁,x_2), x₂)[1],normal)
     end
 end
