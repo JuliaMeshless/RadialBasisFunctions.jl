@@ -39,7 +39,7 @@ import RadialBasisFunctions as RBF
     basis = RBF.PHS(3; poly_deg=1)
     mon = RBF.MonomialBasis(2, 1)
 
-    Lrb = RBF.∂_Hermite(basis, 1)
+    Lrb = RBF.∂(basis, 1)
     Lmb = RBF.∂_Hermite(mon, 1)
 
     @testset "_preallocate_IJV_matrices" begin
@@ -300,7 +300,7 @@ import RadialBasisFunctions as RBF
         @test nnz(rhs_matrix) > 0
 
         # Test with y-derivative operator (instead of x-derivative)
-        Lrbf_y = RBF.∂_Hermite(basis, 2)  # Use y-derivative (dimension 2)
+        Lrbf_y = RBF.∂(basis, 2)  # Use y-derivative (dimension 2)
         Lmbf_y = RBF.∂_Hermite(mon, 2)    # Use y-derivative (dimension 2)
 
         matrices_y = RBF._build_weights(
