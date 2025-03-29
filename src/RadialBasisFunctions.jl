@@ -25,7 +25,12 @@ include("operators/operators.jl")
 export RadialBasisOperator, ScalarValuedOperator, VectorValuedOperator
 export update_weights!, is_cache_valid
 
+include("solve_utils.jl")
 include("solve.jl")
+
+#new stuff fot Hermite
+include("StencilData.jl")
+include("solve_with_Hermite.jl")
 
 include("operators/custom.jl")
 export Custom, custom
