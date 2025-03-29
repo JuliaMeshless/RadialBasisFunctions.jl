@@ -4,7 +4,7 @@ using SparseArrays
 using Test
 
 # Include the module file
-include("../src/RadialBasisFunctions.jl")
+# include("../src/RadialBasisFunctions.jl")
 import RadialBasisFunctions as RBF
 
 @testset "solve_with_Hermite" begin
