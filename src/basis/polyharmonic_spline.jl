@@ -81,13 +81,13 @@ function ∂²(::PHS1, dim::Int, normal::Union{AbstractVector,Nothing}=nothing)
             n_d = normal_arg[dim]
             Δ_d = x[dim] - xᵢ[dim]
             dot_normal = LinearAlgebra.dot(normal_arg, x .- xᵢ)
-            return (2 * n_d * Δ_d + dot_normal * (1 - 3 * Δ_d / (r² + AVOID_INF))) /
-                   (r^3 + AVOID_INF)
+            return (2 * n_d * Δ_d + dot_normal) / (r^3 + AVOID_INF) -
+                   3 * Δ_d^2 * dot_normal / (r^5 + AVOID_INF)
         end
     end
     return ∂²ℒ
 end
-function ∇²(::PHSI, notmal::Union{AbstractVector,Nothing}=nothing)
+function ∇²(::PHS1, normal::Union{AbstractVector,Nothing}=nothing)
     function ∇²ℒ(x, xᵢ, normal_arg=normal)
         r = euclidean(x, xᵢ)
         if normal_arg === nothing
@@ -161,7 +161,8 @@ function ∂²(::PHS3, dim::Int, normal::Union{AbstractVector,Nothing}=nothing)
             n_d = normal_arg[dim]
             Δ_d = x[dim] - xᵢ[dim]
             dot_normal = LinearAlgebra.dot(normal_arg, x .- xᵢ)
-            return -3 * (2 * n_d + dot_normal - dot_normal * Δ_d^2 / (r² + AVOID_INF)) /
+            return -3 *
+                   (2 * Δ_d * n_d + dot_normal - dot_normal * Δ_d^2 / (r² + AVOID_INF)) /
                    (r + AVOID_INF)
         end
     end
@@ -174,7 +175,7 @@ function ∇²(::PHS3, normal::Union{AbstractVector,Nothing}=nothing)
             return 12 * r
         else
             dot_normal = LinearAlgebra.dot(normal_arg, x .- xᵢ)
-            return -6 * dot_normal / (r + AVOID_INF)
+            return -12 * dot_normal / (r + AVOID_INF)
         end
     end
     return ∇²ℒ
@@ -320,15 +321,14 @@ function ∂²(::PHS7, dim::Int, normal::Union{AbstractVector,Nothing}=nothing)
             Δ_d = x[dim] - xᵢ[dim]
             dot_normal = LinearAlgebra.dot(normal_arg, x .- xᵢ)
             r = euclidean(x, xᵢ)
-            return -7 *
-                   (10 * n_d * dot_normal * r^3 + 5 * dot_normal * (3 * r * Δ_d^2 + r^3))
+            return -7 * (10 * n_d * Δ_d * r^3 + 5 * dot_normal * (3 * r * Δ_d^2 + r^3))
         end
     end
     return ∂²ℒ
 end
 function ∇²(::PHS7, normal::Union{Nothing,AbstractVector}=nothing)
-    r = euclidean(x, xᵢ)
     function ∇²ℒ(x, xᵢ, normal_arg=normal)
+        r = euclidean(x, xᵢ)
         if normal_arg === nothing
             return 56 * r^5
         else

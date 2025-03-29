@@ -46,13 +46,28 @@ end
     end
 
     @testset "Hermite" begin
-        normal = SVector(1.0, 1)
-        ∂rbf = RBF.∂(phs, 1)
-        ∂rbf_n = RBF.∂(phs, 1, normal)
-        ∇rbf = RBF.∇(phs, normal)
+        normal = SVector(1.0, 1) ./ sqrt(2)  # Normalize for better numerical stability
+        dim = 1
 
+        # First derivative
+        ∂rbf = RBF.∂(phs, dim)
+        ∂rbf_n = RBF.∂(phs, dim, normal)
         @test ∂rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
-        # @test ∇rbf(x₁, x₂, normal)[1] ≈ LinearAlgebra.dot(Zyg.gradient(x_2->∇rbf(x₁,x_2), x₂)[1],normal)
+
+        # Gradient
+        ∇rbf = RBF.∇(phs)
+        ∇rbf_n = RBF.∇(phs, normal)
+        @test all(
+            ∇rbf_n(x₁, x₂, normal) .≈ [
+                (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[1], x₂) ⋅ normal),
+                (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[2], x₂) ⋅ normal),
+            ],
+        )
+
+        # Second derivative
+        ∂²rbf = RBF.∂²(phs, dim)
+        ∂²rbf_n = RBF.∂²(phs, dim, normal)
+        @test ∂²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
     end
 end
 
@@ -80,6 +95,36 @@ end
         @test all(∇rbf(x₁, x₂) .≈ (-3 * sqrt(5), -6 * sqrt(5)))
         @test ∂²rbf(x₁, x₂) ≈ 18 / sqrt(5)
     end
+
+    @testset "Hermite" begin
+        normal = SVector(1.0, 1) ./ sqrt(2)
+        dim = 1
+
+        # First derivative
+        ∂rbf = RBF.∂(phs, dim)
+        ∂rbf_n = RBF.∂(phs, dim, normal)
+        @test ∂rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
+
+        # Gradient
+        ∇rbf = RBF.∇(phs)
+        ∇rbf_n = RBF.∇(phs, normal)
+        @test all(
+            ∇rbf_n(x₁, x₂, normal) .≈ [
+                (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[1], x₂) ⋅ normal),
+                (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[2], x₂) ⋅ normal),
+            ],
+        )
+
+        # Second derivative
+        ∂²rbf = RBF.∂²(phs, dim)
+        ∂²rbf_n = RBF.∂²(phs, dim, normal)
+        @test ∂²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
+
+        # Laplacian
+        ∇²rbf = RBF.∇²(phs)
+        ∇²rbf_n = RBF.∇²(phs, normal)
+        @test ∇²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
+    end
 end
 
 @testset "PHS, n=5" begin
@@ -106,6 +151,36 @@ end
         @test all(∇rbf(x₁, x₂) .≈ (-25 * sqrt(5), -50 * sqrt(5)))
         @test ∂²rbf(x₁, x₂) ≈ 40 * sqrt(5)
     end
+
+    @testset "Hermite" begin
+        normal = SVector(1.0, 1) ./ sqrt(2)
+        dim = 1
+
+        # First derivative
+        ∂rbf = RBF.∂(phs, dim)
+        ∂rbf_n = RBF.∂(phs, dim, normal)
+        @test ∂rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
+
+        # Gradient
+        ∇rbf = RBF.∇(phs)
+        ∇rbf_n = RBF.∇(phs, normal)
+        @test all(
+            ∇rbf_n(x₁, x₂, normal) .≈ [
+                (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[1], x₂) ⋅ normal),
+                (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[2], x₂) ⋅ normal),
+            ],
+        )
+
+        # Second derivative
+        ∂²rbf = RBF.∂²(phs, dim)
+        ∂²rbf_n = RBF.∂²(phs, dim, normal)
+        @test ∂²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
+
+        # Laplacian
+        ∇²rbf = RBF.∇²(phs)
+        ∇²rbf_n = RBF.∇²(phs, normal)
+        @test ∇²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
+    end
 end
 
 @testset "PHS, n=7" begin
@@ -130,5 +205,35 @@ end
         @test ∂rbf(x₁, x₂) ≈ -175 * sqrt(5)
         @test all(∇rbf(x₁, x₂) .≈ (-175 * sqrt(5), -350 * sqrt(5)))
         @test ∂²rbf(x₁, x₂) ≈ 350 * sqrt(5)
+    end
+
+    @testset "Hermite" begin
+        normal = SVector(1.0, 1) ./ sqrt(2)
+        dim = 1
+
+        # First derivative
+        ∂rbf = RBF.∂(phs, dim)
+        ∂rbf_n = RBF.∂(phs, dim, normal)
+        @test ∂rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
+
+        # Gradient
+        ∇rbf = RBF.∇(phs)
+        ∇rbf_n = RBF.∇(phs, normal)
+        @test all(
+            ∇rbf_n(x₁, x₂, normal) .≈ [
+                (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[1], x₂) ⋅ normal),
+                (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[2], x₂) ⋅ normal),
+            ],
+        )
+
+        # Second derivative
+        ∂²rbf = RBF.∂²(phs, dim)
+        ∂²rbf_n = RBF.∂²(phs, dim, normal)
+        @test ∂²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
+
+        # Laplacian
+        ∇²rbf = RBF.∇²(phs)
+        ∇²rbf_n = RBF.∇²(phs, normal)
+        @test ∇²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
     end
 end
