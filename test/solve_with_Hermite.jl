@@ -14,16 +14,16 @@ import RadialBasisFunctions as RBF
         SVector(2.0, 1.0),   # internal (node 2) 
         SVector(1.5, 0.0),   # boundary with Neumann BC (node 3)
         SVector(0.0, 1.0),   # boundary with Dirichlet BC (node 4)
-        SVector(2.0, 0.0)    # boundary with Neumann BC (node 5)
+        SVector(2.0, 0.0),    # boundary with Neumann BC (node 5)
     ]
     boundary_flag = [false, false, true, true, true]  # First two internal, last three boundary
     is_Neumann = [false, false, true, false, true]    # Nodes 3 and 5 have Neumann BC
     normals = [
         SVector(0.0, 0.0),   # Internal nodes have no normals
-        SVector(0.0, 0.0), 
+        SVector(0.0, 0.0),
         SVector(0.0, 1.0),   # Normal pointing in y direction
         SVector(0.0, 0.0),   # Not used for Dirichlet
-        SVector(1.0, 0.0)    # Normal pointing in x direction
+        SVector(1.0, 0.0),    # Normal pointing in x direction
     ]
 
     # Define adjacency lists (each node connects to itself and 3 others)
@@ -32,7 +32,7 @@ import RadialBasisFunctions as RBF
         [2, 1, 3, 5],        # Node 2 connects to itself, 1, 3, 5
         [3, 1, 2, 5],        # Node 3 connects to itself, 1, 2, 5
         [4, 1, 3, 5],        # Node 4 connects to itself, 1, 3, 5
-        [5, 2, 3, 4]         # Node 5 connects to itself, 2, 3, 4
+        [5, 2, 3, 4],         # Node 5 connects to itself, 2, 3, 4
     ]
 
     # Create basis functions
@@ -50,7 +50,7 @@ import RadialBasisFunctions as RBF
 
         # Check dimensions
         # 2 internal nodes with self-connections + connections to each other
-        @test length(I_lhs) == 4  
+        @test length(I_lhs) == 4
         @test length(J_lhs) == 4
         @test size(V_lhs) == (4, 1)  # Single operator
 
@@ -59,7 +59,7 @@ import RadialBasisFunctions as RBF
         # 2 internal nodes with 3 boundary neighbors each (not all boundary nodes connect to all internal nodes)
         # Node 1 connects to boundary nodes 3, 4
         # Node 2 connects to boundary nodes 3, 5
-        @test length(I_rhs) == 4  
+        @test length(I_rhs) == 4
         @test length(J_rhs) == 4
         @test size(V_rhs) == (4, 1)
 
@@ -81,14 +81,16 @@ import RadialBasisFunctions as RBF
 
     @testset "_calculate_thread_offsets" begin
         nchunks = 2
-        lhs_offsets, rhs_offsets = RBF._calculate_thread_offsets(adjl, boundary_flag, nchunks)
+        lhs_offsets, rhs_offsets = RBF._calculate_thread_offsets(
+            adjl, boundary_flag, nchunks
+        )
 
         # Check that offsets are calculated correctly
         @test length(lhs_offsets) == nchunks
         @test length(rhs_offsets) == nchunks
         @test lhs_offsets[1] == 0  # First thread starts at index 0
         @test rhs_offsets[1] == 0  # First thread starts at index 0
-        
+
         # Second thread starts after first thread's internal connections
         @test lhs_offsets[2] == 4
         # Second thread starts after first thread's boundary connections
@@ -141,7 +143,7 @@ import RadialBasisFunctions as RBF
         # Check that weights were computed
         @test any(stencil.lhs_v .!= 0)  # Some LHS weights should be non-zero
         @test any(stencil.rhs_v .!= 0)  # Some RHS weights should be non-zero
-        
+
         # Test with second node to verify different adjacency pattern
         i = 2
         stencil2 = RBF.StencilData(TD, dim, k + nmon, k, num_ops)
@@ -159,7 +161,7 @@ import RadialBasisFunctions as RBF
             mon,
             k,
         )
-        
+
         # Check connections for node 2
         @test stencil2.d[1] == data[2]  # Self connection
         @test stencil2.d[2] == data[1]  # Connection to node 1
@@ -200,25 +202,25 @@ import RadialBasisFunctions as RBF
         # Check values were written
         @test any(V_lhs .!= 0)  # At least some values should be non-zero
         @test any(V_rhs .!= 0)  # At least some values should be non-zero
-        
+
         # Check indices were updated correctly 
         @test new_lhs_idx == lhs_idx + internal_count
         @test new_rhs_idx == rhs_idx + boundary_count
-        
+
         # Test with Neumann boundary condition
         stencil.is_Neumann[3] = true
         V_lhs = zeros(4, num_ops)
         V_rhs = zeros(4, num_ops)
-        
+
         lhs_idx = 1
         rhs_idx = 1
-        
+
         RBF._write_coefficients_to_global_matrices!(
             V_lhs, V_rhs, stencil, adjl[1], boundary_flag, lhs_idx, rhs_idx
         )
-        
+
         # Verify Neumann BC handling
-        @test any(V_lhs .!= 0) 
+        @test any(V_lhs .!= 0)
         @test any(V_rhs .!= 0)
     end
 
@@ -244,15 +246,15 @@ import RadialBasisFunctions as RBF
         @test size(rhs_matrix) == (2, 3)  # 2 internal nodes x 3 boundary nodes
 
         # Check values
-        @test lhs_matrix[1,1] == 1.0
-        @test lhs_matrix[1,2] == 2.0
-        @test lhs_matrix[2,1] == 3.0
-        @test lhs_matrix[2,2] == 4.0
-        
-        @test rhs_matrix[1,1] == 5.0
-        @test rhs_matrix[1,2] == 6.0
-        @test rhs_matrix[2,1] == 7.0
-        @test rhs_matrix[2,3] == 8.0
+        @test lhs_matrix[1, 1] == 1.0
+        @test lhs_matrix[1, 2] == 2.0
+        @test lhs_matrix[2, 1] == 3.0
+        @test lhs_matrix[2, 2] == 4.0
+
+        @test rhs_matrix[1, 1] == 5.0
+        @test rhs_matrix[1, 2] == 6.0
+        @test rhs_matrix[2, 1] == 7.0
+        @test rhs_matrix[2, 3] == 8.0
 
         # Test multiple operators case
         V_lhs_multi = [1.0 10.0; 2.0 20.0; 3.0 30.0; 4.0 40.0]
@@ -266,17 +268,17 @@ import RadialBasisFunctions as RBF
         @test length(rhs_matrices) == 2
         @test size(lhs_matrices[1]) == (2, 2)
         @test size(rhs_matrices[1]) == (2, 3)
-        
+
         # Check second operator values
-        @test lhs_matrices[2][1,1] == 10.0
-        @test lhs_matrices[2][1,2] == 20.0
-        @test lhs_matrices[2][2,1] == 30.0
-        @test lhs_matrices[2][2,2] == 40.0
-        
-        @test rhs_matrices[2][1,1] == 50.0
-        @test rhs_matrices[2][1,2] == 60.0
-        @test rhs_matrices[2][2,1] == 70.0
-        @test rhs_matrices[2][2,3] == 80.0
+        @test lhs_matrices[2][1, 1] == 10.0
+        @test lhs_matrices[2][1, 2] == 20.0
+        @test lhs_matrices[2][2, 1] == 30.0
+        @test lhs_matrices[2][2, 2] == 40.0
+
+        @test rhs_matrices[2][1, 1] == 50.0
+        @test rhs_matrices[2][1, 2] == 60.0
+        @test rhs_matrices[2][2, 1] == 70.0
+        @test rhs_matrices[2][2, 3] == 80.0
     end
 
     @testset "Full integration test" begin
@@ -296,23 +298,23 @@ import RadialBasisFunctions as RBF
         @test isa(rhs_matrix, SparseMatrixCSC)
         @test nnz(lhs_matrix) > 0  # Should have non-zero entries
         @test nnz(rhs_matrix) > 0
-        
+
         # Test with y-derivative operator (instead of x-derivative)
         Lrbf_y = RBF.∂_Hermite(basis, 2)  # Use y-derivative (dimension 2)
         Lmbf_y = RBF.∂_Hermite(mon, 2)    # Use y-derivative (dimension 2)
-        
+
         matrices_y = RBF._build_weights(
             data, normals, boundary_flag, is_Neumann, adjl, basis, Lrbf_y, Lmbf_y, mon
         )
-        
+
         lhs_matrix_y, rhs_matrix_y = matrices_y
         @test size(lhs_matrix_y) == (2, 2)
         @test size(rhs_matrix_y) == (2, 3)
         @test nnz(lhs_matrix_y) > 0
         @test nnz(rhs_matrix_y) > 0
-        
+
         # Make sure y derivative matrices are different from original
-        @test any(lhs_matrix_y.nzval .≠ lhs_matrix.nzval) || 
-              any(rhs_matrix_y.nzval .≠ rhs_matrix.nzval)
+        @test any(lhs_matrix_y.nzval .≠ lhs_matrix.nzval) ||
+            any(rhs_matrix_y.nzval .≠ rhs_matrix.nzval)
     end
 end
