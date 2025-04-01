@@ -69,7 +69,7 @@ function directional∂²(::PHS1, v1::AbstractVector, v2::AbstractVector)
         dot_v1_v2 = LinearAlgebra.dot(v1, v2)
         dot_v1_r = LinearAlgebra.dot(v1, x .- xᵢ)
         dot_v2_r = LinearAlgebra.dot(v2, x .- xᵢ)
-        return -dot_v1_v2/r + (dot_v1_r * dot_v2_r)/r^3
+        return -dot_v1_v2 / r + (dot_v1_r * dot_v2_r) / r^3
     end
     return directional₂ℒ
 end
