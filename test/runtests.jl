@@ -60,6 +60,10 @@ end
     include("operators/operator_algebra.jl")
 end
 
+@safetestset "Monomial Operators" begin
+    include("operators/monomial.jl")
+end
+
 @safetestset "Stencil" begin
     include("solve.jl")
 end

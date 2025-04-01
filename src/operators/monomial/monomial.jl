@@ -46,25 +46,6 @@ function ∇²(m::MonomialBasis{Dim,Deg}) where {Dim,Deg}
     return ℒMonomialBasis(Dim, Deg, basis!)
 end
 
-# Hermite derivative - works for both regular and Neumann boundaries
-function ∂_Hermite(mb::MonomialBasis{Dim,Deg}, dim::Int) where {Dim,Deg}
-    function hermite_derivative(x, normal=nothing)
-        result = ones(eltype(x), binomial(Dim + Deg, Dim))
-
-        if normal === nothing || all(iszero, normal)
-            # Regular case - just use the partial derivative
-            ∂(mb, dim).f(result, x)
-        else
-            # Neumann boundary case - use normal derivative
-            ∂_normal(mb, normal).f(result, x)
-        end
-
-        return result
-    end
-
-    return hermite_derivative
-end
-
 struct Monomial{E,C}
     exponents::E
     coeffs::C
