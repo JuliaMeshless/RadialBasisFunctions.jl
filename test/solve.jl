@@ -44,3 +44,17 @@ end
         @test all(b[4:6] .≈ bb)
     end
 end
+
+@testset "Calculate Matrix Entry" begin
+    A_test = zeros(3, 3)
+
+    RBF._calculate_matrix_entry!(A_test, 2, 3, x, rb)
+
+    @test A_test[2, 3] ≈ rb(x[2], x[3])
+    @test A_test[2, 3] ≈ (sqrt(sum((x[2] .- x[3]) .^ 2)))^3
+
+    @test all(A_test[1, :] .== 0)
+    @test A_test[2, 1] == 0
+    @test A_test[2, 2] == 0
+    @test all(A_test[3, :] .== 0)
+end
