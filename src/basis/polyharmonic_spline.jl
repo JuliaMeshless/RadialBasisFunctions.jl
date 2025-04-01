@@ -65,9 +65,11 @@ function ∇(::PHS1, normal::Union{AbstractVector,Nothing}=nothing)
 end
 function directional∂²(::PHS1, v1::AbstractVector, v2::AbstractVector)
     function directional₂ℒ(x, xᵢ)
-        return -LinearAlgebra.dot(v1, v2) / (euclidean(x, xᵢ) + AVOID_INF) +
-               LinearAlgebra.dot(v1, x .- xᵢ) * LinearAlgebra.dot(v2, x .- xᵢ) /
-               (sqeuclidean(x, xᵢ) + AVOID_INF)
+        r = euclidean(x, xᵢ)
+        dot_v1_v2 = LinearAlgebra.dot(v1, v2)
+        dot_v1_r = LinearAlgebra.dot(v1, x .- xᵢ)
+        dot_v2_r = LinearAlgebra.dot(v2, x .- xᵢ)
+        return -dot_v1_v2/r + (dot_v1_r * dot_v2_r)/r^3
     end
     return directional₂ℒ
 end
