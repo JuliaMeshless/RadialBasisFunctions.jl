@@ -68,6 +68,11 @@ end
         ∂²rbf = RBF.∂²(phs, dim)
         ∂²rbf_n = RBF.∂²(phs, dim, normal)
         @test ∂²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
+
+        # Laplacian
+        ∇²rbf = RBF.∇²(phs)
+        ∇²rbf_n = RBF.∇²(phs, normal)
+        @test ∇²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
     end
 
     @testset "Directional Second Derivatives" begin

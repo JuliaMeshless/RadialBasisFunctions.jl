@@ -93,8 +93,7 @@ function ∇²(::PHS1, normal::Union{AbstractVector,Nothing}=nothing)
     function ∇²ℒ(x, xᵢ, normal_arg=normal)
         r = euclidean(x, xᵢ)
         if normal_arg === nothing
-            r² = sqeuclidean(x, xᵢ)
-            return sum((-(x .- xᵢ) .^ 2 .+ r²) / (r^3 + AVOID_INF))
+            return 2 / (r + AVOID_INF)
         else
             dot_normal = LinearAlgebra.dot(normal_arg, x .- xᵢ)
             return 2 * dot_normal / (r^3 + AVOID_INF)
