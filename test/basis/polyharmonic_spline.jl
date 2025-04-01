@@ -75,24 +75,24 @@ end
         v1 = SVector(1.0, 0.0)  # x direction
         v2 = SVector(0.0, 1.0)  # y direction
         normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
-        
+
         # Same direction test (both normal)
         dir_deriv = RBF.directional∂²(phs, normal, normal)
-        
+
         # Calculate expected value manually with ForwardDiff
         first_normal_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ normal
         second_normal = FD.gradient(y -> first_normal_deriv(y), x₂) ⋅ normal
-        
-        @test dir_deriv(x₁, x₂) ≈ second_normal rtol=1e-5
-        
+
+        @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
+
         # Test with orthogonal directions
         dir_deriv_xy = RBF.directional∂²(phs, v1, v2)
-        
+
         # Calculate mixed partial derivative with ForwardDiff
         first_x_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ v1
         second_mixed = FD.gradient(y -> first_x_deriv(y), x₂) ⋅ v2
-        
-        @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol=1e-5
+
+        @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
     end
 end
 
@@ -156,24 +156,24 @@ end
         v1 = SVector(1.0, 0.0)  # x direction
         v2 = SVector(0.0, 1.0)  # y direction
         normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
-        
+
         # Same direction test (both normal)
         dir_deriv = RBF.directional∂²(phs, normal, normal)
-        
+
         # Calculate expected value manually with ForwardDiff
         first_normal_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ normal
         second_normal = FD.gradient(y -> first_normal_deriv(y), x₂) ⋅ normal
-        
-        @test dir_deriv(x₁, x₂) ≈ second_normal rtol=1e-5
-        
+
+        @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
+
         # Test with orthogonal directions
         dir_deriv_xy = RBF.directional∂²(phs, v1, v2)
-        
+
         # Calculate mixed partial derivative with ForwardDiff
         first_x_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ v1
         second_mixed = FD.gradient(y -> first_x_deriv(y), x₂) ⋅ v2
-        
-        @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol=1e-5
+
+        @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
     end
 end
 
@@ -237,24 +237,24 @@ end
         v1 = SVector(1.0, 0.0)  # x direction
         v2 = SVector(0.0, 1.0)  # y direction
         normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
-        
+
         # Same direction test (both normal)
         dir_deriv = RBF.directional∂²(phs, normal, normal)
-        
+
         # Calculate expected value manually with ForwardDiff
         first_normal_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ normal
         second_normal = FD.gradient(y -> first_normal_deriv(y), x₂) ⋅ normal
-        
-        @test dir_deriv(x₁, x₂) ≈ second_normal rtol=1e-5
-        
+
+        @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
+
         # Test with orthogonal directions
         dir_deriv_xy = RBF.directional∂²(phs, v1, v2)
-        
+
         # Calculate mixed partial derivative with ForwardDiff
         first_x_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ v1
         second_mixed = FD.gradient(y -> first_x_deriv(y), x₂) ⋅ v2
-        
-        @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol=1e-5
+
+        @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
     end
 end
 
@@ -317,23 +317,23 @@ end
         v1 = SVector(1.0, 0.0)  # x direction
         v2 = SVector(0.0, 1.0)  # y direction
         normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
-        
+
         # Same direction test (both normal)
         dir_deriv = RBF.directional∂²(phs, normal, normal)
-        
+
         # Calculate expected value manually with ForwardDiff
         first_normal_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ normal
         second_normal = FD.gradient(y -> first_normal_deriv(y), x₂) ⋅ normal
-        
-        @test dir_deriv(x₁, x₂) ≈ second_normal rtol=1e-5
-        
+
+        @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
+
         # Test with orthogonal directions
         dir_deriv_xy = RBF.directional∂²(phs, v1, v2)
-        
+
         # Calculate mixed partial derivative with ForwardDiff
         first_x_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ v1
         second_mixed = FD.gradient(y -> first_x_deriv(y), x₂) ⋅ v2
-        
-        @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol=1e-5
+
+        @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
     end
 end
