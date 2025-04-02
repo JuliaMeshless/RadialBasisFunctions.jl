@@ -54,16 +54,12 @@ import RadialBasisFunctions as RBF
         @test length(J_lhs) == 4
         @test size(V_lhs) == (4, 1)  # Single operator
 
-        println(I_lhs, J_lhs, V_lhs)
-
         # 2 internal nodes with 3 boundary neighbors each (not all boundary nodes connect to all internal nodes)
         # Node 1 connects to boundary nodes 3, 4
         # Node 2 connects to boundary nodes 3, 5
         @test length(I_rhs) == 4
         @test length(J_rhs) == 4
         @test size(V_rhs) == (4, 1)
-
-        println(I_rhs, J_rhs, V_rhs)
 
         # Check values - internal to internal connections
         @test (1, 1) in zip(I_lhs, J_lhs)  # Node 1 connects to itself

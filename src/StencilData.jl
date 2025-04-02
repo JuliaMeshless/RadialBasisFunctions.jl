@@ -1,12 +1,12 @@
 struct StencilData{T}
-    A::Symmetric{T,Matrix{T}}            # Local system matrix
-    b::Matrix{T}                          # Local RHS matrix (one column per operator)
-    d::Vector{Vector{T}}                  # Local data points (now using the same type T)
-    is_boundary::Vector{Bool}             # Whether nodes are on boundary
-    is_Neumann::Vector{Bool}              # Whether nodes have Neumann boundary conditions
-    normal::Vector{Vector{T}}             # Normal vectors (meaningful for Neumann points)
-    lhs_v::Matrix{T}                      # Local coefficients for internal nodes
-    rhs_v::Matrix{T}                      # Local coefficients for boundary nodes
+    A::AbstractMatrix{T}            # Local system matrix
+    b::AbstractMatrix{T}                          # Local RHS matrix (one column per operator)
+    d::Vector{AbstractVector{T}}                  # Local data points (now using the same type T)
+    is_boundary::AbstractVector{Bool}             # Whether nodes are on boundary
+    is_Neumann::AbstractVector{Bool}              # Whether nodes have Neumann boundary conditions
+    normal::Vector{AbstractVector{T}}             # Normal vectors (meaningful for Neumann points)
+    lhs_v::AbstractMatrix{T}                      # Local coefficients for internal nodes
+    rhs_v::AbstractMatrix{T}                      # Local coefficients for boundary nodes
 
     # Constructor to initialize all fields
     function StencilData{T}(n::Int, k::Int, num_ops::Int, dim::Int) where {T}
@@ -28,25 +28,6 @@ function StencilData(T::Type, data_dim::Int, n::Int, k::Int, num_ops::Int)
     return StencilData{T}(n, k, num_ops, data_dim)
 end
 
-"""
-    _update_stencil!(
-        stencil::StencilData{T},
-        local_adjl,
-        data,
-        boundary_flag,
-        is_Neumann,
-        normals,
-        ℒrbf,
-        ℒmon,
-        eval_point,
-        basis::B,
-        mon::MonomialBasis{Dim,Deg},
-        k::Int
-    ) where {T, B<:AbstractRadialBasis, Dim, Deg}
-
-Updates stencil data and computes weights in a single operation.
-Modifies the stencil in-place.
-"""
 function _update_stencil!(
     stencil::StencilData{T},
     local_adjl,
@@ -82,8 +63,8 @@ function _update_stencil!(
     end
 
     # Build collocation matrix and RHS
-    _build_collocation_matrix_Hermite!(stencil.A, stencil.d, stencil, basis, mon, k)
-    _build_rhs!(stencil.b, ℒrbf, ℒmon, stencil.d, stencil, eval_point, basis, k)
+    _build_collocation_matrix_Hermite!(stencil, basis, mon, k)
+    _build_rhs!(stencil, ℒrbf, ℒmon, eval_point, basis, k)
 
     # Solve system for each operator (this can easily be improved by using LDL algo)
     weights = (stencil.A \ stencil.b)[1:k, :]
@@ -101,25 +82,20 @@ function _update_stencil!(
 end
 
 function _build_collocation_matrix_Hermite!(
-    A::Symmetric,
-    data::AbstractVector,
-    stencil::StencilData,
-    basis::B,
-    mon::MonomialBasis{Dim,Deg},
-    k::K,
-) where {B<:AbstractRadialBasis,K<:Int,Dim,Deg}
+    stencil::StencilData{T}, basis::B, mon::MonomialBasis{Dim,Deg}, k::K
+) where {T,B<:AbstractRadialBasis,K<:Int,Dim,Deg}
     # radial basis section
-    AA = parent(A)
+    A = parent(stencil.A)
     n = size(A, 2)
     @inbounds for j in 1:k, i in 1:j
-        _calculate_matrix_entry_RBF!(AA, i, j, data, stencil, basis)
+        _calculate_matrix_entry_RBF!(i, j, stencil, basis)
     end
 
     # monomial augmentation
     if Deg > -1
         @inbounds for i in 1:k
             _calculate_matrix_entry_poly!(
-                AA, i, k + 1, n, data[i], stencil.is_Neumann[i], stencil.normal[i], mon
+                A, i, k + 1, n, stencil.d[i], stencil.is_Neumann[i], stencil.normal[i], mon
             )
         end
     end
@@ -127,7 +103,9 @@ function _build_collocation_matrix_Hermite!(
     return nothing
 end
 
-function _calculate_matrix_entry_RBF!(A, i, j, data, stencil::StencilData, basis)
+function _calculate_matrix_entry_RBF!(i, j, stencil::StencilData, basis)
+    A = parent(stencil.A)
+    data = stencil.d
     is_Neumann_i = stencil.is_Neumann[i]
     is_Neumann_j = stencil.is_Neumann[j]
     if !is_Neumann_i && !is_Neumann_j
@@ -165,15 +143,11 @@ function _calculate_matrix_entry_poly!(
 end
 
 function _build_rhs!(
-    b::Matrix{T},
-    ℒrbf::Tuple,
-    ℒmon::Tuple,
-    data::AbstractVector,
-    stencil::StencilData,
-    eval_point,
-    basis::B,
-    k::Int,
+    stencil::StencilData{T}, ℒrbf::Tuple, ℒmon::Tuple, eval_point, basis::B, k::Int
 ) where {T,B<:AbstractRadialBasis}
+    b = stencil.b
+    data = stencil.d
+
     @assert size(b, 2) == length(ℒrbf) == length(ℒmon) "b, ℒrbf, and ℒmon must have the same length"
 
     # radial basis section
@@ -201,15 +175,8 @@ end
 
 # Handle the case when ℒrbf and ℒmon are single operators (not tuples)
 function _build_rhs!(
-    b::Matrix{T},
-    ℒrbf,
-    ℒmon,
-    data::AbstractVector,
-    stencil::StencilData,
-    eval_point,
-    basis::B,
-    k::Int,
+    stencil::StencilData{T}, ℒrbf, ℒmon, eval_point, basis::B, k::Int
 ) where {T,B<:AbstractRadialBasis}
     # Wrap single operators in a tuple and call the tuple version
-    return _build_rhs!(b, (ℒrbf,), (ℒmon,), data, stencil, eval_point, basis, k)
+    return _build_rhs!(stencil, (ℒrbf,), (ℒmon,), eval_point, basis, k)
 end

@@ -13,7 +13,6 @@ function _build_weights(
 
     stencil_data = [StencilData(TD, dim, k + nmon, k, _num_ops(ℒrbf)) for _ in 1:nchunks]
 
-    # Get thread offsets
     lhs_offsets, rhs_offsets = _calculate_thread_offsets(adjl, boundary_flag, nchunks)
 
     # Build stencil for each data point and store in global weight matrices
