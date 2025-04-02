@@ -8,7 +8,6 @@ struct StencilData{T}
     lhs_v::AbstractMatrix{T}                      # Local coefficients for internal nodes
     rhs_v::AbstractMatrix{T}                      # Local coefficients for boundary nodes
 
-    # Constructor to initialize all fields
     function StencilData{T}(n::Int, k::Int, num_ops::Int, dim::Int) where {T}
         A = Symmetric(zeros(T, n, n), :U)
         b = zeros(T, n, num_ops)
@@ -47,7 +46,6 @@ function _update_stencil!(
     fill!(parent(stencil.A), 0)
     fill!(stencil.b, 0)
 
-    # Update stencil data
     for (idx, j) in enumerate(local_adjl)
         stencil.d[idx] = data[j]
     end
@@ -62,7 +60,6 @@ function _update_stencil!(
         end
     end
 
-    # Build collocation matrix and RHS
     _build_collocation_matrix_Hermite!(stencil, basis, mon, k)
     _build_rhs!(stencil, ℒrbf, ℒmon, eval_point, basis, k)
 
@@ -84,14 +81,12 @@ end
 function _build_collocation_matrix_Hermite!(
     stencil::StencilData{T}, basis::B, mon::MonomialBasis{Dim,Deg}, k::K
 ) where {T,B<:AbstractRadialBasis,K<:Int,Dim,Deg}
-    # radial basis section
     A = parent(stencil.A)
     n = size(A, 2)
     @inbounds for j in 1:k, i in 1:j
         _calculate_matrix_entry_RBF!(i, j, stencil, basis)
     end
 
-    # monomial augmentation
     if Deg > -1
         @inbounds for i in 1:k
             _calculate_matrix_entry_poly!(
@@ -127,15 +122,10 @@ end
 function _calculate_matrix_entry_poly!(
     A, row, col_start, col_end, data_point, is_Neumann, normal, mon
 )
-    # Get view of the polynomial part for this row
     a = view(A, row, col_start:col_end)
-
     if is_Neumann
-        # For Neumann boundary points, use normal derivative
-        # This uses the ∂_normal function we created earlier
         ∂_normal(mon, normal)(a, data_point)
     else
-        # For regular points, use standard polynomial evaluation
         mon(a, data_point)
     end
 
@@ -177,6 +167,5 @@ end
 function _build_rhs!(
     stencil::StencilData{T}, ℒrbf, ℒmon, eval_point, basis::B, k::Int
 ) where {T,B<:AbstractRadialBasis}
-    # Wrap single operators in a tuple and call the tuple version
     return _build_rhs!(stencil, (ℒrbf,), (ℒmon,), eval_point, basis, k)
 end
