@@ -57,11 +57,6 @@ function _build_weights(data, eval_points, adjl, basis, ℒrbf, ℒmon, mon)
     end
 end
 
-_num_ops(_) = 1
-_num_ops(ℒ::Tuple) = length(ℒ)
-_prepare_b(_, T, n) = zeros(T, n)
-_prepare_b(ℒ::Tuple, T, n) = zeros(T, n, length(ℒ))
-
 function _build_stencil!(
     A::Symmetric,
     b,
@@ -96,6 +91,11 @@ function _build_collocation_matrix!(
         end
     end
 
+    return nothing
+end
+
+function _calculate_matrix_entry!(A, i, j, data, basis)
+    A[i, j] = basis(data[i], data[j])
     return nothing
 end
 
