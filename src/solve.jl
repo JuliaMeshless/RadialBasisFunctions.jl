@@ -119,16 +119,6 @@ function _build_stencil!(
     mon::MonomialBasis,
     k::Int,
 ) where {TD,TE,B<:AbstractRadialBasis}
-    # Reset matrices to zero
-    #=
-    fill!(parent(A), zero(TD))
-    if b isa AbstractMatrix
-        fill!(b, zero(TD))
-    else
-        fill!.(b, zero(TD))
-    end
-    =#
-
     _build_collocation_matrix!(A, data, basis, mon, k)
     _build_rhs!(b, ℒrbf, ℒmon, data, eval_point, basis, k)
     return (A \ b)[1:k, :]
