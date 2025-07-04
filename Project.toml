@@ -15,6 +15,12 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StaticArraysCore = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
 SymRCM = "286e6d88-80af-4590-acc9-0001b223b9bd"
 
+[weakdeps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+
+[extensions]
+RadialBasisFunctionsCUDAExt = "CUDA"
+
 [compat]
 ChunkSplitters = "3"
 Combinatorics = "1"

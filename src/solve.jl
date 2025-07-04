@@ -67,7 +67,7 @@ function _build_weights(
             )
 
             # Store the stencil weights in the value array
-            for op in 1:size(V, 2)
+            for op in axes(V, 2)
                 for idx in 1:k
                     V[(i - 1) * k + idx, op] = stencil[idx, op]
                 end
