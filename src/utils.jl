@@ -19,7 +19,6 @@ function _get_vector_dim(data::AbstractVector)
     return _get_vector_dim(eltype(data))
 end
 
-
 """
     autoselect_k(data::Vector, basis<:AbstractRadialBasis)
 
