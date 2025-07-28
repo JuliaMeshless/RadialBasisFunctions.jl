@@ -3,6 +3,7 @@ module RadialBasisFunctions
 using ChunkSplitters
 using Combinatorics
 using Distances
+using KernelAbstractions
 using LinearAlgebra
 using NearestNeighbors
 using SparseArrays
