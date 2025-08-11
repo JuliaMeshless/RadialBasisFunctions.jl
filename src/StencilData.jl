@@ -1,4 +1,6 @@
 struct StencilData{T}
+    local_adjl::Vector{Int}                     # Local adjacency list indices
+    eval_point::AbstractVector{T}                # Evaluation point for the RHS
     A::AbstractMatrix{T}            # Local system matrix
     b::AbstractMatrix{T}                          # Local RHS matrix (one column per operator)
     d::Vector{AbstractVector{T}}                  # Local data points (now using the same type T)
@@ -8,81 +10,98 @@ struct StencilData{T}
     lhs_v::AbstractMatrix{T}                      # Local coefficients for internal nodes
     rhs_v::AbstractMatrix{T}                      # Local coefficients for boundary nodes
     weights::AbstractMatrix{T}                    # Weights for the local system
+    function StencilData(all_coords, adjl, functional_data)
+        TD = eltype(first(all_coords))
 
-    function StencilData{T}(n::Int, k::Int, num_ops::Int, dim::Int) where {T}
-        A = Symmetric(zeros(T, n, n), :U)
-        b = zeros(T, n, num_ops)
-        d = [zeros(T, dim) for _ in 1:k]
+        dim = length(first(all_coords))
+        nmon = binomial(dim + functional_data.basis.poly_deg, functional_data.mon.poly_deg)
+        k = length(first(adjl))
+        n = k + nmon
+
+        num_ops = _num_ops(functional_data.ℒrbf)
+
+        local_adjl = zeros(eltype(first(adjl)[1]), k)
+        eval_point = zeros(TD, dim)
+        A = Symmetric(zeros(TD, n, n), :U)
+        b = zeros(TD, n, num_ops)
+        d = [zeros(TD, dim) for _ in 1:k]
         is_boundary = zeros(Bool, k)
         is_Neumann = zeros(Bool, k)
-        normal = [zeros(T, dim) for _ in 1:k]
-        lhs_v = zeros(T, k, num_ops)
-        rhs_v = zeros(T, k, num_ops)
-        weights = zeros(T, n, num_ops)
+        normal = [zeros(TD, dim) for _ in 1:k]
+        lhs_v = zeros(TD, k, num_ops)
+        rhs_v = zeros(TD, k, num_ops)
+        weights = zeros(TD, n, num_ops)
 
-        return new(A, b, d, is_boundary, is_Neumann, normal, lhs_v, rhs_v, weights)
+        return new(
+            local_adjl,
+            eval_point,
+            A,
+            b,
+            d,
+            is_boundary,
+            is_Neumann,
+            normal,
+            lhs_v,
+            rhs_v,
+            weights,
+        )
     end
 end
 
-#convenience constructor
-function StencilData(T::Type, data_dim::Int, n::Int, k::Int, num_ops::Int)
-    return StencilData{T}(n, k, num_ops, data_dim)
+function _set_stencil_eval_point!(
+    region_data::RegionData, chunk_index::Int, point::AbstractVector{T}
+) where {T}
+    stencil_data = region_data.stencil_data[chunk_index]
+    return stencil_data.eval_point .= point
 end
 
-function _update_stencil!(
-    stencil::StencilData{T},
-    local_adjl,
-    data,
-    boundary_flag,
-    is_Neumann,
-    normals,
-    ℒrbf,
-    ℒmon,
-    eval_point,
-    basis::B,
-    mon::MonomialBasis{Dim,Deg},
-    k::Int,
-) where {T,B<:AbstractRadialBasis,Dim,Deg}
-    fill!(stencil.lhs_v, 0)
-    fill!(stencil.rhs_v, 0)
-    fill!(parent(stencil.A), 0)
-    fill!(stencil.b, 0)
+function _update_stencil!(region_data::RegionData, global_index::Int, chunk_index::Int)
+    stencil_data = region_data.stencil_data[chunk_index]
+    stencil_data.local_adjl .= region_data.adjl[global_index]
 
-    for (idx, j) in enumerate(local_adjl)
-        stencil.d[idx] = data[j]
+    fill!(parent(stencil_data.A), 0)
+    fill!(stencil_data.b, 0)
+    fill!(stencil_data.lhs_v, 0)
+    fill!(stencil_data.rhs_v, 0)
+
+    for (idx, j) in enumerate(stencil_data.local_adjl)
+        stencil_data.d[idx] = data[j]
     end
 
-    for (j_local, j_global) in enumerate(local_adjl)
-        stencil.is_boundary[j_local] = boundary_flag[j_global]
-        stencil.is_Neumann[j_local] = is_Neumann[j_global]
+    #TODO: calculate j_boundary
+    for (j_local, j_global) in enumerate(stencil_data.local_adjl)
+        stencil_data.is_boundary[j_local] = boundary_flag[j_global]
+        stencil_data.is_Neumann[j_local] = is_Neumann[j_global]
         if is_Neumann[j_global]
-            copyto!(stencil.normal[j_local], convert.(T, normals[j_global]))
+            copyto!(stencil_data.normal[j_local], convert.(T, normals[j_global]))
         else
-            stencil.normal[j_local] .= zero(T)
+            stencil_data.normal[j_local] .= zero(T)
         end
     end
 
-    _build_collocation_matrix_Hermite!(stencil, basis, mon, k)
-    _build_rhs!(stencil, ℒrbf, ℒmon, eval_point, basis, k)
+    _build_collocation_matrix_Hermite!(stencil_data, region_data.functional_data)
+    eval_point = stencil_data.eval_point
+    _build_rhs!(stencil_data, region_data.functional_data, eval_point)
 
-    fill!(stencil.weights, 0)
-    stencil.weights .= bunchkaufman!(stencil.A) \ stencil.b
+    fill!(stencil_data.weights, 0)
+    stencil_data.weights .= bunchkaufman!(stencil_data.A) \ stencil_data.b
 
     # Store weights in appropriate matrices
     for j in 1:k
-        if !stencil.is_boundary[j]
-            stencil.lhs_v[j, :] .= view(stencil.weights, j, :)
+        if !stencil_data.is_boundary[j]
+            stencil_data.lhs_v[j, :] .= view(stencil_data.weights, j, :)
         else
-            stencil.rhs_v[j, :] .= view(stencil.weights, j, :)
+            stencil_data.rhs_v[j, :] .= view(stencil_data.weights, j, :)
         end
     end
 
     return nothing
 end
 
-function _build_collocation_matrix_Hermite!(
-    stencil::StencilData{T}, basis::B, mon::MonomialBasis{Dim,Deg}, k::K
-) where {T,B<:AbstractRadialBasis,K<:Int,Dim,Deg}
+function _build_collocation_matrix_Hermite!(stencil::StencilData, functional_data)
+    basis = functional_data.basis
+    mon = functional_data.mon
+    k = length(stencil.local_adjl)
     A = parent(stencil.A)
     n = size(A, 2)
     @inbounds for j in 1:k, i in 1:j
@@ -134,9 +153,11 @@ function _calculate_matrix_entry_poly!(
     return nothing
 end
 
-function _build_rhs!(
-    stencil::StencilData{T}, ℒrbf::Tuple, ℒmon::Tuple, eval_point, basis::B, k::Int
-) where {T,B<:AbstractRadialBasis}
+function _build_rhs!(stencil, functional_data, eval_point)
+    ℒrbf = functional_data.ℒrbf
+    ℒmon = functional_data.ℒmon
+    basis = functional_data.basis
+    k = length(stencil.local_adjl)
     b = stencil.b
     data = stencil.d
 
@@ -163,11 +184,4 @@ function _build_rhs!(
     end
 
     return nothing
-end
-
-# Handle the case when ℒrbf and ℒmon are single operators (not tuples)
-function _build_rhs!(
-    stencil::StencilData{T}, ℒrbf, ℒmon, eval_point, basis::B, k::Int
-) where {T,B<:AbstractRadialBasis}
-    return _build_rhs!(stencil, (ℒrbf,), (ℒmon,), eval_point, basis, k)
 end
