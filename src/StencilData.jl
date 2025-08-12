@@ -20,7 +20,13 @@ struct StencilData{T}
         TD = eltype(first(all_coords))
 
         dim = length(first(all_coords))
-        nmon = binomial(dim + functional_data.basis.poly_deg, functional_data.mon.poly_deg)
+        # Enforce uniform adjacency list length (stencil size k)
+        @assert all(length(a) == length(first(adjl)) for a in adjl) "All adjacency lists must have the same length"
+        # Number of monomials for augmentation; MonomialBasis doesn't store poly_deg field,
+        # its degree is given by degree(mon). It matches basis.poly_deg when augmentation enabled.
+        nmon = binomial(
+            dim + functional_data.basis.poly_deg, functional_data.basis.poly_deg
+        )
         k = length(first(adjl))
         n = k + nmon
 
@@ -29,7 +35,7 @@ struct StencilData{T}
         # adjacency entries are Int-like; take eltype of inner adjacency vector
         local_adjl = zeros(eltype(first(adjl)), k)
         eval_point = zeros(TD, dim)
-        A = Symmetric(zeros(TD, n, n), :U)
+        A = zeros(TD, n, n)
         b = zeros(TD, n, num_ops)
         local_coords = [zeros(TD, dim) for _ in 1:k]
         is_boundary = zeros(Bool, k)
@@ -42,7 +48,7 @@ struct StencilData{T}
         poly_buf = zeros(TD, n - k)      # length of polynomial block (nmon)
         deriv_buf = similar(poly_buf)
 
-        return new(
+        return new{TD}(
             local_adjl,
             eval_point,
             A,
@@ -68,7 +74,7 @@ function _set_stencil_eval_point!(
 end
 
 function _reset_local_arrays(stencil_data::StencilData)
-    fill!(parent(stencil_data.A), 0)
+    fill!(stencil_data.A, 0)
     fill!(stencil_data.b, 0)
     fill!(stencil_data.lhs_v, 0)
     fill!(stencil_data.rhs_v, 0)
@@ -90,11 +96,12 @@ end
 function _set_stencil_boundary_data!(stencil_data::StencilData, region_data::RegionData)
     @inbounds for i in eachindex(stencil_data.local_adjl)
         global_index = stencil_data.local_adjl[i]
-        boundary_index = region_data.g2b[global_index]
+        boundary_index = region_data.global_to_boundary[global_index]
         stencil_data.is_boundary[i] = region_data.is_boundary[global_index]
         if stencil_data.is_boundary[i]
             stencil_data.boundary_types[i] = region_data.boundary_types[boundary_index]
-            if is_Neumann(stencil_data.boundary_types[i])
+            if is_Neumann(stencil_data.boundary_types[i]) ||
+                is_Robin(stencil_data.boundary_types[i])
                 stencil_data.normals[i] .= region_data.normals[boundary_index]
             end
         end
@@ -118,7 +125,25 @@ function _update_stencil!(
     _build_collocation_matrix_Hermite!(stencil_data, region_data.functional_data)
     _build_rhs!(stencil_data, region_data.functional_data)
 
-    stencil_data.weights .= bunchkaufman!(stencil_data.A) \ stencil_data.b
+    # Complete polynomial rows (P^T block) before solving
+    basis = region_data.functional_data.basis
+    if basis.poly_deg > -1
+        k = length(stencil_data.local_adjl)
+        n = size(stencil_data.A, 1)
+        nmon = n - k
+        @inbounds for p in 1:nmon, j in 1:k
+            stencil_data.A[k + p, j] = stencil_data.A[j, k + p]
+        end
+    end
+    try
+        stencil_data.weights .= stencil_data.A \ stencil_data.b
+    catch err
+        if err isa LinearAlgebra.SingularException
+            stencil_data.weights .= pinv(stencil_data.A) * stencil_data.b
+        else
+            rethrow()
+        end
+    end
 
     # Store weights in appropriate matrices
     k = length(stencil_data.local_adjl)
@@ -137,7 +162,7 @@ function _build_collocation_matrix_Hermite!(stencil::StencilData, functional_dat
     basis = functional_data.basis
     mon = functional_data.mon
     k = length(stencil.local_adjl)
-    A = parent(stencil.A)
+    A = stencil.A
     @inbounds for j in 1:k, i in 1:j
         _calculate_matrix_entry_RBF!(i, j, stencil, basis)
     end
@@ -152,7 +177,7 @@ function _build_collocation_matrix_Hermite!(stencil::StencilData, functional_dat
 end
 
 function _calculate_matrix_entry_RBF!(i, j, stencil_data::StencilData, basis)
-    A = parent(stencil_data.A)
+    A = stencil_data.A
     data = stencil_data.local_coords
 
     bt_i = stencil_data.boundary_types[i]
@@ -205,7 +230,7 @@ function _calculate_matrix_entry_RBF!(i, j, stencil_data::StencilData, basis)
 end
 
 function _calculate_matrix_entry_poly!(stencil::StencilData, row, col_start, mon)
-    A = parent(stencil.A)
+    A = stencil.A
     col_end = size(A, 2)
     data_point = stencil.local_coords[row]
     bt = stencil.boundary_types[row]
@@ -257,11 +282,11 @@ function _build_rhs!(stencil::StencilData, functional_data)
         @inbounds for i in eachindex(data)
             if stencil.is_boundary[i]
                 bt = stencil.boundary_types[i]
-                α = α(bt)
-                β = β(bt)
+                αv = α(bt)
+                βv = β(bt)
                 b[i, j] =
-                    α * ℒ(eval_point, data[i]) +
-                    β * ℒ(eval_point, data[i], stencil.normals[i])
+                    αv * ℒ(eval_point, data[i]) +
+                    βv * ℒ(eval_point, data[i], stencil.normals[i])
             else # internal
                 b[i, j] = ℒ(eval_point, data[i])
             end

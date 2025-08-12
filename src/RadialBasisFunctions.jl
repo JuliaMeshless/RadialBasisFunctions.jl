@@ -30,6 +30,8 @@ include("solve_utils.jl")
 include("solve.jl")
 
 #new stuff fot Hermite
+include("boundary_type.jl")
+include("region_data")
 include("StencilData.jl")
 include("solve_with_Hermite.jl")
 

@@ -30,7 +30,7 @@ struct RegionData
         adjl,
         functional_data::FunctionalData,
     )
-        g2b, b2g = _compute_boundary_mappings(is_boundary)
+        global_to_boundary, boundary_to_global = _compute_boundary_mappings(is_boundary)
         return new(
             all_coords,
             collect(is_boundary),
@@ -38,8 +38,8 @@ struct RegionData
             normals,
             adjl,
             functional_data,
-            g2b,
-            b2g,
+            global_to_boundary,
+            boundary_to_global,
         )
     end
 end
