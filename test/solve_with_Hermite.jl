@@ -6,31 +6,32 @@ using Test
 import RadialBasisFunctions as RBF
 
 @testset "solve_with_Hermite (new API)" begin
-    # Geometry: 2 internal nodes, 3 boundary nodes (Dirichlet, Neumann, Robin)
+    # Geometry: 3 internal nodes, 4 boundary nodes (Dirichlet, Neumann, Robin variants)
     data = [
         SVector(1.0, 2.0),   # 1 internal
         SVector(2.0, 1.0),   # 2 internal
-        SVector(1.5, 0.0),   # 3 boundary (Neumann)
-        SVector(0.0, 1.0),   # 4 boundary (Dirichlet)
-        SVector(2.2, 0.2),   # 5 boundary (Robin)
+        SVector(1.2, 1.6),   # 3 internal (added)
+        SVector(1.5, 0.0),   # 4 boundary (Neumann)
+        SVector(0.0, 1.0),   # 5 boundary (Dirichlet)
+        SVector(2.2, 0.2),   # 6 boundary (Robin)
+        SVector(2.5, 1.8),   # 7 boundary (Dirichlet)
     ]
-    is_boundary = [false, false, true, true, true]
+    is_boundary = [false, false, false, true, true, true, true]
 
-    # Boundary ordering follows global order (3,4,5)
+    # Boundary ordering follows global order (4,5,6,7)
     bt_neu = RBF.BoundaryType(Float64[0.0, 1.0])            # Neumann α=0 β=1
     bt_dir = RBF.BoundaryType(Float64[1.0, 0.0])            # Dirichlet α=1 β=0
     bt_rob = RBF.BoundaryType(Float64[0.4, 0.6])            # Robin α>0 β>0
-    boundary_types = [bt_neu, bt_dir, bt_rob]
+    boundary_types = [bt_neu, bt_dir, bt_rob, bt_dir]
     normals = [
-        SVector(0.0, 1.0),   # for node 3 (Neumann)
-        SVector(0.0, 0.0),   # for node 4 (Dirichlet - unused)
-        SVector(1.0, 0.0),   # for node 5 (Robin)
+        SVector(0.0, 1.0),   # for node 4 (Neumann)
+        SVector(0.0, 0.0),   # for node 5 (Dirichlet - unused)
+        SVector(1.0, 0.0),   # for node 6 (Robin)
+        SVector(0.0, 0.0),   # for node 7 (Dirichlet - unused)
     ]
 
-    # Adjacency: uniform length (each node lists 5 entries: itself + all other internal + all boundary)
-    adjl = [
-        [1, 2, 3, 4, 5], [2, 1, 3, 4, 5], [3, 1, 2, 4, 5], [4, 1, 2, 3, 5], [5, 1, 2, 3, 4]
-    ]
+    # Adjacency: uniform length (each node lists all 7 nodes)
+    adjl = [collect(1:7) for _ in 1:7]
 
     basis = RBF.PHS(3; poly_deg=1)
     mon = RBF.MonomialBasis(2, 1)
@@ -47,14 +48,14 @@ import RadialBasisFunctions as RBF
 
     @testset "_preallocate_IJV_matrices" begin
         lhs, rhs = RBF._preallocate_IJV_matrices(region)
-        @test length(lhs.I) == 2 * 2  # internal/internal including self + other for two nodes
-        @test length(rhs.I) == 2 * 3  # each internal connects to 3 boundary
+        @test length(lhs.I) == 3 * 3  # internal/internal including self + others for three nodes
+        @test length(rhs.I) == 3 * 4  # each internal connects to 4 boundary
         @test size(lhs.V, 2) == 1
         @test size(rhs.V, 2) == 1
-        # internal indices should be in 1:2, boundary remapped to 1:3
-        @test all(1 .<= lhs.I .<= 2)
-        @test all(1 .<= lhs.J .<= 2)
-        @test all(1 .<= rhs.J .<= 3)
+        # internal indices should be in 1:3, boundary remapped to 1:4
+        @test all(1 .<= lhs.I .<= 3)
+        @test all(1 .<= lhs.J .<= 3)
+        @test all(1 .<= rhs.J .<= 4)
     end
 
     @testset "_calculate_thread_offsets" begin
@@ -75,22 +76,22 @@ import RadialBasisFunctions as RBF
         # adjacency length for internal node 1
         k = length(region.adjl[1])
         A = parent(stencil.A)
-        # Identify local indices of boundary nodes (3,4,5)
+        # Identify local indices of boundary nodes (4,5,6,7)
         loc_map = Dict(stencil.local_adjl[i] => i for i in 1:k)
         i_internal = loc_map[1]
-        idx_neu = loc_map[3]
-        idx_dir = loc_map[4]
-        idx_rob = loc_map[5]
+        idx_neu = loc_map[4]
+        idx_dir = loc_map[5]
+        idx_rob = loc_map[6]
 
         x_int = data[1]
-        φ_neu = basis(x_int, data[3])
-        φ_dir = basis(x_int, data[4])
-        φ_rob = basis(x_int, data[5])
-        g_neu = RBF.∇(basis)(x_int, data[3])
-        g_rob = RBF.∇(basis)(x_int, data[5])
+        φ_neu = basis(x_int, data[4])
+        φ_dir = basis(x_int, data[5])
+        φ_rob = basis(x_int, data[6])
+        g_neu = RBF.∇(basis)(x_int, data[4])
+        g_rob = RBF.∇(basis)(x_int, data[6])
         # Expected entries (Dirichlet uses α=1 β=0)
         exp_dir = φ_dir
-        exp_neu = dot(normals[1], -g_neu) * 1.0  # α=0 β=1, second argument derivative sign
+        exp_neu = dot(normals[1], -g_neu) * 1.0  # α=0 β=1
         exp_rob = 0.4 * φ_rob + 0.6 * dot(normals[3], -g_rob)
 
         @test isapprox(A[i_internal, idx_dir], exp_dir; atol=1e-10)
@@ -100,10 +101,10 @@ import RadialBasisFunctions as RBF
 
     @testset "Full integration" begin
         lhs_mat, rhs_mat = RBF._build_weights(region)
-        @test size(lhs_mat, 1) == 2
-        @test size(lhs_mat, 2) == 2
-        @test size(rhs_mat, 1) == 2
-        @test size(rhs_mat, 2) == 3
+        @test size(lhs_mat, 1) == 3
+        @test size(lhs_mat, 2) == 3
+        @test size(rhs_mat, 1) == 3
+        @test size(rhs_mat, 2) == 4
         @test nnz(lhs_mat) > 0
         @test nnz(rhs_mat) > 0
     end

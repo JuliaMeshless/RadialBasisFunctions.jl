@@ -1,7 +1,7 @@
 struct StencilData{T}
     local_adjl::Vector{Int}                     # Local adjacency list indices
     eval_point::AbstractVector{T}                # Evaluation point for the RHS
-    A::AbstractMatrix{T}            # Local system matrix
+    A::Matrix{T}            # Local system matrix (treated as symmetric in upper triangle)
     b::AbstractMatrix{T}                          # Local RHS matrix (one column per operator)
     local_coords::Vector{AbstractVector{T}}                  # Local data points (now using the same type T)
     is_boundary::AbstractVector{Bool}             # Whether nodes are on boundary
@@ -16,14 +16,8 @@ struct StencilData{T}
         all_coords = region_data.all_coords
         adjl = region_data.adjl
         functional_data = region_data.functional_data
-
         TD = eltype(first(all_coords))
-
         dim = length(first(all_coords))
-        # Enforce uniform adjacency list length (stencil size k)
-        @assert all(length(a) == length(first(adjl)) for a in adjl) "All adjacency lists must have the same length"
-        # Number of monomials for augmentation; MonomialBasis doesn't store poly_deg field,
-        # its degree is given by degree(mon). It matches basis.poly_deg when augmentation enabled.
         nmon = binomial(
             dim + functional_data.basis.poly_deg, functional_data.basis.poly_deg
         )
@@ -125,21 +119,45 @@ function _update_stencil!(
     _build_collocation_matrix_Hermite!(stencil_data, region_data.functional_data)
     _build_rhs!(stencil_data, region_data.functional_data)
 
-    # Complete polynomial rows (P^T block) before solving
     basis = region_data.functional_data.basis
-    if basis.poly_deg > -1
-        k = length(stencil_data.local_adjl)
-        n = size(stencil_data.A, 1)
-        nmon = n - k
-        @inbounds for p in 1:nmon, j in 1:k
-            stencil_data.A[k + p, j] = stencil_data.A[j, k + p]
-        end
-    end
     try
-        stencil_data.weights .= stencil_data.A \ stencil_data.b
+        F = bunchkaufman(Symmetric(stencil_data.A, :U)) # factor using only upper triangle
+        stencil_data.weights .= F \ stencil_data.b
     catch err
         if err isa LinearAlgebra.SingularException
-            stencil_data.weights .= pinv(stencil_data.A) * stencil_data.b
+            A = stencil_data.A
+            n = size(A, 1)
+            k = length(stencil_data.local_adjl)
+            basis = region_data.functional_data.basis
+            nmon = n - k
+            s = svdvals(A)
+            # rank tolerance similar to LAPACK default
+            tol = maximum(s) * eps(eltype(s)) * max(size(A)...)
+            r = count(>(tol), s)
+            condA = maximum(s) / max(minimum(s), eps(eltype(s)))
+            # Attempt a tiny diagonal regularization on the RBF block only (leave polynomial constraint rows/cols)
+            λ = maximum(s; init=zero(eltype(s))) * (eps(eltype(s)) * 10)
+            if !isfinite(λ) || λ == 0
+                λ = eps(eltype(s))
+            end
+            kblock = k
+            for i in 1:kblock
+                stencil_data.A[i, i] += λ
+            end
+            try
+                F2 = bunchkaufman(Symmetric(stencil_data.A, :U))
+                stencil_data.weights .= F2 \ stencil_data.b
+            catch err2
+                if err2 isa LinearAlgebra.SingularException
+                    error(
+                        "Singular local stencil matrix (rank=$r < n=$n, cond≈$(round(condA; digits=3))). " *
+                        "Regularization λ=$(λ) failed. Stencil size k=$k, polynomial terms nmon=$nmon (deg=$(basis.poly_deg)). " *
+                        "Suggestions: increase neighbor count (k), reduce polynomial degree, or improve node distribution.",
+                    )
+                else
+                    rethrow()
+                end
+            end
         else
             rethrow()
         end
@@ -200,31 +218,23 @@ function _calculate_matrix_entry_RBF!(i, j, stencil_data::StencilData, basis)
 
     if is_nr_i && (is_int_j || is_dir_j)
         n_i = stencil_data.normals[i]
-        α_i = α(bt_i)
-        β_i = β(bt_i)
-        A[i, j] = α_i * φ + β_i * LinearAlgebra.dot(n_i, g)
+        A[i, j] = α(bt_i) * φ + β(bt_i) * LinearAlgebra.dot(n_i, g)
     elseif (is_int_i || is_dir_i) && is_nr_j
         n_j = stencil_data.normals[j]
-        α_j = α(bt_j)
-        β_j = β(bt_j)
-        A[i, j] = α_j * φ + β_j * LinearAlgebra.dot(n_j, -g)
+        A[i, j] = α(bt_j) * φ + β(bt_j) * LinearAlgebra.dot(n_j, -g)
     elseif is_nr_i && is_nr_j
         n_i = stencil_data.normals[i]
         n_j = stencil_data.normals[j]
-        α_i = α(bt_i)
-        β_i = β(bt_i)
-        α_j = α(bt_j)
-        β_j = β(bt_j)
         # Mixed Robin/Neumann interaction (expand (α+β∂_n)_i (α+β∂_n)_j applied to kernel)
         # Terms: α_i α_j φ + α_i β_j (∂_{n_j} wrt j) + β_i α_j (∂_{n_i} wrt i) + β_i β_j (∂_{n_i}∂_{n_j})
         term_∂i = LinearAlgebra.dot(n_i, g)                  # ∂/∂n_i (first arg)
         term_∂j = LinearAlgebra.dot(n_j, -g)                 # ∂/∂n_j (second arg)
         term_∂i∂j = directional∂²(basis, n_i, n_j)(data[i], data[j])
         A[i, j] =
-            α_i * α_j * φ +
-            α_i * β_j * term_∂j +
-            β_i * α_j * term_∂i +
-            β_i * β_j * term_∂i∂j
+            α(bt_i) * α(bt_j) * φ +
+            α(bt_i) * β(bt_j) * term_∂j +
+            β(bt_i) * α(bt_j) * term_∂i +
+            β(bt_i) * β(bt_j) * term_∂i∂j
     end
     return nothing
 end
