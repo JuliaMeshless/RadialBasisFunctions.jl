@@ -3,14 +3,20 @@ struct StencilData{T}
     eval_point::AbstractVector{T}                # Evaluation point for the RHS
     A::AbstractMatrix{T}            # Local system matrix
     b::AbstractMatrix{T}                          # Local RHS matrix (one column per operator)
-    d::Vector{AbstractVector{T}}                  # Local data points (now using the same type T)
+    local_coords::Vector{AbstractVector{T}}                  # Local data points (now using the same type T)
     is_boundary::AbstractVector{Bool}             # Whether nodes are on boundary
-    is_Neumann::AbstractVector{Bool}              # Whether nodes have Neumann boundary conditions
-    normal::Vector{AbstractVector{T}}             # Normal vectors (meaningful for Neumann points)
+    boundary_types::AbstractVector{BoundaryType}              # Boundary type (Dirichlet / Neumann / Robin)
+    normals::Vector{AbstractVector{T}}             # Normal vectors (meaningful for Neumann points)
     lhs_v::AbstractMatrix{T}                      # Local coefficients for internal nodes
     rhs_v::AbstractMatrix{T}                      # Local coefficients for boundary nodes
     weights::AbstractMatrix{T}                    # Weights for the local system
-    function StencilData(all_coords, adjl, functional_data)
+    poly_buf::Vector{T}                           # Reusable buffer for polynomial values
+    deriv_buf::Vector{T}                          # Reusable buffer for normal derivative values
+    function StencilData(region_data::RegionData)
+        all_coords = region_data.all_coords
+        adjl = region_data.adjl
+        functional_data = region_data.functional_data
+
         TD = eltype(first(all_coords))
 
         dim = length(first(all_coords))
@@ -20,73 +26,102 @@ struct StencilData{T}
 
         num_ops = _num_ops(functional_data.ℒrbf)
 
-        local_adjl = zeros(eltype(first(adjl)[1]), k)
+        # adjacency entries are Int-like; take eltype of inner adjacency vector
+        local_adjl = zeros(eltype(first(adjl)), k)
         eval_point = zeros(TD, dim)
         A = Symmetric(zeros(TD, n, n), :U)
         b = zeros(TD, n, num_ops)
-        d = [zeros(TD, dim) for _ in 1:k]
+        local_coords = [zeros(TD, dim) for _ in 1:k]
         is_boundary = zeros(Bool, k)
-        is_Neumann = zeros(Bool, k)
-        normal = [zeros(TD, dim) for _ in 1:k]
+        boundary_types = _init_boundary_types(TD, k)
+        normals = [zeros(TD, dim) for _ in 1:k]
         lhs_v = zeros(TD, k, num_ops)
         rhs_v = zeros(TD, k, num_ops)
         weights = zeros(TD, n, num_ops)
+        # Buffers for polynomial and derivative values
+        poly_buf = zeros(TD, n - k)      # length of polynomial block (nmon)
+        deriv_buf = similar(poly_buf)
 
         return new(
             local_adjl,
             eval_point,
             A,
             b,
-            d,
+            local_coords,
             is_boundary,
-            is_Neumann,
-            normal,
+            boundary_types,
+            normals,
             lhs_v,
             rhs_v,
             weights,
+            poly_buf,
+            deriv_buf,
         )
     end
 end
 
 function _set_stencil_eval_point!(
-    region_data::RegionData, chunk_index::Int, point::AbstractVector{T}
+    stencil_data::StencilData, point::AbstractVector{T}
 ) where {T}
-    stencil_data = region_data.stencil_data[chunk_index]
-    return stencil_data.eval_point .= point
+    stencil_data.eval_point .= point
+    return nothing
 end
 
-function _update_stencil!(region_data::RegionData, global_index::Int, chunk_index::Int)
-    stencil_data = region_data.stencil_data[chunk_index]
-    stencil_data.local_adjl .= region_data.adjl[global_index]
-
+function _reset_local_arrays(stencil_data::StencilData)
     fill!(parent(stencil_data.A), 0)
     fill!(stencil_data.b, 0)
     fill!(stencil_data.lhs_v, 0)
     fill!(stencil_data.rhs_v, 0)
-
-    for (idx, j) in enumerate(stencil_data.local_adjl)
-        stencil_data.d[idx] = data[j]
+    fill!(stencil_data.weights, 0)
+    _set_to_zero!(stencil_data.boundary_types)
+    for n in stencil_data.normals
+        fill!(n, 0)
     end
+    return nothing
+end
 
-    #TODO: calculate j_boundary
-    for (j_local, j_global) in enumerate(stencil_data.local_adjl)
-        stencil_data.is_boundary[j_local] = boundary_flag[j_global]
-        stencil_data.is_Neumann[j_local] = is_Neumann[j_global]
-        if is_Neumann[j_global]
-            copyto!(stencil_data.normal[j_local], convert.(T, normals[j_global]))
-        else
-            stencil_data.normal[j_local] .= zero(T)
+function _set_stencil_local_coords!(stencil_data::StencilData, region_data::RegionData)
+    @inbounds for i in eachindex(stencil_data.local_adjl)
+        stencil_data.local_coords[i] = region_data.all_coords[stencil_data.local_adjl[i]]
+    end
+    return nothing
+end
+
+function _set_stencil_boundary_data!(stencil_data::StencilData, region_data::RegionData)
+    @inbounds for i in eachindex(stencil_data.local_adjl)
+        global_index = stencil_data.local_adjl[i]
+        boundary_index = region_data.g2b[global_index]
+        stencil_data.is_boundary[i] = region_data.is_boundary[global_index]
+        if stencil_data.is_boundary[i]
+            stencil_data.boundary_types[i] = region_data.boundary_types[boundary_index]
+            if is_Neumann(stencil_data.boundary_types[i])
+                stencil_data.normals[i] .= region_data.normals[boundary_index]
+            end
         end
     end
+    return nothing
+end
+
+function _update_stencil!(
+    stencil_data::StencilData, region_data::RegionData, global_index::Int
+)
+    stencil_data.local_adjl .= region_data.adjl[global_index]
+
+    _reset_local_arrays(stencil_data)
+
+    _set_stencil_local_coords!(stencil_data, region_data)
+
+    _set_stencil_boundary_data!(stencil_data, region_data)
+
+    # NOTE: eval_point is intentionally NOT set here (user chooses when/how to set it)
 
     _build_collocation_matrix_Hermite!(stencil_data, region_data.functional_data)
-    eval_point = stencil_data.eval_point
-    _build_rhs!(stencil_data, region_data.functional_data, eval_point)
+    _build_rhs!(stencil_data, region_data.functional_data)
 
-    fill!(stencil_data.weights, 0)
     stencil_data.weights .= bunchkaufman!(stencil_data.A) \ stencil_data.b
 
     # Store weights in appropriate matrices
+    k = length(stencil_data.local_adjl)
     for j in 1:k
         if !stencil_data.is_boundary[j]
             stencil_data.lhs_v[j, :] .= view(stencil_data.weights, j, :)
@@ -103,72 +138,131 @@ function _build_collocation_matrix_Hermite!(stencil::StencilData, functional_dat
     mon = functional_data.mon
     k = length(stencil.local_adjl)
     A = parent(stencil.A)
-    n = size(A, 2)
     @inbounds for j in 1:k, i in 1:j
         _calculate_matrix_entry_RBF!(i, j, stencil, basis)
     end
 
-    if Deg > -1
+    if degree(mon) > -1
         @inbounds for i in 1:k
-            _calculate_matrix_entry_poly!(
-                A, i, k + 1, n, stencil.d[i], stencil.is_Neumann[i], stencil.normal[i], mon
-            )
+            _calculate_matrix_entry_poly!(stencil, i, k + 1, mon)
         end
     end
 
     return nothing
 end
 
-function _calculate_matrix_entry_RBF!(i, j, stencil::StencilData, basis)
+function _calculate_matrix_entry_RBF!(i, j, stencil_data::StencilData, basis)
+    A = parent(stencil_data.A)
+    data = stencil_data.local_coords
+
+    bt_i = stencil_data.boundary_types[i]
+    bt_j = stencil_data.boundary_types[j]
+    is_int_i = !stencil_data.is_boundary[i]
+    is_int_j = !stencil_data.is_boundary[j]
+    is_dir_i = is_Dirichlet(bt_i)
+    is_dir_j = is_Dirichlet(bt_j)
+    is_nr_i = !is_int_i && !is_dir_i # boundary and not Dirichlet => Neumann or Robin
+    is_nr_j = !is_int_j && !is_dir_j
+
+    φ = basis(data[i], data[j])
+
+    if (is_int_i || is_dir_i) && (is_int_j || is_dir_j)
+        A[i, j] = φ
+        return nothing
+    end
+
+    g = ∇(basis)(data[i], data[j])
+
+    if is_nr_i && (is_int_j || is_dir_j)
+        n_i = stencil_data.normals[i]
+        α_i = α(bt_i)
+        β_i = β(bt_i)
+        A[i, j] = α_i * φ + β_i * LinearAlgebra.dot(n_i, g)
+    elseif (is_int_i || is_dir_i) && is_nr_j
+        n_j = stencil_data.normals[j]
+        α_j = α(bt_j)
+        β_j = β(bt_j)
+        A[i, j] = α_j * φ + β_j * LinearAlgebra.dot(n_j, -g)
+    elseif is_nr_i && is_nr_j
+        n_i = stencil_data.normals[i]
+        n_j = stencil_data.normals[j]
+        α_i = α(bt_i)
+        β_i = β(bt_i)
+        α_j = α(bt_j)
+        β_j = β(bt_j)
+        # Mixed Robin/Neumann interaction (expand (α+β∂_n)_i (α+β∂_n)_j applied to kernel)
+        # Terms: α_i α_j φ + α_i β_j (∂_{n_j} wrt j) + β_i α_j (∂_{n_i} wrt i) + β_i β_j (∂_{n_i}∂_{n_j})
+        term_∂i = LinearAlgebra.dot(n_i, g)                  # ∂/∂n_i (first arg)
+        term_∂j = LinearAlgebra.dot(n_j, -g)                 # ∂/∂n_j (second arg)
+        term_∂i∂j = directional∂²(basis, n_i, n_j)(data[i], data[j])
+        A[i, j] =
+            α_i * α_j * φ +
+            α_i * β_j * term_∂j +
+            β_i * α_j * term_∂i +
+            β_i * β_j * term_∂i∂j
+    end
+    return nothing
+end
+
+function _calculate_matrix_entry_poly!(stencil::StencilData, row, col_start, mon)
     A = parent(stencil.A)
-    data = stencil.d
-    is_Neumann_i = stencil.is_Neumann[i]
-    is_Neumann_j = stencil.is_Neumann[j]
-    if !is_Neumann_i && !is_Neumann_j
-        A[i, j] = basis(data[i], data[j])
-    elseif is_Neumann_i && !is_Neumann_j
-        n = stencil.normal[i]
-        A[i, j] = LinearAlgebra.dot(n, ∇(basis)(data[i], data[j]))
-    elseif !is_Neumann_i && is_Neumann_j
-        n = stencil.normal[j]
-        A[i, j] = LinearAlgebra.dot(n, -∇(basis)(data[i], data[j]))
-    elseif is_Neumann_i && is_Neumann_j
-        ni = stencil.normal[i]
-        nj = stencil.normal[j]
-        A[i, j] = directional∂²(basis, ni, nj)(data[i], data[j])
+    col_end = size(A, 2)
+    data_point = stencil.local_coords[row]
+    bt = stencil.boundary_types[row]
+    polyvals = stencil.poly_buf
+    derivvals = stencil.deriv_buf
+
+    # Internal or Dirichlet nodes: only polynomial values
+    if !stencil.is_boundary[row] || is_Dirichlet(bt)
+        mon(polyvals, data_point)
+        @inbounds for (k, c) in enumerate(col_start:col_end)
+            A[row, c] = polyvals[k]
+        end
+        return nothing
+    end
+
+    nvec = stencil.normals[row]
+    if is_Neumann(bt)
+        ∂_normal(mon, nvec)(polyvals, data_point) # reuse polyvals buffer for derivative
+        @inbounds for (k, c) in enumerate(col_start:col_end)
+            A[row, c] = polyvals[k]
+        end
+        return nothing
+    end
+
+    # Robin: α * P + β * ∂_n P using both buffers
+    mon(polyvals, data_point)
+    ∂_normal(mon, nvec)(derivvals, data_point)
+    αv = α(bt)
+    βv = β(bt)
+    @inbounds for (k, c) in enumerate(col_start:col_end)
+        A[row, c] = αv * polyvals[k] + βv * derivvals[k]
     end
     return nothing
 end
 
-function _calculate_matrix_entry_poly!(
-    A, row, col_start, col_end, data_point, is_Neumann, normal, mon
-)
-    a = view(A, row, col_start:col_end)
-    if is_Neumann
-        ∂_normal(mon, normal)(a, data_point)
-    else
-        mon(a, data_point)
-    end
-
-    return nothing
-end
-
-function _build_rhs!(stencil, functional_data, eval_point)
+function _build_rhs!(stencil::StencilData, functional_data)
     ℒrbf = functional_data.ℒrbf
     ℒmon = functional_data.ℒmon
     basis = functional_data.basis
     k = length(stencil.local_adjl)
     b = stencil.b
-    data = stencil.d
+    data = stencil.local_coords
+    eval_point = stencil.eval_point
 
     @assert size(b, 2) == length(ℒrbf) == length(ℒmon) "b, ℒrbf, and ℒmon must have the same length"
 
     # radial basis section
     for (j, ℒ) in enumerate(ℒrbf)
         @inbounds for i in eachindex(data)
-            if stencil.is_Neumann[i]
-                b[i, j] = ℒ(eval_point, data[i], stencil.normal[i])
-            else
+            if stencil.is_boundary[i]
+                bt = stencil.boundary_types[i]
+                α = α(bt)
+                β = β(bt)
+                b[i, j] =
+                    α * ℒ(eval_point, data[i]) +
+                    β * ℒ(eval_point, data[i], stencil.normals[i])
+            else # internal
                 b[i, j] = ℒ(eval_point, data[i])
             end
         end

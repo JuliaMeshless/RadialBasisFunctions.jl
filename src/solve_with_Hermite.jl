@@ -7,85 +7,81 @@ struct FunctionalData
     ℒrbf::Tuple
     ℒmon::Tuple
     function FunctionalData(basis, mon, ℒrbf, ℒmon)
-        if type(ℒrbf) != Tuple
-            ℒrbf = (ℒrbf,)
-        end
-        if type(ℒmon) != Tuple
-            ℒmon = (ℒmon,)
-        end
-        return new(basis, mon, ℒrbf, ℒmon)
+        ℒrbf_tuple = ℒrbf isa Tuple ? ℒrbf : (ℒrbf,)
+        ℒmon_tuple = ℒmon isa Tuple ? ℒmon : (ℒmon,)
+        return new(basis, mon, ℒrbf_tuple, ℒmon_tuple)
     end
 end
 
 struct RegionData
-    all_coords # N_points x dim
-    is_boundary # N_points
-    boundary_type # N_boundary
-    boundary_normals # N_boundary x dim
-    adjl
-    functional_data::FunctionalData # Contains basis, monomial basis, and linear operators
-    stencil_data # N_points x threads
-    global_to_boundary::Vector{Int} # Maps global indices to boundary indices
-    boundary_to_global::Vector{Int} # Maps boundary indices to global indices
-
+    all_coords                 # Vector of coordinate vectors (N_points)
+    is_boundary::Vector{Bool}  # Length N_points
+    boundary_types             # Vector length N_boundary (BoundaryType objects)
+    normals                    # Vector length N_boundary (normal vectors)
+    adjl                       # Adjacency list (Vector of neighbor index vectors)
+    functional_data::FunctionalData
+    global_to_boundary::Vector{Int}  # Maps global index -> boundary index (0 if internal)
+    boundary_to_global::Vector{Int}  # Maps boundary index -> global index
     function RegionData(
-        all_coords, is_boundary, boundary_type, boundary_normals, adjl, functional_data
+        all_coords,
+        is_boundary::AbstractVector{Bool},
+        boundary_types,
+        normals,
+        adjl,
+        functional_data::FunctionalData,
     )
-        nchunks = Threads.nthreads()
-        stencil_data = [StencilData(all_coords, adjl, functional_data) for _ in 1:nchunks]
-        global_to_boundary, boundary_to_global = set_global_and_boundary_indices!(
-            region_data
-        )
+        g2b, b2g = _compute_boundary_mappings(is_boundary)
         return new(
             all_coords,
-            is_boundary,
-            boundary_type,
-            boundary_normals,
+            collect(is_boundary),
+            boundary_types,
+            normals,
             adjl,
             functional_data,
-            stencil_data,
-            global_to_boundary,
-            boundary_to_global,
+            g2b,
+            b2g,
         )
     end
 end
 
-function set_global_and_boundary_indices!(region_data::RegionData)
-    #I want this function to provide a mapping from global to boundary indices and vice versa
-    global_to_boundary = zeros(Int, length(region_data.all_coords))
-    boundary_to_global = zeros(Int, sum(region_data.is_boundary))
-
-    global_idx = 1
-    for (i, is_bnd) in enumerate(region_data.is_boundary)
-        if is_bnd
-            boundary_to_global[global_idx] = i
-            global_idx += 1
+function _compute_boundary_mappings(is_boundary::AbstractVector{Bool})
+    N = length(is_boundary)
+    n_bnd = count(is_boundary)
+    global_to_boundary = zeros(Int, N)
+    boundary_to_global = Vector{Int}(undef, n_bnd)
+    bidx = 0
+    @inbounds for i in 1:N
+        if is_boundary[i]
+            bidx += 1
+            global_to_boundary[i] = bidx
+            boundary_to_global[bidx] = i
         end
     end
-
     return global_to_boundary, boundary_to_global
 end
 
-function _build_weights(region_data::RegionData)
+function _build_weights(region_data::RegionData, n_chunks=Threads.nthreads())
     lhs, rhs = _preallocate_IJV_matrices(region_data)
 
-    lhs_offsets, rhs_offsets = _calculate_thread_offsets(region_data, nchunks)
+    lhs_offsets, rhs_offsets = _calculate_thread_offsets(region_data, n_chunks)
 
     # Build stencil for each data point and store in global weight matrices
+    stencil_datas = [StencilData(region_data) for _ in 1:n_chunks]
+
     Threads.@threads for (ichunk, xrange) in
-                         enumerate(index_chunks(region_data.adjl; n=nchunks))
+                         enumerate(index_chunks(region_data.adjl; n=n_chunks))
         for i in xrange
             if !region_data.is_boundary[i]
 
                 # Update stencil and compute weights in a single call
-                _set_stencil_eval_point!(region_data, ichunk, region_data.all_coords[i])
-                _update_stencil!(region_data, i, ichunk)
+                _set_stencil_eval_point!(stencil_datas[ichunk], region_data.all_coords[i])
+                _update_stencil!(stencil_datas[ichunk], region_data, i)
 
                 # Copy results from stencil_data to global matrices
                 _write_coefficients_to_global_matrices!(
                     lhs,
                     rhs,
-                    region_data.stencil_data[ichunk],
+                    stencil_datas[ichunk],
                     lhs_offsets[ichunk],
                     rhs_offsets[ichunk],
                 )
