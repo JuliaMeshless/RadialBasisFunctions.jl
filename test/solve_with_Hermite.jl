@@ -37,6 +37,8 @@ import RadialBasisFunctions as RBF
     @testset "BoundaryType classification" begin
         @test RBF.is_Neumann(bt_neu)
         @test RBF.is_Dirichlet(bt_dir)
+        @test !RBF.is_Robin(bt_neu)
+        @test !RBF.is_Robin(bt_dir)
     end
 
     @testset "_preallocate_IJV_matrices" begin
@@ -149,6 +151,360 @@ end
     prob = LinearProblem(lhs_dx, RHS)
     sol = solve(prob)
     @test sol.u ≈ an_sol.(all_coords[.!is_boundary])
+end
+
+@testset "Neumann boundary conditions - small deterministic case" begin
+    # Configuration with mixed Dirichlet and Neumann boundary conditions
+    # (Pure Neumann problems are under-determined)
+    node_coords = [
+        SVector(1.0, 2.0),
+        SVector(2.0, 1.0),
+        SVector(1.5, 0.0),
+        SVector(0.0, 1.0),
+        SVector(2.0, 0.0),
+    ]
+    is_boundary = [false, false, true, true, true]
+    bt_neu = RBF.BoundaryType(Float64[0.0, 1.0])  # Neumann BC
+    bt_dir = RBF.BoundaryType(Float64[1.0, 0.0])  # Dirichlet BC
+    boundary_types = [bt_neu, bt_dir, bt_neu]  # Mix of Neumann and Dirichlet
+    normals = [
+        SVector(0.0, 1.0),  # node 3 (Neumann)
+        SVector(-1.0, 0.0), # node 4 (Dirichlet - normal not used)
+        SVector(1.0, 0.0),  # node 5 (Neumann)
+    ]
+
+    # Adjacency: each node + 3 others (k = 4 for internal nodes)
+    adjl = [[1, 2, 3, 4], [2, 1, 3, 5], [3, 1, 2, 5], [4, 1, 3, 5], [5, 2, 3, 4]]
+
+    # Basis & operators
+    basis = RBF.PHS(3; poly_deg=1)
+    mon = RBF.MonomialBasis(2, 1)
+    fdata = RBF.FunctionalData(basis, mon, (RBF.∂(basis, 1),), (RBF.∂_Hermite(mon, 1),))
+    region = RBF.RegionData(node_coords, is_boundary, boundary_types, normals, adjl, fdata)
+
+    @testset "Mixed Neumann/Dirichlet boundary types" begin
+        @test RBF.is_Neumann(boundary_types[1])
+        @test RBF.is_Dirichlet(boundary_types[2])
+        @test RBF.is_Neumann(boundary_types[3])
+        @test !RBF.is_Robin(boundary_types[1])
+        @test !RBF.is_Robin(boundary_types[2])
+        @test !RBF.is_Robin(boundary_types[3])
+    end
+
+    @testset "Neumann matrix structure" begin
+        lhs_mat, rhs_mat = RBF._build_weights(region)
+        @test size(lhs_mat) == (2, 2)
+        @test size(rhs_mat) == (2, 3)
+        @test nnz(lhs_mat) > 0
+        @test nnz(rhs_mat) > 0
+    end
+
+    @testset "Mixed Neumann/Dirichlet manufactured solution test" begin
+        # Use a linear function: u(x,y) = 1 + 2x + 3y
+        # ∂u/∂x = 2, ∂u/∂y = 3
+        an_sol(coord) = 1.0 + 2.0 * coord[1] + 3.0 * coord[2]
+        du_dx = 2.0
+        du_dy = 3.0
+
+        # Calculate boundary values based on boundary type
+        boundary_values = Float64[]
+        boundary_coords = node_coords[is_boundary]
+
+        for (i, (coord, normal, bt)) in
+            enumerate(zip(boundary_coords, normals, boundary_types))
+            if RBF.is_Dirichlet(bt)
+                # Dirichlet: u = g
+                push!(boundary_values, an_sol(coord))
+            elseif RBF.is_Neumann(bt)
+                # Neumann: ∂u/∂n = g
+                normal_derivative = normal[1] * du_dx + normal[2] * du_dy
+                push!(boundary_values, normal_derivative)
+            end
+        end
+
+        lhs_mat, rhs_mat = RBF._build_weights(region)
+        RHS = -rhs_mat * boundary_values
+        prob = LinearProblem(lhs_mat, RHS)
+        sol = solve(prob)
+
+        # Solution should match manufactured solution at internal nodes
+        expected = an_sol.(node_coords[.!is_boundary])
+        @test sol.u ≈ expected atol = 1e-10
+    end
+end
+
+@testset "Pure Neumann boundary conditions - singularity test" begin
+    # Configuration with all Neumann boundary conditions (singular system)
+    node_coords = [
+        SVector(1.0, 2.0),
+        SVector(2.0, 1.0),
+        SVector(1.5, 0.0),
+        SVector(0.0, 1.0),
+        SVector(2.0, 0.0),
+    ]
+    is_boundary = [false, false, true, true, true]
+    bt_neu = RBF.BoundaryType(Float64[0.0, 1.0])  # Pure Neumann BC
+    boundary_types = [bt_neu, bt_neu, bt_neu]  # All boundary nodes are Neumann
+    normals = [
+        SVector(0.0, 1.0),  # node 3
+        SVector(-1.0, 0.0), # node 4
+        SVector(1.0, 0.0),  # node 5
+    ]
+
+    # Adjacency: each node + 3 others
+    adjl = [[1, 2, 3, 4], [2, 1, 3, 5], [3, 1, 2, 5], [4, 1, 3, 5], [5, 2, 3, 4]]
+
+    # Basis & operators
+    basis = RBF.PHS(3; poly_deg=1)
+    mon = RBF.MonomialBasis(2, 1)
+    fdata = RBF.FunctionalData(basis, mon, (RBF.∂(basis, 1),), (RBF.∂_Hermite(mon, 1),))
+    region = RBF.RegionData(node_coords, is_boundary, boundary_types, normals, adjl, fdata)
+
+    @testset "All boundary types are Neumann" begin
+        for bt in boundary_types
+            @test RBF.is_Neumann(bt)
+            @test !RBF.is_Dirichlet(bt)
+            @test !RBF.is_Robin(bt)
+        end
+    end
+
+    @testset "Pure Neumann matrix structure" begin
+        lhs_mat, rhs_mat = RBF._build_weights(region)
+        @test size(lhs_mat) == (2, 2)
+        @test size(rhs_mat) == (2, 3)
+        @test nnz(lhs_mat) > 0
+        @test nnz(rhs_mat) > 0
+
+        # Pure Neumann systems are typically singular
+        # Check that the system can be constructed (but may not be solvable)
+        @test isa(lhs_mat, SparseMatrixCSC)
+        @test isa(rhs_mat, SparseMatrixCSC)
+    end
+end
+
+@testset "Robin boundary conditions - small deterministic case" begin
+    # Configuration with Robin boundary conditions (α*u + β*(∂u/∂n) = g)
+    node_coords = [
+        SVector(1.0, 2.0),
+        SVector(2.0, 1.0),
+        SVector(1.5, 0.0),
+        SVector(0.0, 1.0),
+        SVector(2.0, 0.0),
+    ]
+    is_boundary = [false, false, true, true, true]
+
+    # Robin BCs with different coefficients
+    bt_robin1 = RBF.BoundaryType(Float64[1.0, 1.0])  # α=1, β=1
+    bt_robin2 = RBF.BoundaryType(Float64[2.0, 0.5])  # α=2, β=0.5
+    bt_robin3 = RBF.BoundaryType(Float64[0.5, 2.0])  # α=0.5, β=2.0
+    boundary_types = [bt_robin1, bt_robin2, bt_robin3]
+
+    normals = [
+        SVector(0.0, 1.0),  # node 3
+        SVector(-1.0, 0.0), # node 4
+        SVector(1.0, 0.0),  # node 5
+    ]
+
+    # Adjacency: each node + 3 others (k = 4 for internal nodes)
+    adjl = [[1, 2, 3, 4], [2, 1, 3, 5], [3, 1, 2, 5], [4, 1, 3, 5], [5, 2, 3, 4]]
+
+    # Basis & operators
+    basis = RBF.PHS(3; poly_deg=1)
+    mon = RBF.MonomialBasis(2, 1)
+    fdata = RBF.FunctionalData(basis, mon, (RBF.∂(basis, 1),), (RBF.∂_Hermite(mon, 1),))
+    region = RBF.RegionData(node_coords, is_boundary, boundary_types, normals, adjl, fdata)
+
+    @testset "All boundary types are Robin" begin
+        for bt in boundary_types
+            @test RBF.is_Robin(bt)
+            @test !RBF.is_Dirichlet(bt)
+            @test !RBF.is_Neumann(bt)
+        end
+    end
+
+    @testset "Robin coefficient access" begin
+        @test RBF.α(bt_robin1) == 1.0
+        @test RBF.β(bt_robin1) == 1.0
+        @test RBF.α(bt_robin2) == 2.0
+        @test RBF.β(bt_robin2) == 0.5
+        @test RBF.α(bt_robin3) == 0.5
+        @test RBF.β(bt_robin3) == 2.0
+    end
+
+    @testset "Robin matrix structure" begin
+        lhs_mat, rhs_mat = RBF._build_weights(region)
+        @test size(lhs_mat) == (2, 2)
+        @test size(rhs_mat) == (2, 3)
+        @test nnz(lhs_mat) > 0
+        @test nnz(rhs_mat) > 0
+    end
+
+    @testset "Robin manufactured solution test" begin
+        # Use a linear function: u(x,y) = 1 + 2x + 3y
+        # ∂u/∂x = 2, ∂u/∂y = 3
+        an_sol(coord) = 1.0 + 2.0 * coord[1] + 3.0 * coord[2]
+        du_dx = 2.0
+        du_dy = 3.0
+
+        # Calculate Robin boundary values: α*u + β*(∂u/∂n) = g
+        boundary_values = Float64[]
+        boundary_coords = node_coords[is_boundary]
+
+        for (i, (coord, normal, bt)) in
+            enumerate(zip(boundary_coords, normals, boundary_types))
+            u_val = an_sol(coord)
+            normal_derivative = normal[1] * du_dx + normal[2] * du_dy
+            robin_value = RBF.α(bt) * u_val + RBF.β(bt) * normal_derivative
+            push!(boundary_values, robin_value)
+        end
+
+        lhs_mat, rhs_mat = RBF._build_weights(region)
+        RHS = -rhs_mat * boundary_values
+        prob = LinearProblem(lhs_mat, RHS)
+        sol = solve(prob)
+
+        # Solution should match manufactured solution
+        expected = an_sol.(node_coords[.!is_boundary])
+        @test sol.u ≈ expected atol = 1e-10
+    end
+end
+
+@testset "Mixed boundary conditions - comprehensive test" begin
+    # Configuration with all three types of boundary conditions
+    node_coords = [
+        SVector(1.0, 2.0),   # internal
+        SVector(2.0, 1.0),   # internal
+        SVector(3.0, 1.5),   # internal
+        SVector(1.5, 0.0),   # boundary - Dirichlet
+        SVector(0.0, 1.0),   # boundary - Neumann
+        SVector(2.0, 0.0),   # boundary - Robin
+        SVector(3.0, 0.5),   # boundary - Dirichlet
+    ]
+    is_boundary = [false, false, false, true, true, true, true]
+
+    # Mixed boundary types
+    bt_dir = RBF.BoundaryType(Float64[1.0, 0.0])    # Dirichlet
+    bt_neu = RBF.BoundaryType(Float64[0.0, 1.0])    # Neumann
+    bt_robin = RBF.BoundaryType(Float64[1.5, 0.8])  # Robin
+    boundary_types = [bt_dir, bt_neu, bt_robin, bt_dir]
+
+    normals = [
+        SVector(0.0, 1.0),   # node 4 (Dirichlet - normal not used)
+        SVector(-1.0, 0.0),  # node 5 (Neumann)
+        SVector(1.0, 0.0),   # node 6 (Robin)
+        SVector(0.0, -1.0),  # node 7 (Dirichlet - normal not used)
+    ]
+
+    # Larger adjacency lists for more nodes
+    adjl = [
+        [1, 2, 3, 4, 5],     # Node 1
+        [2, 1, 3, 5, 6],     # Node 2  
+        [3, 1, 2, 6, 7],     # Node 3
+        [4, 1, 2, 3, 7],     # Node 4
+        [5, 1, 2, 4, 6],     # Node 5
+        [6, 2, 3, 5, 7],     # Node 6
+        [7, 3, 4, 6],        # Node 7
+    ]
+
+    # Basis & operators
+    basis = RBF.PHS(3; poly_deg=1)
+    mon = RBF.MonomialBasis(2, 1)
+    fdata = RBF.FunctionalData(basis, mon, (RBF.∂(basis, 1),), (RBF.∂_Hermite(mon, 1),))
+    region = RBF.RegionData(node_coords, is_boundary, boundary_types, normals, adjl, fdata)
+
+    @testset "Mixed boundary type classification" begin
+        @test RBF.is_Dirichlet(boundary_types[1])
+        @test RBF.is_Neumann(boundary_types[2])
+        @test RBF.is_Robin(boundary_types[3])
+        @test RBF.is_Dirichlet(boundary_types[4])
+
+        @test !RBF.is_Neumann(boundary_types[1])
+        @test !RBF.is_Robin(boundary_types[1])
+        @test !RBF.is_Dirichlet(boundary_types[2])
+        @test !RBF.is_Robin(boundary_types[2])
+        @test !RBF.is_Dirichlet(boundary_types[3])
+        @test !RBF.is_Neumann(boundary_types[3])
+    end
+
+    @testset "Mixed boundary matrix structure" begin
+        lhs_mat, rhs_mat = RBF._build_weights(region)
+        @test size(lhs_mat) == (3, 3)  # 3 internal nodes
+        @test size(rhs_mat) == (3, 4)  # 3 internal nodes x 4 boundary nodes
+        @test nnz(lhs_mat) > 0
+        @test nnz(rhs_mat) > 0
+    end
+
+    @testset "Mixed boundary manufactured solution test" begin
+        # Use a simpler linear function: u(x,y) = 1 + 2x + 3y
+        # ∂u/∂x = 2, ∂u/∂y = 3
+        an_sol(coord) = 1.0 + 2.0 * coord[1] + 3.0 * coord[2]
+        du_dx(coord) = 2.0
+        du_dy(coord) = 3.0
+
+        # Calculate boundary values based on boundary type
+        boundary_values = Float64[]
+        boundary_coords = node_coords[is_boundary]
+
+        for (i, (coord, normal, bt)) in
+            enumerate(zip(boundary_coords, normals, boundary_types))
+            if RBF.is_Dirichlet(bt)
+                # Dirichlet: u = g
+                push!(boundary_values, an_sol(coord))
+            elseif RBF.is_Neumann(bt)
+                # Neumann: ∂u/∂n = g
+                normal_derivative = normal[1] * du_dx(coord) + normal[2] * du_dy(coord)
+                push!(boundary_values, normal_derivative)
+            elseif RBF.is_Robin(bt)
+                # Robin: α*u + β*(∂u/∂n) = g
+                u_val = an_sol(coord)
+                normal_derivative = normal[1] * du_dx(coord) + normal[2] * du_dy(coord)
+                robin_value = RBF.α(bt) * u_val + RBF.β(bt) * normal_derivative
+                push!(boundary_values, robin_value)
+            end
+        end
+
+        lhs_mat, rhs_mat = RBF._build_weights(region)
+        RHS = -rhs_mat * boundary_values
+        prob = LinearProblem(lhs_mat, RHS)
+        sol = solve(prob)
+
+        # Solution should match manufactured solution at internal nodes
+        expected = an_sol.(node_coords[.!is_boundary])
+        @test sol.u ≈ expected atol = 1e-6  # Relaxed tolerance for more complex case
+    end
+end
+
+@testset "Boundary condition setter functions" begin
+    bt = RBF.BoundaryType(Float64[0.0, 0.0])
+
+    @testset "Set to Dirichlet" begin
+        RBF.set_Dirichlet!(bt)
+        @test RBF.is_Dirichlet(bt)
+        @test !RBF.is_Neumann(bt)
+        @test !RBF.is_Robin(bt)
+        @test RBF.α(bt) == 1.0
+        @test RBF.β(bt) == 0.0
+    end
+
+    @testset "Set to Neumann" begin
+        RBF.set_Neumann!(bt)
+        @test RBF.is_Neumann(bt)
+        @test !RBF.is_Dirichlet(bt)
+        @test !RBF.is_Robin(bt)
+        @test RBF.α(bt) == 0.0
+        @test RBF.β(bt) == 1.0
+    end
+
+    @testset "Set to Robin" begin
+        α_val = 2.5
+        β_val = 1.8
+        RBF.set_Robin!(bt, α_val, β_val)
+        @test RBF.is_Robin(bt)
+        @test !RBF.is_Dirichlet(bt)
+        @test !RBF.is_Neumann(bt)
+        @test RBF.α(bt) ≈ α_val
+        @test RBF.β(bt) ≈ β_val
+    end
 end
 
 # @testset "Alternative operator (y-derivative)" begin
