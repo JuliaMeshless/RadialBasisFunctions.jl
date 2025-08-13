@@ -1,7 +1,7 @@
 struct StencilData{T}
     local_adjl::Vector{Int}                     # Local adjacency list indices
     eval_point::AbstractVector{T}                # Evaluation point for the RHS
-    A::Matrix{T}            # Local system matrix (treated as symmetric in upper triangle)
+    A::Symmetric{T}                              # Local system matrix (will be treated as symmetric)
     b::AbstractMatrix{T}                          # Local RHS matrix (one column per operator)
     local_coords::Vector{AbstractVector{T}}                  # Local data points (now using the same type T)
     is_boundary::AbstractVector{Bool}             # Whether nodes are on boundary
@@ -10,8 +10,6 @@ struct StencilData{T}
     lhs_v::AbstractMatrix{T}                      # Local coefficients for internal nodes
     rhs_v::AbstractMatrix{T}                      # Local coefficients for boundary nodes
     weights::AbstractMatrix{T}                    # Weights for the local system
-    poly_buf::Vector{T}                           # Reusable buffer for polynomial values
-    deriv_buf::Vector{T}                          # Reusable buffer for normal derivative values
     function StencilData(region_data::RegionData)
         all_coords = region_data.all_coords
         adjl = region_data.adjl
@@ -28,8 +26,9 @@ struct StencilData{T}
 
         # adjacency entries are Int-like; take eltype of inner adjacency vector
         local_adjl = zeros(eltype(first(adjl)), k)
+        # println("local_adjl = $local_adjl")
         eval_point = zeros(TD, dim)
-        A = zeros(TD, n, n)
+        A = Symmetric(zeros(TD, n, n), :U)  # Regular matrix, will use Symmetric wrapper when solving
         b = zeros(TD, n, num_ops)
         local_coords = [zeros(TD, dim) for _ in 1:k]
         is_boundary = zeros(Bool, k)
@@ -38,9 +37,6 @@ struct StencilData{T}
         lhs_v = zeros(TD, k, num_ops)
         rhs_v = zeros(TD, k, num_ops)
         weights = zeros(TD, n, num_ops)
-        # Buffers for polynomial and derivative values
-        poly_buf = zeros(TD, n - k)      # length of polynomial block (nmon)
-        deriv_buf = similar(poly_buf)
 
         return new{TD}(
             local_adjl,
@@ -54,8 +50,6 @@ struct StencilData{T}
             lhs_v,
             rhs_v,
             weights,
-            poly_buf,
-            deriv_buf,
         )
     end
 end
@@ -67,8 +61,8 @@ function _set_stencil_eval_point!(
     return nothing
 end
 
-function _reset_local_arrays(stencil_data::StencilData)
-    fill!(stencil_data.A, 0)
+function _reset_local_arrays!(stencil_data::StencilData)
+    fill!(parent(stencil_data.A), 0)
     fill!(stencil_data.b, 0)
     fill!(stencil_data.lhs_v, 0)
     fill!(stencil_data.rhs_v, 0)
@@ -93,7 +87,8 @@ function _set_stencil_boundary_data!(stencil_data::StencilData, region_data::Reg
         boundary_index = region_data.global_to_boundary[global_index]
         stencil_data.is_boundary[i] = region_data.is_boundary[global_index]
         if stencil_data.is_boundary[i]
-            stencil_data.boundary_types[i] = region_data.boundary_types[boundary_index]
+            stencil_data.boundary_types[i].coefficients .=
+                region_data.boundary_types[boundary_index].coefficients
             if is_Neumann(stencil_data.boundary_types[i]) ||
                 is_Robin(stencil_data.boundary_types[i])
                 stencil_data.normals[i] .= region_data.normals[boundary_index]
@@ -106,88 +101,72 @@ end
 function _update_stencil!(
     stencil_data::StencilData, region_data::RegionData, global_index::Int
 )
-    stencil_data.local_adjl .= region_data.adjl[global_index]
+    _reset_local_arrays!(stencil_data)
 
-    _reset_local_arrays(stencil_data)
+    stencil_data.local_adjl .= region_data.adjl[global_index]
 
     _set_stencil_local_coords!(stencil_data, region_data)
 
     _set_stencil_boundary_data!(stencil_data, region_data)
 
-    # NOTE: eval_point is intentionally NOT set here (user chooses when/how to set it)
-
     _build_collocation_matrix_Hermite!(stencil_data, region_data.functional_data)
     _build_rhs!(stencil_data, region_data.functional_data)
 
-    basis = region_data.functional_data.basis
     try
-        F = bunchkaufman(Symmetric(stencil_data.A, :U)) # factor using only upper triangle
+        F = bunchkaufman(stencil_data.A)
         stencil_data.weights .= F \ stencil_data.b
     catch err
         if err isa LinearAlgebra.SingularException
-            A = stencil_data.A
-            n = size(A, 1)
+            Aparent = parent(stencil_data.A)  # Get underlying matrix from Symmetric wrapper
+            n = size(Aparent, 1)
             k = length(stencil_data.local_adjl)
-            basis = region_data.functional_data.basis
             nmon = n - k
-            s = svdvals(A)
-            # rank tolerance similar to LAPACK default
-            tol = maximum(s) * eps(eltype(s)) * max(size(A)...)
-            r = count(>(tol), s)
-            condA = maximum(s) / max(minimum(s), eps(eltype(s)))
-            # Attempt a tiny diagonal regularization on the RBF block only (leave polynomial constraint rows/cols)
-            λ = maximum(s; init=zero(eltype(s))) * (eps(eltype(s)) * 10)
-            if !isfinite(λ) || λ == 0
-                λ = eps(eltype(s))
-            end
-            kblock = k
-            for i in 1:kblock
-                stencil_data.A[i, i] += λ
-            end
-            try
-                F2 = bunchkaufman(Symmetric(stencil_data.A, :U))
-                stencil_data.weights .= F2 \ stencil_data.b
-            catch err2
-                if err2 isa LinearAlgebra.SingularException
-                    error(
-                        "Singular local stencil matrix (rank=$r < n=$n, cond≈$(round(condA; digits=3))). " *
-                        "Regularization λ=$(λ) failed. Stencil size k=$k, polynomial terms nmon=$nmon (deg=$(basis.poly_deg)). " *
-                        "Suggestions: increase neighbor count (k), reduce polynomial degree, or improve node distribution.",
-                    )
-                else
-                    rethrow()
-                end
-            end
-        else
-            rethrow()
+            r = rank(Aparent)  # Check rank of underlying matrix
+            println(
+                "Singular local stencil_data matrix (rank=" *
+                string(r) *
+                " < n=" *
+                string(n) *
+                "). " *
+                "Stencil size k=" *
+                string(k) *
+                ", polynomial terms nmon=" *
+                string(nmon) *
+                ".",
+            )
         end
     end
 
     # Store weights in appropriate matrices
+    # The first k entries of weights correspond to the k local nodes
     k = length(stencil_data.local_adjl)
+    num_ops = size(stencil_data.weights, 2)
+
     for j in 1:k
-        if !stencil_data.is_boundary[j]
-            stencil_data.lhs_v[j, :] .= view(stencil_data.weights, j, :)
-        else
-            stencil_data.rhs_v[j, :] .= view(stencil_data.weights, j, :)
+        for op in 1:num_ops
+            if !stencil_data.is_boundary[j]
+                stencil_data.lhs_v[j, op] = stencil_data.weights[j, op]
+            else
+                stencil_data.rhs_v[j, op] = stencil_data.weights[j, op]
+            end
         end
     end
 
     return nothing
 end
 
-function _build_collocation_matrix_Hermite!(stencil::StencilData, functional_data)
+function _build_collocation_matrix_Hermite!(stencil_data::StencilData, functional_data)
     basis = functional_data.basis
     mon = functional_data.mon
-    k = length(stencil.local_adjl)
-    A = stencil.A
-    @inbounds for j in 1:k, i in 1:j
-        _calculate_matrix_entry_RBF!(i, j, stencil, basis)
+    k = length(stencil_data.local_adjl)
+    # Only fill upper triangle for symetric matrix
+    @inbounds for j in 1:k, i in 1:j  # Changed to j >= i for upper triangle
+        _calculate_matrix_entry_RBF!(i, j, stencil_data, basis)
     end
 
     if degree(mon) > -1
         @inbounds for i in 1:k
-            _calculate_matrix_entry_poly!(stencil, i, k + 1, mon)
+            _calculate_matrix_entry_poly!(stencil_data, i, k + 1, mon)
         end
     end
 
@@ -195,7 +174,7 @@ function _build_collocation_matrix_Hermite!(stencil::StencilData, functional_dat
 end
 
 function _calculate_matrix_entry_RBF!(i, j, stencil_data::StencilData, basis)
-    A = stencil_data.A
+    A = parent(stencil_data.A)
     data = stencil_data.local_coords
 
     bt_i = stencil_data.boundary_types[i]
@@ -239,64 +218,59 @@ function _calculate_matrix_entry_RBF!(i, j, stencil_data::StencilData, basis)
     return nothing
 end
 
-function _calculate_matrix_entry_poly!(stencil::StencilData, row, col_start, mon)
-    A = stencil.A
+function _calculate_matrix_entry_poly!(stencil_data::StencilData, row, col_start, mon)
+    A = parent(stencil_data.A)
     col_end = size(A, 2)
-    data_point = stencil.local_coords[row]
-    bt = stencil.boundary_types[row]
-    polyvals = stencil.poly_buf
-    derivvals = stencil.deriv_buf
+    data_point = stencil_data.local_coords[row]
+    bt = stencil_data.boundary_types[row]
 
     # Internal or Dirichlet nodes: only polynomial values
-    if !stencil.is_boundary[row] || is_Dirichlet(bt)
-        mon(polyvals, data_point)
-        @inbounds for (k, c) in enumerate(col_start:col_end)
-            A[row, c] = polyvals[k]
-        end
+    if !stencil_data.is_boundary[row] || is_Dirichlet(bt)
+        a = view(A, row, col_start:col_end)
+        mon(a, data_point)
         return nothing
     end
 
-    nvec = stencil.normals[row]
+    nvec = stencil_data.normals[row]
     if is_Neumann(bt)
-        ∂_normal(mon, nvec)(polyvals, data_point) # reuse polyvals buffer for derivative
-        @inbounds for (k, c) in enumerate(col_start:col_end)
-            A[row, c] = polyvals[k]
-        end
+        a = view(A, row, col_start:col_end)
+        ∂_normal(mon, nvec)(a, data_point)
         return nothing
     end
 
-    # Robin: α * P + β * ∂_n P using both buffers
+    # Robin: α * P + β * ∂_n P
+    nmon = col_end - col_start + 1
+    polyvals = zeros(eltype(A), nmon)
+    derivvals = zeros(eltype(A), nmon)
     mon(polyvals, data_point)
     ∂_normal(mon, nvec)(derivvals, data_point)
-    αv = α(bt)
-    βv = β(bt)
     @inbounds for (k, c) in enumerate(col_start:col_end)
-        A[row, c] = αv * polyvals[k] + βv * derivvals[k]
+        A[row, c] = α(bt) * polyvals[k] + β(bt) * derivvals[k]
     end
     return nothing
 end
 
-function _build_rhs!(stencil::StencilData, functional_data)
+function _build_rhs!(stencil_data::StencilData, functional_data)
     ℒrbf = functional_data.ℒrbf
     ℒmon = functional_data.ℒmon
     basis = functional_data.basis
-    k = length(stencil.local_adjl)
-    b = stencil.b
-    data = stencil.local_coords
-    eval_point = stencil.eval_point
+    k = length(stencil_data.local_adjl)
+    b = stencil_data.b
+    data = stencil_data.local_coords
+    eval_point = stencil_data.eval_point
 
     @assert size(b, 2) == length(ℒrbf) == length(ℒmon) "b, ℒrbf, and ℒmon must have the same length"
 
     # radial basis section
     for (j, ℒ) in enumerate(ℒrbf)
         @inbounds for i in eachindex(data)
-            if stencil.is_boundary[i]
-                bt = stencil.boundary_types[i]
+            if stencil_data.is_boundary[i]
+                bt = stencil_data.boundary_types[i]
                 αv = α(bt)
                 βv = β(bt)
                 b[i, j] =
                     αv * ℒ(eval_point, data[i]) +
-                    βv * ℒ(eval_point, data[i], stencil.normals[i])
+                    βv * ℒ(eval_point, data[i], stencil_data.normals[i])
             else # internal
                 b[i, j] = ℒ(eval_point, data[i])
             end
