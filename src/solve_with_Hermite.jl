@@ -3,28 +3,28 @@ function _build_weights(region_data::RegionData, n_chunks=Threads.nthreads())
 
     lhs_offsets, rhs_offsets = _calculate_thread_offsets(region_data, n_chunks)
 
-    # Build stencil for each data point and store in global weight matrices
     stencil_datas = [StencilData(region_data) for _ in 1:n_chunks]
 
     Threads.@threads for (ichunk, xrange) in
                          enumerate(index_chunks(region_data.adjl; n=n_chunks))
+        local_lhs_idx = lhs_offsets[ichunk]
+        local_rhs_idx = rhs_offsets[ichunk]
+        stencil_data = stencil_datas[ichunk]
         for i in xrange
             if !region_data.is_boundary[i]
 
                 # Update stencil and compute weights in a single call
-                _set_stencil_eval_point!(stencil_datas[ichunk], region_data.all_coords[i])
-                _update_stencil!(stencil_datas[ichunk], region_data, i)
+                _set_stencil_eval_point!(stencil_data, region_data.all_coords[i])
+                _update_stencil!(stencil_data, region_data, i)
 
                 # Copy results from stencil_data to global matrices
-                _write_coefficients_to_global_matrices!(
-                    lhs,
-                    rhs,
-                    stencil_datas[ichunk],
-                    lhs_offsets[ichunk],
-                    rhs_offsets[ichunk],
+                local_lhs_idx, local_rhs_idx = _write_coefficients_to_global_matrices!(
+                    lhs, rhs, stencil_data, local_lhs_idx, local_rhs_idx
                 )
             end
         end
+        @assert local_lhs_idx - 1 <= length(lhs.I)
+        @assert local_rhs_idx - 1 <= length(rhs.I)
     end
 
     return _return_global_matrices(lhs, rhs, region_data.is_boundary)
@@ -91,15 +91,6 @@ function _preallocate_IJV_matrices(region_data)
     return (lhs=(I=I_lhs, J=J_lhs, V=V_lhs), rhs=(I=I_rhs, J=J_rhs, V=V_rhs))
 end
 
-"""
-    _calculate_thread_offsets(adjl, boundary_flag, nchunks)
-
-Calculate the starting offsets for each thread when filling LHS and RHS matrices.
-- lhs_offsets: Starting indices for internal-to-internal connections
-- rhs_offsets: Starting indices for internal-to-boundary connections
-
-Returns a tuple of (lhs_offsets, rhs_offsets).
-"""
 function _calculate_thread_offsets(region_data, nchunks)
     adjl = region_data.adjl
     boundary_flag = region_data.is_boundary
@@ -130,6 +121,7 @@ function _calculate_thread_offsets(region_data, nchunks)
 end
 
 function _write_coefficients_to_global_matrices!(lhs, rhs, stencil, lhs_idx, rhs_idx)
+    num_entries = 0
     for j_local in eachindex(stencil.local_adjl)
         if !stencil.is_boundary[j_local]  # Internal node -> goes to LHS
             lhs.V[lhs_idx, :] = stencil.lhs_v[j_local, :]
@@ -138,25 +130,11 @@ function _write_coefficients_to_global_matrices!(lhs, rhs, stencil, lhs_idx, rhs
             rhs.V[rhs_idx, :] = stencil.rhs_v[j_local, :]
             rhs_idx += 1
         end
+        num_entries += 1
     end
-
-    return nothing
+    return lhs_idx, rhs_idx
 end
 
-"""
-    _return_global_matrices(I_lhs, J_lhs, V_lhs, I_rhs, J_rhs, V_rhs, boundary_flag)
-
-Constructs sparse matrix representation of the global linear system.
-
-# Arguments
-- `I_lhs`, `J_lhs`, `V_lhs`: COO format components for LHS matrix
-- `I_rhs`, `J_rhs`, `V_rhs`: COO format components for RHS matrix
-- `boundary_flag`: Boolean array indicating boundary nodes
-
-# Returns
-- For single operators: tuple of (lhs_matrix, rhs_matrix)
-- For multiple operators: tuple of (lhs_matrices, rhs_matrices)
-"""
 function _return_global_matrices(lhs, rhs, boundary_flag)
     nrows = count(.!boundary_flag)
     ncols_lhs = count(.!boundary_flag)
