@@ -30,10 +30,12 @@ include("solve_utils.jl")
 include("solve.jl")
 
 #new stuff fot Hermite
-include("boundary_type.jl")
-include("region_data")
-include("StencilData.jl")
+include("hermite/boundary_type.jl")
+include("hermite/region_data.jl")
+include("hermite/StencilData.jl")
 include("solve_with_Hermite.jl")
+export BoundaryType, Dirichlet, Neumann, Robin
+export α, β, is_Dirichlet, is_Neumann, is_Robin
 
 include("operators/custom.jl")
 export Custom, custom

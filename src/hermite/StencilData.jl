@@ -1,15 +1,15 @@
 struct StencilData{T}
-    local_adjl::Vector{Int}                     # Local adjacency list indices
-    eval_point::AbstractVector{T}                # Evaluation point for the RHS
-    A::Symmetric{T}                              # Local system matrix (will be treated as symmetric)
-    b::AbstractMatrix{T}                          # Local RHS matrix (one column per operator)
-    local_coords::Vector{AbstractVector{T}}                  # Local data points (now using the same type T)
-    is_boundary::AbstractVector{Bool}             # Whether nodes are on boundary
-    boundary_types::AbstractVector{BoundaryType}              # Boundary type (Dirichlet / Neumann / Robin)
-    normals::Vector{AbstractVector{T}}             # Normal vectors (meaningful for Neumann points)
-    lhs_v::AbstractMatrix{T}                      # Local coefficients for internal nodes
-    rhs_v::AbstractMatrix{T}                      # Local coefficients for boundary nodes
-    weights::AbstractMatrix{T}                    # Weights for the local system
+    local_adjl::AbstractVector{<:Integer}              # Local adjacency list indices
+    eval_point::AbstractVector{T}                      # Evaluation point for the RHS
+    A::Symmetric{T}                                    # Local system matrix
+    b::AbstractArray{T}                                # Local RHS matrix (one column per operator)
+    local_coords::AbstractVector{<:AbstractVector{T}}  # Local data points (now using the same type T)
+    is_boundary::AbstractVector{Bool}                  # Whether nodes are on boundary
+    boundary_types::AbstractVector{<:BoundaryType}     # Boundary type (Dirichlet / Neumann / Robin)
+    normals::AbstractVector{AbstractVector{T}}         # Normal vectors (meaningful for Neumann points)
+    lhs_v::AbstractMatrix{T}                           # Local coefficients for internal nodes
+    rhs_v::AbstractMatrix{T}                           # Local coefficients for boundary nodes
+    weights::AbstractMatrix{T}                         # Weights for the local system
     function StencilData(region_data::RegionData)
         all_coords = region_data.all_coords
         adjl = region_data.adjl
@@ -26,9 +26,8 @@ struct StencilData{T}
 
         # adjacency entries are Int-like; take eltype of inner adjacency vector
         local_adjl = zeros(eltype(first(adjl)), k)
-        # println("local_adjl = $local_adjl")
         eval_point = zeros(TD, dim)
-        A = Symmetric(zeros(TD, n, n), :U)  # Regular matrix, will use Symmetric wrapper when solving
+        A = Symmetric(zeros(TD, n, n), :U)
         b = zeros(TD, n, num_ops)
         local_coords = [zeros(TD, dim) for _ in 1:k]
         is_boundary = zeros(Bool, k)
@@ -67,7 +66,11 @@ function _reset_local_arrays!(stencil_data::StencilData)
     fill!(stencil_data.lhs_v, 0)
     fill!(stencil_data.rhs_v, 0)
     fill!(stencil_data.weights, 0)
-    _set_to_zero!(stencil_data.boundary_types)
+    # Reset boundary types to zeros (since BoundaryType is now immutable)
+    for i in eachindex(stencil_data.boundary_types)
+        T = typeof(stencil_data.boundary_types[i].α)
+        stencil_data.boundary_types[i] = BoundaryType(zero(T), zero(T))
+    end
     for n in stencil_data.normals
         fill!(n, 0)
     end
@@ -87,8 +90,9 @@ function _set_stencil_boundary_data!(stencil_data::StencilData, region_data::Reg
         boundary_index = region_data.global_to_boundary[global_index]
         stencil_data.is_boundary[i] = region_data.is_boundary[global_index]
         if stencil_data.is_boundary[i]
-            stencil_data.boundary_types[i].coefficients .=
-                region_data.boundary_types[boundary_index].coefficients
+            # Copy the boundary type (now immutable)
+            source_bt = region_data.boundary_types[boundary_index]
+            stencil_data.boundary_types[i] = BoundaryType(α(source_bt), β(source_bt))
             if is_Neumann(stencil_data.boundary_types[i]) ||
                 is_Robin(stencil_data.boundary_types[i])
                 stencil_data.normals[i] .= region_data.normals[boundary_index]

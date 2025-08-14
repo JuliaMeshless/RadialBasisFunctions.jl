@@ -19,6 +19,9 @@ julia --project=test test/runtests.jl
 # Run tests for specific components
 julia --project=test test/basis/polyharmonic_spline.jl
 julia --project=test test/operators/gradient.jl
+
+# Run tests in development mode (activating the main project)
+julia --project=. test/runtests.jl
 ```
 
 ### Documentation
@@ -97,3 +100,11 @@ The package requires `Vector{AbstractVector}` input format (not matrices). Each 
 - `src/solve.jl:21-102` - Core weight computation with GPU kernels
 - `src/operators/operators.jl:10-31` - Main operator type definition
 - `src/basis/basis.jl` - Abstract basis type hierarchy
+
+## Important Development Notes
+
+- The package requires Julia 1.8+ (see Project.toml compatibility)
+- Uses KernelAbstractions.jl for GPU/CPU parallelization
+- Data must be in `Vector{AbstractVector}` format (not matrices) - each point needs inferrable dimension (e.g., `SVector{2,Float64}`)
+- Two neighbor search backends available: NearestNeighbors.jl (default) and PointNeighbors.jl (`use_pointneighbors=true`)
+- PointNeighbors.jl automatically handles GPU arrays with appropriate backends
