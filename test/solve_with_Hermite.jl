@@ -474,11 +474,9 @@ end
     end
 end
 
-@testset "Boundary condition setter functions" begin
-    bt = RBF.BoundaryType(Float64[0.0, 0.0])
-
-    @testset "Set to Dirichlet" begin
-        RBF.set_Dirichlet!(bt)
+@testset "Boundary condition helper constructors" begin
+    @testset "Create Dirichlet" begin
+        bt = RBF.Dirichlet(Float64)
         @test RBF.is_Dirichlet(bt)
         @test !RBF.is_Neumann(bt)
         @test !RBF.is_Robin(bt)
@@ -486,8 +484,8 @@ end
         @test RBF.β(bt) == 0.0
     end
 
-    @testset "Set to Neumann" begin
-        RBF.set_Neumann!(bt)
+    @testset "Create Neumann" begin
+        bt = RBF.Neumann(Float64)
         @test RBF.is_Neumann(bt)
         @test !RBF.is_Dirichlet(bt)
         @test !RBF.is_Robin(bt)
@@ -495,10 +493,10 @@ end
         @test RBF.β(bt) == 1.0
     end
 
-    @testset "Set to Robin" begin
+    @testset "Create Robin" begin
         α_val = 2.5
         β_val = 1.8
-        RBF.set_Robin!(bt, α_val, β_val)
+        bt = RBF.Robin(α_val, β_val)
         @test RBF.is_Robin(bt)
         @test !RBF.is_Dirichlet(bt)
         @test !RBF.is_Neumann(bt)
