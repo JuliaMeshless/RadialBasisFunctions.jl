@@ -68,6 +68,6 @@ end
     include("solve.jl")
 end
 
-@safetestset "Solve with Hermite" begin
-    include("solve_with_Hermite.jl")
-end
+# @safetestset "Solve with Hermite" begin
+#     include("solve_with_Hermite.jl")  # Removed - old Hermite implementation deleted
+# end
