@@ -27,15 +27,19 @@ export RadialBasisOperator, ScalarValuedOperator, VectorValuedOperator
 export update_weights!, is_cache_valid
 
 include("solve_utils.jl")
+
+# Boundary types needed by solve.jl
+include("boundary_types.jl")
+
 include("solve.jl")
 
-#new stuff fot Hermite
-include("hermite/boundary_type.jl")
-include("hermite/region_data.jl")
-include("hermite/StencilData.jl")
-include("solve_with_Hermite.jl")
-export BoundaryType, Dirichlet, Neumann, Robin
-export α, β, is_Dirichlet, is_Neumann, is_Robin
+# New clean Hermite implementation
+include("solve_hermite.jl")
+export BoundaryCondition, Dirichlet, Neumann, Robin
+export α, β, is_dirichlet, is_neumann, is_robin
+export HermiteBoundaryInfo, StencilType, StandardStencil, HermiteStencil
+export stencil_type, has_boundary_points
+
 
 include("operators/custom.jl")
 export Custom, custom

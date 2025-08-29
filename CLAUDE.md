@@ -58,7 +58,7 @@ julia --project=benchmark benchmark/benchmarks.jl
    - `_build_weights()` - Main function for computing RBF stencil weights
    - Uses KernelAbstractions.jl for GPU/CPU parallelization
    - Batch processing for memory efficiency
-   - `StencilData.jl` and `solve_with_Hermite.jl` - Hermite interpolation support
+   - `solve_hermite.jl` - Clean Hermite interpolation implementation with multiple dispatch
 
 4. **Interpolation** (`src/interpolation.jl`): 
    - `Interpolator` type for global interpolation (uses all data points)

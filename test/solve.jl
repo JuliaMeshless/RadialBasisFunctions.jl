@@ -16,7 +16,7 @@ n = k + 3
 
 @testset "Coefficient Matrix" begin
     A = Symmetric(zeros(n, n))
-    RBF._build_collocation_matrix!(A, x, rb, mb, k)
+    RBF._build_collocation_matrix!(A, x, rb, mb, k, RBF.StandardStencil())
     @testset "RBFs" begin
         @test A[1, 2] ≈ (sqrt(sum((x[1] .- x[2]) .^ 2)))^3
         @test A[1, 3] ≈ (sqrt(sum((x[1] .- x[3]) .^ 2)))^3
@@ -32,7 +32,7 @@ end
 @testset "Right-hand side" begin
     b = zeros(n)
     eval_point = SVector(0.0, 0.0)
-    RBF._build_rhs!(b, Lrb, Lmb, x, eval_point, rb, k)
+    RBF._build_rhs!(b, Lrb, Lmb, x, eval_point, rb, k, RBF.StandardStencil())
     @testset "RBFs" begin
         @test b[1] ≈ Lrb(eval_point, x[1])
         @test b[2] ≈ Lrb(eval_point, x[2])
