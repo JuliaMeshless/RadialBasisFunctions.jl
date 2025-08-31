@@ -216,177 +216,175 @@ function _build_weights(
     end
 end
 
-"""
-Multiple dispatch for _build_stencil! when local_data is HermiteStencilData (HermiteStencil).
-Handles boundary conditions within the stencil using Hermite interpolation.
-"""
-function _build_stencil!(
-    A::Symmetric, b, ℒrbf, ℒmon, data::HermiteStencilData, eval_point, basis, mon, k
-)
-    _build_collocation_matrix!(A, data, basis, mon, k)
-    _build_rhs!(b, ℒrbf, ℒmon, data, eval_point, basis, k)
-    return (A \ b)[1:k, :]
-end
+# """
+# Multiple dispatch for _build_stencil! when local_data is HermiteStencilData (HermiteStencil).
+# Handles boundary conditions within the stencil using Hermite interpolation.
+# """
+# function _build_stencil!(
+#     A::Symmetric, b, ℒrbf, ℒmon, data::HermiteStencilData, eval_point, basis, mon, k
+# )
+#     _build_collocation_matrix!(A, data, basis, mon, k)
+#     _build_rhs!(b, ℒrbf, ℒmon, data, eval_point, basis, k)
+#     return (A \ b)[1:k, :]
+# end
 
-"""
-Build Hermite collocation matrix with boundary condition modifications.
-"""
-function _build_collocation_matrix!(
-    A::Symmetric, hermite_data::HermiteStencilData, basis, mon, k
-)
-    AA = parent(A)
-    N = size(A, 2)
+# """
+# Build Hermite collocation matrix with boundary condition modifications.
+# """
+# function _build_collocation_matrix!(A::Symmetric, data::HermiteStencilData, basis, mon, k)
+#     AA = parent(A)
+#     N = size(A, 2)
 
-    # Build RBF matrix entries with Hermite modifications
-    @inbounds for j in 1:k, i in 1:j
-        AA[i, j] = _hermite_rbf_entry(i, j, hermite_data, basis)
-    end
+#     # Build RBF matrix entries with Hermite modifications
+#     @inbounds for j in 1:k, i in 1:j
+#         AA[i, j] = _hermite_rbf_entry(i, j, data, basis)
+#     end
 
-    # Polynomial augmentation with boundary operator modifications
-    if basis.poly_deg > -1
-        @inbounds for i in 1:k
-            a = view(AA, i, (k + 1):N)
-            _hermite_poly_entry!(a, i, hermite_data, mon)
-        end
-    end
+#     # Polynomial augmentation with boundary operator modifications
+#     if basis.poly_deg > -1
+#         @inbounds for i in 1:k
+#             a = view(AA, i, (k + 1):N)
+#             _hermite_poly_entry!(a, i, data, mon)
+#         end
+#     end
 
-    return nothing
-end
+#     return nothing
+# end
 
-"""
-Compute single RBF matrix entry for Hermite interpolation.
-"""
-function _hermite_rbf_entry(i::Int, j::Int, hermite_data::HermiteStencilData, basis)
-    xi, xj = hermite_data.data[i], hermite_data.data[j]
-    bt_i = hermite_data.boundary_conditions[i]
-    bt_j = hermite_data.boundary_conditions[j]
-    is_int_i = !hermite_data.is_boundary[i]
-    is_int_j = !hermite_data.is_boundary[j]
-    is_dir_i = is_dirichlet(bt_i)
-    is_dir_j = is_dirichlet(bt_j)
-    is_nr_i = !is_int_i && !is_dir_i # boundary and not Dirichlet => Neumann or Robin
-    is_nr_j = !is_int_j && !is_dir_j
+# """
+# Compute single RBF matrix entry for Hermite interpolation.
+# """
+# function _hermite_rbf_entry(i::Int, j::Int, data::HermiteStencilData, basis)
+#     xi, xj = data.data[i], data.data[j]
+#     bt_i = data.boundary_conditions[i]
+#     bt_j = data.boundary_conditions[j]
+#     is_int_i = !data.is_boundary[i]
+#     is_int_j = !data.is_boundary[j]
+#     is_dir_i = is_dirichlet(bt_i)
+#     is_dir_j = is_dirichlet(bt_j)
+#     is_nr_i = !is_int_i && !is_dir_i # boundary and not Dirichlet => Neumann or Robin
+#     is_nr_j = !is_int_j && !is_dir_j
 
-    φ = basis(xi, xj)
+#     φ = basis(xi, xj)
 
-    if (is_int_i || is_dir_i) && (is_int_j || is_dir_j)
-        return φ
-    end
+#     if (is_int_i || is_dir_i) && (is_int_j || is_dir_j)
+#         return φ
+#     end
 
-    g = ∇(basis)(xi, xj)
+#     g = ∇(basis)(xi, xj)
 
-    if is_nr_i && (is_int_j || is_dir_j)
-        n_i = hermite_data.normals[i]
-        return α(bt_i) * φ + β(bt_i) * dot(n_i, g)
-    elseif (is_int_i || is_dir_i) && is_nr_j
-        n_j = hermite_data.normals[j]
-        return α(bt_j) * φ + β(bt_j) * dot(n_j, -g)
-    elseif is_nr_i && is_nr_j
-        n_i = hermite_data.normals[i]
-        n_j = hermite_data.normals[j]
-        # Mixed Robin/Neumann interaction
-        term_∂i = dot(n_i, g)                  # ∂/∂n_i (first arg)
-        term_∂j = dot(n_j, -g)                 # ∂/∂n_j (second arg)
-        term_∂i∂j = directional∂²(basis, n_i, n_j)(xi, xj)
-        return α(bt_i) * α(bt_j) * φ +
-               α(bt_i) * β(bt_j) * term_∂j +
-               β(bt_i) * α(bt_j) * term_∂i +
-               β(bt_i) * β(bt_j) * term_∂i∂j
-    end
-end
+#     if is_nr_i && (is_int_j || is_dir_j)
+#         n_i = data.normals[i]
+#         return α(bt_i) * φ + β(bt_i) * dot(n_i, g)
+#     elseif (is_int_i || is_dir_i) && is_nr_j
+#         n_j = data.normals[j]
+#         return α(bt_j) * φ + β(bt_j) * dot(n_j, -g)
+#     elseif is_nr_i && is_nr_j
+#         n_i = data.normals[i]
+#         n_j = data.normals[j]
+#         # Mixed Robin/Neumann interaction
+#         term_∂i = dot(n_i, g)                  # ∂/∂n_i (first arg)
+#         term_∂j = dot(n_j, -g)                 # ∂/∂n_j (second arg)
+#         term_∂i∂j = directional∂²(basis, n_i, n_j)(xi, xj)
+#         return α(bt_i) * α(bt_j) * φ +
+#                α(bt_i) * β(bt_j) * term_∂j +
+#                β(bt_i) * α(bt_j) * term_∂i +
+#                β(bt_i) * β(bt_j) * term_∂i∂j
+#     end
+# end
 
-"""
-Compute polynomial entries for Hermite interpolation.
-"""
-function _hermite_poly_entry!(
-    a::AbstractVector, i::Int, hermite_data::HermiteStencilData, mon
-)
-    xi = hermite_data.data[i]
-    bt = hermite_data.boundary_conditions[i]
+# """
+# Compute polynomial entries for Hermite interpolation.
+# """
+# function _hermite_poly_entry!(a::AbstractVector, i::Int, data::HermiteStencilData, mon)
+#     xi = data.data[i]
+#     bt = data.boundary_conditions[i]
 
-    # Internal or Dirichlet nodes: only polynomial values
-    if !hermite_data.is_boundary[i] || is_dirichlet(bt)
-        mon(a, xi)
-        return nothing
-    end
+#     # Internal or Dirichlet nodes: only polynomial values
+#     if !data.is_boundary[i] || is_dirichlet(bt)
+#         mon(a, xi)
+#         return nothing
+#     end
 
-    nvec = hermite_data.normals[i]
-    if is_neumann(bt)
-        ∂_normal(mon, nvec)(a, xi)
-        return nothing
-    end
+#     nvec = data.normals[i]
+#     if is_neumann(bt)
+#         ∂_normal(mon, nvec)(a, xi)
+#         return nothing
+#     end
 
-    # Robin: α * P + β * ∂_n P
-    nmon = length(a)
-    polyvals = zeros(eltype(a), nmon)
-    derivvals = zeros(eltype(a), nmon)
-    mon(polyvals, xi)
-    ∂_normal(mon, nvec)(derivvals, xi)
-    @inbounds for k in 1:nmon
-        a[k] = α(bt) * polyvals[k] + β(bt) * derivvals[k]
-    end
-    return nothing
-end
+#     # Robin: α * P + β * ∂_n P
+#     nmon = length(a)
+#     polyvals = zeros(eltype(a), nmon)
+#     derivvals = zeros(eltype(a), nmon)
+#     mon(polyvals, xi)
+#     ∂_normal(mon, nvec)(derivvals, xi)
+#     @inbounds for k in 1:nmon
+#         a[k] = α(bt) * polyvals[k] + β(bt) * derivvals[k]
+#     end
+#     return nothing
+# end
 
-"""
-Build RHS for Hermite stencil with boundary conditions.
-"""
-function _build_rhs!(b, ℒrbf, ℒmon, hermite_data::HermiteStencilData, eval_point, basis, k)
-    # Handle multiple operators case
-    num_ops = isa(ℒrbf, Tuple) ? length(ℒrbf) : 1
-    ℒrbf_tuple = isa(ℒrbf, Tuple) ? ℒrbf : (ℒrbf,)
-    ℒmon_tuple = isa(ℒmon, Tuple) ? ℒmon : (ℒmon,)
+# """
+# Build RHS for Hermite stencil with boundary conditions.
+# """
+# function _build_rhs!(b, ℒrbf, ℒmon, data::HermiteStencilData, eval_point, basis, k)
+#     # Handle multiple operators case
+#     num_ops = isa(ℒrbf, Tuple) ? length(ℒrbf) : 1
+#     ℒrbf_tuple = isa(ℒrbf, Tuple) ? ℒrbf : (ℒrbf,)
+#     ℒmon_tuple = isa(ℒmon, Tuple) ? ℒmon : (ℒmon,)
 
-    # RBF section with Hermite modifications
-    for j in 1:num_ops
-        ℒ = ℒrbf_tuple[j]
-        @inbounds for i in 1:k
-            if hermite_data.is_boundary[i]
-                bt = hermite_data.boundary_conditions[i]
-                αv = α(bt)
-                βv = β(bt)
-                if num_ops == 1
-                    b[i] = αv * ℒ(eval_point, hermite_data.data[i]) +
-                           βv * ℒ(eval_point, hermite_data.data[i], hermite_data.normals[i])
-                else
-                    b[i, j] = αv * ℒ(eval_point, hermite_data.data[i]) +
-                              βv * ℒ(eval_point, hermite_data.data[i], hermite_data.normals[i])
-                end
-            else # internal
-                if num_ops == 1
-                    b[i] = ℒ(eval_point, hermite_data.data[i])
-                else
-                    b[i, j] = ℒ(eval_point, hermite_data.data[i])
-                end
-            end
-        end
-    end
+#     # RBF section with Hermite modifications
+#     for j in 1:num_ops
+#         ℒ = ℒrbf_tuple[j]
+#         @inbounds for i in 1:k
+#             if data.is_boundary[i]
+#                 bt = data.boundary_conditions[i]
+#                 αv = α(bt)
+#                 βv = β(bt)
+#                 if num_ops == 1
+#                     b[i] =
+#                         αv * ℒ(eval_point, data.data[i]) +
+#                         βv * ℒ(eval_point, data.data[i], data.normals[i])
+#                 else
+#                     b[i, j] =
+#                         αv * ℒ(eval_point, data.data[i]) +
+#                         βv * ℒ(eval_point, data.data[i], data.normals[i])
+#                 end
+#             else # internal
+#                 if num_ops == 1
+#                     b[i] = ℒ(eval_point, data.data[i])
+#                 else
+#                     b[i, j] = ℒ(eval_point, data.data[i])
+#                 end
+#             end
+#         end
+#     end
 
-    # Monomial augmentation
-    if basis.poly_deg > -1
-        N = size(b, 1)
-        for j in 1:num_ops
-            ℒ = ℒmon_tuple[j]
-            if num_ops == 1
-                bmono = view(b, (k + 1):N)
-            else
-                bmono = view(b, (k + 1):N, j)
-            end
-            ℒ(bmono, eval_point)
-        end
-    end
+#     # Monomial augmentation
+#     if basis.poly_deg > -1
+#         N = size(b, 1)
+#         for j in 1:num_ops
+#             ℒ = ℒmon_tuple[j]
+#             if num_ops == 1
+#                 bmono = view(b, (k + 1):N)
+#             else
+#                 bmono = view(b, (k + 1):N, j)
+#             end
+#             ℒ(bmono, eval_point)
+#         end
+#     end
 
-    return nothing
-end
+#     return nothing
+# end
 
-"""
-Helper functions
-"""
-function _num_ops(ℒrbf)
-    return isa(ℒrbf, Tuple) ? length(ℒrbf) : 1
-end
+# """
+# Helper functions
+# """
+# function _num_ops(ℒrbf)
+#     return isa(ℒrbf, Tuple) ? length(ℒrbf) : 1
+# end
 
-function _prepare_b(ℒrbf, TD, n)
-    num_ops = _num_ops(ℒrbf)
-    return num_ops == 1 ? zeros(TD, n) : zeros(TD, n, num_ops)
-end
+# function _prepare_b(ℒrbf, TD, n)
+#     num_ops = _num_ops(ℒrbf)
+#     return num_ops == 1 ? zeros(TD, n) : zeros(TD, n, num_ops)
+# end

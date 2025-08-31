@@ -91,9 +91,15 @@ function update_stencil_data!(
         hermite_data.data[local_idx] .= global_data[global_idx]
         hermite_data.is_boundary[local_idx] = is_boundary[global_idx]
 
-        boundary_idx = global_to_boundary[global_idx]
-        hermite_data.boundary_conditions[local_idx] = boundary_conditions[boundary_idx]
-        hermite_data.normals[local_idx] .= normals[boundary_idx]
+        if is_boundary[global_idx]
+            boundary_idx = global_to_boundary[global_idx]
+            hermite_data.boundary_conditions[local_idx] = boundary_conditions[boundary_idx]
+            hermite_data.normals[local_idx] .= normals[boundary_idx]
+        else
+            # Set default Dirichlet for interior points (not used but keeps type consistency)
+            hermite_data.boundary_conditions[local_idx] = Dirichlet(T)
+            fill!(hermite_data.normals[local_idx], zero(T))
+        end
     end
 
     return nothing
@@ -114,7 +120,8 @@ function stencil_type(
 )
     if sum(is_boundary[neighbors]) == 0
         return StandardStencil()
-    elseif is_dirichlet(boundary_conditions[global_to_boundary[eval_idx]])
+    elseif is_boundary[eval_idx] &&
+        is_dirichlet(boundary_conditions[global_to_boundary[eval_idx]])
         return DirichletStencil()
     else
         return HermiteStencil()
