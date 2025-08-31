@@ -63,16 +63,7 @@ function _build_weights(
 
             # Build stencil and store in global weight matrix
             stencil = _build_stencil!(
-                A,
-                b,
-                ℒrbf,
-                ℒmon,
-                local_data,
-                eval_points[i],
-                basis,
-                mon,
-                k,
-                StandardStencil(),
+                A, b, ℒrbf, ℒmon, local_data, eval_points[i], basis, mon, k
             )
 
             # Store the stencil weights in the value array
