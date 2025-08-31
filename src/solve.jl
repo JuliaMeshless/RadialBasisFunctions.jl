@@ -63,7 +63,16 @@ function _build_weights(
 
             # Build stencil and store in global weight matrix
             stencil = _build_stencil!(
-                A, b, ℒrbf, ℒmon, local_data, eval_points[i], basis, mon, k, StandardStencil()
+                A,
+                b,
+                ℒrbf,
+                ℒmon,
+                local_data,
+                eval_points[i],
+                basis,
+                mon,
+                k,
+                StandardStencil(),
             )
 
             # Store the stencil weights in the value array
@@ -118,15 +127,14 @@ function _build_stencil!(
     basis::B,
     mon::MonomialBasis,
     k::Int,
-    ::StandardStencil
 ) where {TD,TE,B<:AbstractRadialBasis}
-    _build_collocation_matrix!(A, data, basis, mon, k, StandardStencil())
-    _build_rhs!(b, ℒrbf, ℒmon, data, eval_point, basis, k, StandardStencil())
+    _build_collocation_matrix!(A, data, basis, mon, k)
+    _build_rhs!(b, ℒrbf, ℒmon, data, eval_point, basis, k)
     return (A \ b)[1:k, :]
 end
 
 function _build_collocation_matrix!(
-    A::Symmetric, data::AbstractVector, basis::B, mon::MonomialBasis{Dim,Deg}, k::K, ::StandardStencil
+    A::Symmetric, data::AbstractVector, basis::B, mon::MonomialBasis{Dim,Deg}, k::K
 ) where {B<:AbstractRadialBasis,K<:Int,Dim,Deg}
     # radial basis section
     AA = parent(A)
@@ -147,7 +155,7 @@ function _build_collocation_matrix!(
 end
 
 function _build_rhs!(
-    b, ℒrbf, ℒmon, data::AbstractVector{TD}, eval_point::TE, basis::B, k::K, ::StandardStencil
+    b, ℒrbf, ℒmon, data::AbstractVector{TD}, eval_point::TE, basis::B, k::K
 ) where {TD,TE,B<:AbstractRadialBasis,K<:Int}
     # radial basis section
     @inbounds for i in eachindex(data)
@@ -165,7 +173,7 @@ function _build_rhs!(
 end
 
 function _build_rhs!(
-    b, ℒrbf::Tuple, ℒmon::Tuple, data::AbstractVector{TD}, eval_point::TE, basis::B, k::K, ::StandardStencil
+    b, ℒrbf::Tuple, ℒmon::Tuple, data::AbstractVector{TD}, eval_point::TE, basis::B, k::K
 ) where {TD,TE,B<:AbstractRadialBasis,K<:Int}
     @assert size(b, 2) == length(ℒrbf) == length(ℒmon) "b, ℒrbf, ℒmon must have the same length"
     # radial basis section
@@ -186,4 +194,3 @@ function _build_rhs!(
 
     return nothing
 end
-
