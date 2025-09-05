@@ -26,10 +26,10 @@ include("operators/operators.jl")
 export RadialBasisOperator, ScalarValuedOperator, VectorValuedOperator
 export update_weights!, is_cache_valid
 
-include("solve_utils.jl")
-
-# Boundary types needed by solve.jl
+# Boundary types needed by solve.jl and solve_utils.jl
 include("boundary_types.jl")
+
+include("solve_utils.jl")
 
 include("solve.jl")
 
