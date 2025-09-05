@@ -7,9 +7,6 @@ both the collocation matrix and RHS to maintain symmetry and non-singularity.
 """
 
 using LinearAlgebra: dot
-using SparseArrays: sparse
-using KernelAbstractions
-using KernelAbstractions: @kernel, @index, CPU
 
 """
 Build collocation matrix for Hermite interpolation with boundary conditions.
@@ -341,8 +338,8 @@ end
 
 """
 Build weights for Hermite interpolation with sparse matrix construction.
-This function follows the solve_hermite.jl philosophy by extending the core 
-_build_weights function to handle boundary conditions on both stencil points 
+This function follows the solve_hermite.jl philosophy by extending the core
+_build_weights function to handle boundary conditions on both stencil points
 AND evaluation points.
 
 This is the Hermite variant of _build_weights from solve.jl, optimized for
@@ -362,32 +359,10 @@ function _build_weights(
     batch_size::Int=10,
     device=CPU(),
 )
-    TD = eltype(first(data))
-    dim = length(first(data))
-    k = length(first(adjl))
-    nmon = binomial(dim + basis.poly_deg, basis.poly_deg)
-    num_ops = _num_ops(ℒrbf)
-
-    # Pass 1: Count non-zero elements for exact allocation
-    total_nnz, _, row_offsets = _count_nonzeros(adjl, is_boundary, boundary_conditions)
-
-    # Allocate exact memory for sparse matrix
-    I = Vector{Int}(undef, total_nnz)
-    J = Vector{Int}(undef, total_nnz)
-    V = Matrix{TD}(undef, total_nnz, num_ops)
-
-    # Pass 2: Pre-allocate boundary info structures (one per batch)
-    N_eval = length(eval_points)
-    n_batches = ceil(Int, N_eval / batch_size)
-
-    # Pre-allocate Hermite stencil data for each batch
-    batch_hermite_datas = [HermiteStencilData{TD}(k, dim) for _ in 1:n_batches]
-    global_to_boundary = _construct_global_to_boundary(is_boundary)
-
-    @kernel function fill_sparse_arrays_kernel(
-        I,
-        J,
-        V,
+    # Use the unified kernel infrastructure with optimized allocation strategy
+    boundary_data = (is_boundary, boundary_conditions, normals)
+    return _build_weights_unified(
+        OptimizedAllocation(),
         data,
         eval_points,
         adjl,
@@ -395,172 +370,8 @@ function _build_weights(
         ℒrbf,
         ℒmon,
         mon,
-        is_boundary,
-        boundary_conditions,
-        normals,
-        batch_hermite_datas,
-        global_to_boundary,
-        row_offsets,
-        batch_size,
-        N_eval,
-        nmon,
+        boundary_data;
+        batch_size=batch_size,
+        device=device,
     )
-        batch_idx = @index(Global)
-        hermite_data = batch_hermite_datas[batch_idx]
-
-        # Calculate range for this batch
-        start_idx = (batch_idx - 1) * batch_size + 1
-        end_idx = min(batch_idx * batch_size, N_eval)
-
-        # Pre-allocate work arrays for this thread
-        n = k + nmon  # max possible stencil size
-        A = Symmetric(zeros(TD, n, n), :U)
-        b = _prepare_b(ℒrbf, TD, n)
-
-        for eval_idx in start_idx:end_idx
-            start_pos = row_offsets[eval_idx]
-            neighbors = adjl[eval_idx]
-            eval_point = eval_points[eval_idx]
-
-            # Handle different stencil types
-            stencil_type_result = stencil_type(
-                is_boundary, boundary_conditions, eval_idx, neighbors, global_to_boundary
-            )
-
-            if isa(stencil_type_result, DirichletStencil)
-                # Dirichlet center: only diagonal element is non-zero
-                I[start_pos] = eval_idx
-                J[start_pos] = eval_idx
-                V[start_pos, :] .= 1.0
-            else
-                # Standard or Hermite stencil: determine local_data and dispatch
-                local_data = if isa(stencil_type_result, StandardStencil)
-                    view(data, neighbors)
-                elseif isa(stencil_type_result, HermiteStencil)
-                    update_stencil_data!(
-                        hermite_data,
-                        data,
-                        neighbors,
-                        is_boundary,
-                        boundary_conditions,
-                        normals,
-                        global_to_boundary,
-                    )
-                    hermite_data
-                end
-
-                weights = _build_stencil!(
-                    A, b, ℒrbf, ℒmon, local_data, eval_point, basis, mon, k
-                )
-
-                # Fill sparse matrix entries
-                for local_idx in 1:k
-                    pos = start_pos + local_idx - 1
-                    I[pos] = eval_idx
-                    J[pos] = neighbors[local_idx]
-                    if num_ops == 1
-                        V[pos, 1] = weights[local_idx]
-                    else
-                        V[pos, :] = weights[local_idx, :]
-                    end
-                end
-            end
-        end
-    end
-
-    # Launch kernel
-    kernel = fill_sparse_arrays_kernel(device)
-    kernel(
-        I,
-        J,
-        V,
-        data,
-        eval_points,
-        adjl,
-        basis,
-        ℒrbf,
-        ℒmon,
-        mon,
-        is_boundary,
-        boundary_conditions,
-        normals,
-        batch_hermite_datas,
-        global_to_boundary,
-        row_offsets,
-        batch_size,
-        N_eval,
-        nmon;
-        ndrange=n_batches,
-        workgroupsize=1,
-    )
-
-    # Wait for completion
-    KernelAbstractions.synchronize(device)
-
-    # Create and return sparse matrix/matrices
-    nrows = length(eval_points)
-    ncols = length(data)
-
-    if num_ops == 1
-        return sparse(I, J, V[:, 1], nrows, ncols)
-    else
-        return ntuple(i -> sparse(I, J, V[:, i], nrows, ncols), num_ops)
-    end
-end
-
-"""
-Helper function to count non-zero elements for optimized sparse matrix allocation.
-"""
-function _count_nonzeros(
-    adjl, is_boundary::Vector{Bool}, boundary_conditions::Vector{<:BoundaryCondition}
-)
-    N_eval = length(adjl)
-    nnz_per_row = Vector{Int}(undef, N_eval)
-    row_offsets = Vector{Int}(undef, N_eval + 1)
-    global_to_boundary = _construct_global_to_boundary(is_boundary)
-
-    total_nnz = 0
-    row_offsets[1] = 1  # 1-based indexing for first row
-
-    for eval_idx in 1:N_eval
-        if is_boundary[eval_idx]
-            boundary_idx = global_to_boundary[eval_idx]
-            bc = boundary_conditions[boundary_idx]
-            if is_dirichlet(bc)
-                # Dirichlet: only diagonal element is non-zero
-                nnz_per_row[eval_idx] = 1
-            else
-                # Neumann/Robin center: full stencil
-                nnz_per_row[eval_idx] = length(adjl[eval_idx])
-            end
-        else
-            # Interior: full stencil
-            nnz_per_row[eval_idx] = length(adjl[eval_idx])
-        end
-
-        total_nnz += nnz_per_row[eval_idx]
-        row_offsets[eval_idx + 1] = total_nnz + 1
-    end
-
-    return total_nnz, nnz_per_row, row_offsets
-end
-
-"""
-Construct global_to_boundary index mapping.
-"""
-function _construct_global_to_boundary(is_boundary::Vector{Bool})
-    N_tot = length(is_boundary)
-    global_to_boundary = Vector{Int}(undef, N_tot)
-
-    boundary_counter = 0
-    for i in 1:N_tot
-        if is_boundary[i]
-            boundary_counter += 1
-            global_to_boundary[i] = boundary_counter
-        else
-            global_to_boundary[i] = 0  # Non-boundary points map to 0
-        end
-    end
-
-    return global_to_boundary
 end

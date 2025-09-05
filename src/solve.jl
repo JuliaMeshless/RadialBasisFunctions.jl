@@ -20,67 +20,9 @@ end
 function _build_weights(
     data, eval_points, adjl, basis, ℒrbf, ℒmon, mon; batch_size=10, device=CPU()
 )
-    TD = eltype(first(data))
-    dim = length(first(data)) # dimension of data
-    nmon = binomial(dim + basis.poly_deg, basis.poly_deg)
-    k = length(first(adjl))  # number of data in influence/support domain
-    sizes = (k, nmon)
-
-    # allocate arrays to build sparse matrix
-    Na = length(adjl)
-    I = zeros(Int, k * Na)
-    J = reduce(vcat, adjl)
-    V = zeros(TD, k * Na, _num_ops(ℒrbf))
-
-    # Calculate number of batches
-    n_batches = ceil(Int, Na / batch_size)
-
-    # Create kernel for building stencils in batches
-    @kernel function build_stencils_kernel(
-        I, J, V, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon, k, batch_size, Na
-    )
-        # Get the batch index for this thread
-        batch_idx = @index(Global)
-
-        # Calculate the range of points for this batch
-        start_idx = (batch_idx - 1) * batch_size + 1
-        end_idx = min(batch_idx * batch_size, Na)
-
-        # Pre-allocate work arrays for this thread
-        n = k + nmon
-        A = Symmetric(zeros(TD, n, n), :U)
-        b = _prepare_b(ℒrbf, TD, n)
-
-        # Process each point in the batch sequentially
-        for i in start_idx:end_idx
-            # Set row indices for sparse matrix
-            for idx in 1:k
-                I[(i - 1) * k + idx] = i
-            end
-
-            # Get data points in the influence domain
-            local_data = [data[j] for j in adjl[i]]
-
-            # Build stencil and store in global weight matrix
-            stencil = _build_stencil!(
-                A, b, ℒrbf, ℒmon, local_data, eval_points[i], basis, mon, k
-            )
-
-            # Store the stencil weights in the value array
-            for op in axes(V, 2)
-                for idx in 1:k
-                    V[(i - 1) * k + idx, op] = stencil[idx, op]
-                end
-            end
-        end
-    end
-
-    # Launch kernel with one thread per batch
-    kernel = build_stencils_kernel(device)
-    kernel(
-        I,
-        J,
-        V,
+    # Use the unified kernel infrastructure with standard allocation strategy
+    return _build_weights_unified(
+        StandardAllocation(),
         data,
         eval_points,
         adjl,
@@ -88,24 +30,10 @@ function _build_weights(
         ℒrbf,
         ℒmon,
         mon,
-        k,
-        batch_size,
-        Na;
-        ndrange=n_batches,
-        workgroupsize=1,
+        nothing;
+        batch_size=batch_size,
+        device=device,
     )
-
-    # Wait for kernel to complete
-    KernelAbstractions.synchronize(device)
-
-    # Create and return sparse matrix/matrices
-    nrows = length(adjl)
-    ncols = length(data)
-    if size(V, 2) == 1
-        return sparse(I, J, V[:, 1], nrows, ncols)
-    else
-        return ntuple(i -> sparse(I, J, V[:, i], nrows, ncols), size(V, 2))
-    end
 end
 
 function _build_stencil!(
@@ -185,3 +113,4 @@ function _build_rhs!(
 
     return nothing
 end
+
