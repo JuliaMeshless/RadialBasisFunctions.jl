@@ -427,30 +427,30 @@ function _launch_unified_kernel!(
 
             if isa(stencil_type_result, DirichletStencil)
                 _handle_dirichlet_optimized!(I, J, V, eval_idx, start_pos, num_ops)
-            else
-                # Standard or Hermite stencil
-                local_data = if isa(stencil_type_result, StandardStencil)
-                    view(data, neighbors)
-                elseif isa(stencil_type_result, HermiteStencil)
-                    update_stencil_data!(
-                        hermite_data,
-                        data,
-                        neighbors,
-                        is_boundary,
-                        boundary_conditions,
-                        normals,
-                        global_to_boundary,
-                    )
-                    hermite_data
-                end
-
+                continue
+            end
+            if isa(stencil_type_result, InternalStencil)
                 weights = _build_stencil!(
-                    A, b, ℒrbf, ℒmon, local_data, eval_point, basis, mon, k
-                )
-                _fill_entries_optimized!(
-                    I, J, V, weights, eval_idx, neighbors, start_pos, k, num_ops
+                    A, b, ℒrbf, ℒmon, view(data, neighbors), eval_point, basis, mon, k
                 )
             end
+            if isa(stencil_type_result, HermiteStencil)
+                update_stencil_data!(
+                    hermite_data,
+                    data,
+                    neighbors,
+                    is_boundary,
+                    boundary_conditions,
+                    normals,
+                    global_to_boundary,
+                )
+                weights = _build_stencil!(
+                    A, b, ℒrbf, ℒmon, hermite_data, eval_point, basis, mon, k
+                )
+            end
+            _fill_entries_optimized!(
+                I, J, V, weights, eval_idx, neighbors, start_pos, k, num_ops
+            )
         end
     end
 

@@ -107,7 +107,7 @@ end
 
 # Trait types for dispatch
 abstract type StencilType end
-struct StandardStencil <: StencilType end
+struct InternalStencil <: StencilType end
 struct DirichletStencil <: StencilType end
 struct HermiteStencil <: StencilType end
 
@@ -119,7 +119,7 @@ function stencil_type(
     global_to_boundary::Vector{Int},
 )
     if sum(is_boundary[neighbors]) == 0
-        return StandardStencil()
+        return InternalStencil()
     elseif is_boundary[eval_idx] &&
         is_dirichlet(boundary_conditions[global_to_boundary[eval_idx]])
         return DirichletStencil()

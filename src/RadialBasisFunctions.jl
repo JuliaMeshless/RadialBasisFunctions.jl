@@ -37,9 +37,8 @@ include("solve.jl")
 include("solve_hermite.jl")
 export BoundaryCondition, Dirichlet, Neumann, Robin
 export α, β, is_dirichlet, is_neumann, is_robin
-export HermiteBoundaryInfo, StencilType, StandardStencil, HermiteStencil
+export HermiteBoundaryInfo, StencilType, InternalStencil, HermiteStencil
 export stencil_type, has_boundary_points
-
 
 include("operators/custom.jl")
 export Custom, custom
