@@ -257,84 +257,11 @@ function _build_stencil!(
     return (A \ b)[1:k, :]
 end
 
-"""
-Standard stencil building - delegates to solve.jl implementation.
-This method handles the case when local_data is a simple view of coordinate vectors.
-"""
-function _build_stencil!(
-    A::Symmetric,
-    b,
-    ℒrbf,
-    ℒmon,
-    local_data::SubArray{<:AbstractVector},  # This is what view(data, neighbors) returns
-    eval_point,
-    basis::AbstractRadialBasis,
-    mon::MonomialBasis,
-    k::Int,
-)
-    # Use the standard solve.jl approach for interior stencils
-    # Build standard collocation matrix
-    AA = parent(A)
-    n = k + length(mon)
+# Note: The SubArray method has been removed to delegate to solve.jl
+# When local_data is a SubArray{<:AbstractVector}, it will automatically
+# dispatch to the _build_stencil! method in solve.jl since SubArray <: AbstractVector
 
-    # RBF part
-    @inbounds for j in 1:k, i in 1:j
-        AA[i, j] = basis(local_data[i], local_data[j])
-    end
-
-    # Polynomial part
-    if mon.poly_deg > -1
-        @inbounds for i in 1:k
-            a = view(AA, i, (k + 1):n)
-            mon(a, local_data[i])
-        end
-    end
-
-    # Build RHS
-    _build_rhs_standard!(b, ℒrbf, ℒmon, local_data, eval_point, mon)
-
-    return (A \ b)[1:k, :]
-end
-
-"""
-Standard RHS building for interior stencils.
-"""
-function _build_rhs_standard!(b, ℒrbf, ℒmon, local_data, eval_point, mon)
-    k = length(local_data)
-
-    # Handle single or multiple operators
-    if isa(ℒrbf, Tuple)
-        # Multiple operators
-        for (j, ℒ) in enumerate(ℒrbf)
-            @inbounds for i in 1:k
-                b[i, j] = ℒ(eval_point, local_data[i])
-            end
-        end
-
-        # Monomial augmentation
-        if mon.poly_deg > -1
-            N = size(b, 1)
-            for (j, ℒ) in enumerate(ℒmon)
-                bmono = view(b, (k + 1):N, j)
-                ℒ(bmono, eval_point)
-            end
-        end
-    else
-        # Single operator
-        @inbounds for i in 1:k
-            b[i] = ℒrbf(eval_point, local_data[i])
-        end
-
-        # Monomial augmentation
-        if mon.poly_deg > -1
-            N = length(b)
-            bmono = view(b, (k + 1):N)
-            ℒmon(bmono, eval_point)
-        end
-    end
-
-    return nothing
-end
+# _build_rhs_standard! function removed - now using the one from solve.jl
 
 """
 Build weights for Hermite interpolation with sparse matrix construction.
