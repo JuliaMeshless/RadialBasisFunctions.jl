@@ -22,12 +22,12 @@ export degree, dim
 include("utils.jl")
 export find_neighbors, reorder_points!
 
+# Boundary types needed by solve.jl and solve_utils.jl
+include("boundary_types.jl")
+
 include("operators/operators.jl")
 export RadialBasisOperator, ScalarValuedOperator, VectorValuedOperator
 export update_weights!, is_cache_valid
-
-# Boundary types needed by solve.jl and solve_utils.jl
-include("boundary_types.jl")
 
 include("solve_utils.jl")
 

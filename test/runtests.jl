@@ -68,6 +68,22 @@ end
     include("solve.jl")
 end
 
+@safetestset "Boundary Types" begin
+    include("boundary_types.jl")
+end
+
+@safetestset "Solve Unit Tests" begin
+    include("solve/unit/matrix_entries.jl")
+    include("solve/unit/collocation_matrix.jl")
+    include("solve/unit/rhs_vector.jl")
+end
+
+#these are still work in progress:
+@safetestset "Solve Integration Tests" begin
+    include("solve/integration/hermite_integration.jl")
+    include("solve/integration/solve_utils_integration.jl")
+end
+
 # @safetestset "Solve with Hermite" begin
 #     include("solve_with_Hermite.jl")  # Removed - old Hermite implementation deleted
 # end

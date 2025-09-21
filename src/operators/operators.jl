@@ -54,6 +54,24 @@ function RadialBasisOperator(
     return RadialBasisOperator(ℒ, weights, data, eval_points, adjl, basis, true)
 end
 
+# Hermite-compatible constructor
+function RadialBasisOperator(
+    ℒ,
+    data::AbstractVector{TD},
+    eval_points::AbstractVector{TE},
+    basis::B,
+    is_boundary::Vector{Bool},
+    boundary_conditions::Vector{<:BoundaryCondition},
+    normals::Vector{<:AbstractVector};
+    k::T=autoselect_k(data, basis),
+    adjl=find_neighbors(data, eval_points, k),
+) where {TD,TE,T<:Int,B<:AbstractRadialBasis}
+    weights = _build_weights(
+        ℒ, data, eval_points, adjl, basis, is_boundary, boundary_conditions, normals
+    )
+    return RadialBasisOperator(ℒ, weights, data, eval_points, adjl, basis, true)
+end
+
 dim(op::RadialBasisOperator) = length(first(op.data))
 
 # caching
