@@ -302,3 +302,37 @@ function _build_weights(
         device=device,
     )
 end
+
+"""
+Generic Hermite dispatcher for operators.
+This eliminates repetitive _build_weights methods across operator files.
+All operators that can call ℒ(basis) and ℒ(mon) can use this dispatcher.
+"""
+function _build_weights(
+    ℒ::AbstractOperator,
+    data::AbstractVector,
+    eval_points::AbstractVector,
+    adjl::AbstractVector,
+    basis::AbstractRadialBasis,
+    is_boundary::Vector{Bool},
+    boundary_conditions::Vector{<:BoundaryCondition},
+    normals::Vector{<:AbstractVector},
+)
+    dim = length(first(data))
+    mon = MonomialBasis(dim, basis.poly_deg)
+    ℒmon = ℒ(mon)
+    ℒrbf = ℒ(basis)
+
+    return _build_weights(
+        data,
+        eval_points,
+        adjl,
+        basis,
+        ℒrbf,
+        ℒmon,
+        mon,
+        is_boundary,
+        boundary_conditions,
+        normals,
+    )
+end
