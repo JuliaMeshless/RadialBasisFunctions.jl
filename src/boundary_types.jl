@@ -55,7 +55,7 @@ end
 #pre-allocation constructor
 function HermiteStencilData{T}(k::Int, dim::Int) where {T<:Real}
     data = [Vector{T}(undef, dim) for _ in 1:k]  # Pre-allocate with correct dimension
-    is_boundary = falses(k)
+    is_boundary = Vector{Bool}(falses(k))
     boundary_conditions = [Dirichlet(T) for _ in 1:k]
     normals = [Vector{T}(undef, dim) for _ in 1:k]  # Pre-allocate with correct dimension
     return HermiteStencilData(data, is_boundary, boundary_conditions, normals)
@@ -113,11 +113,11 @@ struct HermiteStencil <: StencilType end
 
 function stencil_type(
     is_boundary::Vector{Bool},
-    boundary_conditions::Vector{BoundaryCondition},
+    boundary_conditions::Vector{BoundaryCondition{T}},
     eval_idx::Int,
     neighbors::Vector{Int},
     global_to_boundary::Vector{Int},
-)
+) where {T}
     if sum(is_boundary[neighbors]) == 0
         return InternalStencil()
     elseif is_boundary[eval_idx] &&
