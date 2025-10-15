@@ -83,7 +83,3 @@ end
     include("solve/integration/hermite_integration.jl")
     include("solve/integration/solve_utils_integration.jl")
 end
-
-# @safetestset "Solve with Hermite" begin
-#     include("solve_with_Hermite.jl")  # Removed - old Hermite implementation deleted
-# end
