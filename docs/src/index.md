@@ -4,8 +4,8 @@
 layout: home
 
 hero:
-  name: LockstepODE.jl Docs
-  tagline: Stepping Through ODEs in Lockstep
+  name: RadialBasisFunctions.jl Docs
+  tagline: All things radial!
 ---
 ```
 
