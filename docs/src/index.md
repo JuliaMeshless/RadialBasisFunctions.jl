@@ -1,5 +1,12 @@
-```@meta
-CurrentModule = RadialBasisFunctions
+```@raw html
+---
+# https://vitepress.dev/reference/default-theme-home-page
+layout: home
+
+hero:
+  name: LockstepODE.jl Docs
+  tagline: Stepping Through ODEs in Lockstep
+---
 ```
 
 # RadialBasisFunctions.jl

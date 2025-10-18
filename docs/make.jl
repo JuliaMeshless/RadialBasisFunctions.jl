@@ -1,5 +1,6 @@
 using RadialBasisFunctions
 using Documenter
+using DocumenterVitepress
 
 DocMeta.setdocmeta!(
     RadialBasisFunctions, :DocTestSetup, :(using RadialBasisFunctions); recursive=true
@@ -10,11 +11,12 @@ makedocs(;
     authors="Kyle Beggs",
     sitename="RadialBasisFunctions.jl",
     repo=Documenter.Remotes.GitHub("JuliaMeshless", "RadialBasisFunctions.jl"),
-    format=Documenter.HTML(;
-        prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://JuliaMeshless.github.io/RadialBasisFunctions.jl",
-        edit_link="main",
-        assets=String[],
+    format=DocumenterVitepress.MarkdownVitepress(;
+        repo="https://github.com/JuliaMeshless/RadialBasisFunctions.jl",
+        devbranch="main",
+        devurl="dev",
+        md_output_path=".",
+        build_vitepress=false,
     ),
     pages=[
         "Home" => "index.md",
@@ -22,10 +24,13 @@ makedocs(;
         "Theory" => "theory.md",
         "API" => "api.md",
     ],
+    clean=false,
 )
 
-deploydocs(;
+DocumenterVitepress.deploydocs(;
     repo="github.com/JuliaMeshless/RadialBasisFunctions.jl",
-    devbranch="main",
-    versions=["stable" => "v^", "dev" => "dev"],
+    target=joinpath(@__DIR__, "build"),
+    branch="gh-pages",
+    devbranch="main", # or master, trunk, ...
+    push_preview=true,
 )
