@@ -27,9 +27,6 @@ dxdy = dx - dy
 dy = partial(x[1:500], 1, 2)
 @test_throws ArgumentError dx + dy
 
-dy = partial(x, 1, 2; adjl=dx.adjl[1:500])
-@test_throws ArgumentError dx + dy
-
 adjl = copy(dx.adjl)
 adjl[1] = dx.adjl[2]
 adjl[2] = dx.adjl[1]

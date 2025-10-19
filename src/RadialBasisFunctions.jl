@@ -22,24 +22,23 @@ export degree, dim
 include("utils.jl")
 export find_neighbors, reorder_points!
 
+# Boundary types needed by solve.jl and solve_utils.jl
+include("boundary_types.jl")
+
 include("operators/operators.jl")
 export RadialBasisOperator, ScalarValuedOperator, VectorValuedOperator
 export update_weights!, is_cache_valid
 
 include("solve_utils.jl")
 
-# Boundary types needed by solve.jl
-include("boundary_types.jl")
-
 include("solve.jl")
 
 # New clean Hermite implementation
 include("solve_hermite.jl")
-export BoundaryCondition, Dirichlet, Neumann, Robin
-export α, β, is_dirichlet, is_neumann, is_robin
-export HermiteBoundaryInfo, StencilType, StandardStencil, HermiteStencil
+export BoundaryCondition, Dirichlet, Neumann, Robin, Internal
+export α, β, is_dirichlet, is_neumann, is_robin, is_internal
+export HermiteBoundaryInfo, StencilType, InternalStencil, HermiteStencil
 export stencil_type, has_boundary_points
-
 
 include("operators/custom.jl")
 export Custom, custom

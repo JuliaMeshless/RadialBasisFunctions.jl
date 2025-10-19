@@ -43,6 +43,38 @@ function directional(
     return RadialBasisOperator(ℒ, data, eval_points, basis; k=k, adjl=adjl)
 end
 
+"""
+    function directional(data, eval_points, v, basis, is_boundary, boundary_conditions, normals; k=autoselect_k(data, basis))
+
+Builds a Hermite-compatible `RadialBasisOperator` where the operator is the directional derivative, `Directional`.
+The additional boundary information enables Hermite interpolation with proper boundary condition handling.
+"""
+function directional(
+    data::AbstractVector,
+    eval_points::AbstractVector,
+    v::AbstractVector,
+    basis::B,
+    is_boundary::Vector{Bool},
+    boundary_conditions::Vector{<:BoundaryCondition},
+    normals::Vector{<:AbstractVector};
+    k::T=autoselect_k(data, basis),
+    adjl=find_neighbors(data, eval_points, k),
+) where {B<:AbstractRadialBasis,T<:Int}
+    Dim = length(first(data))
+    ℒ = Directional{Dim}(v)
+    return RadialBasisOperator(
+        ℒ,
+        data,
+        eval_points,
+        basis,
+        is_boundary,
+        boundary_conditions,
+        normals;
+        k=k,
+        adjl=adjl,
+    )
+end
+
 function _build_weights(ℒ::Directional{Dim}, data, eval_points, adjl, basis) where {Dim}
     v = ℒ.v
     if !(length(v) == Dim || length(v) == length(data))
@@ -53,6 +85,64 @@ function _build_weights(ℒ::Directional{Dim}, data, eval_points, adjl, basis) w
         )
     end
     weights = _build_weights(Gradient{Dim}(), data, eval_points, adjl, basis)
+
+    if length(v) == Dim
+        return mapreduce(+, zip(weights, v)) do zipped
+            w, vᵢ = zipped
+            w * vᵢ
+        end
+    else
+        vv = ntuple(i -> getindex.(v, i), Dim)
+        return mapreduce(+, zip(weights, vv)) do zipped
+            w, vᵢ = zipped
+            Diagonal(vᵢ) * w
+        end
+    end
+end
+
+"""
+    _build_weights(ℒ::Directional, data, eval_points, adjl, basis, is_boundary, boundary_conditions, normals)
+
+Hermite-compatible method for building directional derivative weights with boundary condition support.
+"""
+function _build_weights(
+    ℒ::Directional{Dim},
+    data::AbstractVector,
+    eval_points::AbstractVector,
+    adjl::AbstractVector,
+    basis::AbstractRadialBasis,
+    is_boundary::Vector{Bool},
+    boundary_conditions::Vector{<:BoundaryCondition},
+    normals::Vector{<:AbstractVector},
+) where {Dim}
+    v = ℒ.v
+    if !(length(v) == Dim || length(v) == length(data))
+        throw(
+            DomainError(
+                "The geometrical vector for Directional() should match either the dimension of the input or the number of input points. The geometrical vector length is $(length(v)) while there are $(length(data)) points with a dimension of $Dim",
+            ),
+        )
+    end
+
+    # Build gradient weights using Hermite method
+    dim = length(first(data))
+    mon = MonomialBasis(dim, basis.poly_deg)
+    gradient_op = Gradient{Dim}()
+    ℒmon = gradient_op(mon)
+    ℒrbf = gradient_op(basis)
+
+    weights = _build_weights(
+        data,
+        eval_points,
+        adjl,
+        basis,
+        ℒrbf,
+        ℒmon,
+        mon,
+        is_boundary,
+        boundary_conditions,
+        normals,
+    )
 
     if length(v) == Dim
         return mapreduce(+, zip(weights, v)) do zipped

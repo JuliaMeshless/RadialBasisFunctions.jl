@@ -32,12 +32,23 @@ function _∂(m::MonomialBasis{Dim,Deg}, order::Int, ::Val{N}) where {Dim,Deg,N}
     return ℒMonomialBasis(Dim, Deg, basis!)
 end
 
+function ∇(m::MonomialBasis{Dim,Deg}) where {Dim,Deg}
+    ∂¹_ops = ntuple(dim -> ∂(m, dim), Dim)
+    function basis!(b, x)
+        for (i, ∂¹!) in enumerate(∂¹_ops)
+            ∂¹!(view(b, :, i), x)
+        end
+        return nothing
+    end
+    return ℒMonomialBasis(Dim, Deg, basis!)
+end
+
 function ∇²(m::MonomialBasis{Dim,Deg}) where {Dim,Deg}
-    ∂² = ntuple(dim -> ∂(m, 2, dim), Dim)
+    ∂²_ops = ntuple(dim -> ∂²(m, dim), Dim)
     function basis!(b, x)
         cache = ones(eltype(x), size(b))
         b .= zero(eltype(x))
-        for ∂²! in ∂²
+        for ∂²! in ∂²_ops
             ∂²!(cache, x)
             b .+= cache
         end
