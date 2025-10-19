@@ -20,8 +20,6 @@ import RadialBasisFunctions as RBF
     mon_2d = MonomialBasis(2, 1)
 
     # CURRENT LIMITATION: Hermite implementation only supports PHS basis functions
-    # This is because Robin-Robin boundary interactions require directional∂²(basis, v1, v2)
-    # which is only implemented for PHS1, PHS3, PHS5, PHS7
     # TODO: Implement directional∂² for IMQ and Gaussian to enable full Hermite support
     hermite_compatible_bases = [basis_phs]  # Only PHS for now
     all_bases = [basis_phs, basis_imq, basis_gaussian]  # For standard (non-Hermite) tests
@@ -170,7 +168,7 @@ import RadialBasisFunctions as RBF
         @testset "Interior points (no boundary)" begin
             # Test that interior points produce same result as standard
             is_boundary = [false, false, false]
-            bcs = [Dirichlet(), Dirichlet(), Dirichlet()]
+            bcs = [Internal(), Internal(), Internal()]  # Interior sentinel values
             normals = [[0.0], [0.0], [0.0]]
 
             hermite_data = RBF.HermiteStencilData(data_1d, is_boundary, bcs, normals)
@@ -193,7 +191,7 @@ import RadialBasisFunctions as RBF
         @testset "Single Dirichlet boundary" begin
             # Test with one Dirichlet boundary point
             is_boundary = [false, true, false]
-            bcs = [Dirichlet(), Dirichlet(), Dirichlet()]
+            bcs = [Internal(), Dirichlet(), Internal()]  # Interior/Boundary/Interior
             normals = [[0.0], [1.0], [0.0]]
 
             hermite_data = RBF.HermiteStencilData(data_1d, is_boundary, bcs, normals)
@@ -425,8 +423,8 @@ import RadialBasisFunctions as RBF
             # For now, test non-Hermite-compatible bases only with ALL interior points
             # to completely avoid any boundary interactions requiring directional∂²
             is_interior_only = [false, false, false]  # All interior points
-            bcs_interior = [Dirichlet(), Dirichlet(), Dirichlet()]  # Unused but required
-            normals_interior = [[0.0], [0.0], [0.0]]  # Unused but required
+            bcs_interior = [Internal(), Internal(), Internal()]  # Interior sentinel values
+            normals_interior = [[0.0], [0.0], [0.0]]  # Unused for interior
             hermite_data_interior = RBF.HermiteStencilData(
                 data_1d, is_interior_only, bcs_interior, normals_interior
             )

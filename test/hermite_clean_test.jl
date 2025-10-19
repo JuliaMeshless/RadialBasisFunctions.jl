@@ -51,14 +51,14 @@ import RadialBasisFunctions as RBF
     # Set up boundary info: point 3 (index 3) is Neumann boundary
     is_boundary = [false, false, true]
     boundary_conditions = [
-        RBF.BoundaryCondition(1.0, 0.0),     # placeholder Dirichlet for interior point 1
-        RBF.BoundaryCondition(1.0, 0.0),     # placeholder Dirichlet for interior point 2  
-        RBF.BoundaryCondition(0.0, 1.0),      # Neumann condition for boundary point 3
+        RBF.Internal(),     # Interior point 1 (sentinel value, not used)
+        RBF.Internal(),     # Interior point 2 (sentinel value, not used)
+        RBF.Neumann(),      # Neumann condition for boundary point 3
     ]
     normals = [
-        [0.0],   # placeholder normal for point 1
-        [0.0],   # placeholder normal for point 2
-        [1.0],    # outward normal for point 3 (rightward)
+        [0.0],   # Interior point 1 (not used)
+        [0.0],   # Interior point 2 (not used)
+        [1.0],    # Outward normal for boundary point 3 (rightward)
     ]
 
     # Create HermiteStencilData

@@ -23,22 +23,43 @@ end
 is_dirichlet(bc::BoundaryCondition) = isone(bc.α) && iszero(bc.β)
 is_neumann(bc::BoundaryCondition) = iszero(bc.α) && isone(bc.β)
 is_robin(bc::BoundaryCondition) = !iszero(bc.α) && !iszero(bc.β)
+is_internal(bc::BoundaryCondition) = iszero(bc.α) && iszero(bc.β)
 
 # Constructor helpers
 Dirichlet(::Type{T}=Float64) where {T<:Real} = BoundaryCondition(one(T), zero(T))
 Neumann(::Type{T}=Float64) where {T<:Real} = BoundaryCondition(zero(T), one(T))
 Robin(α::Real, β::Real) = BoundaryCondition(α, β)
+Internal(::Type{T}=Float64) where {T<:Real} = BoundaryCondition(zero(T), zero(T))
 
 # Boundary information for a local stencil
 """
-This struct is meant to be used to correctly broadcast the build_stencil() function
+    HermiteStencilData{T}
+
+Local stencil data structure for Hermite interpolation with boundary conditions.
+
+This struct is meant to be used to correctly broadcast the build_stencil() function.
 When Hermite scheme is used, it can be given to _build_stencil!() in place of the sole data.
+
+# Fields
+- `data`: Coordinates of stencil points (stored as Vector{T} for efficiency)
+- `is_boundary`: Boolean flags indicating which points are on the boundary
+- `boundary_conditions`: Boundary condition for each point. For interior points 
+  (where `is_boundary[i] == false`), contains `Internal()` sentinel values that 
+  should NOT be used. Always check `is_boundary[i]` before accessing.
+- `normals`: Normal vectors for boundary points. For interior points, contains 
+  zero vectors. Always check `is_boundary[i]` before accessing.
+
+# Note
+The `boundary_conditions` and `normals` arrays have the same length as `data` and
+`is_boundary`, but only the entries where `is_boundary[i] == true` contain meaningful
+data. Interior point entries are filled with sentinel `Internal()` and zero vectors
+for type stability and array reuse in parallel kernels.
 """
 struct HermiteStencilData{T<:Real}
-    data::AbstractVector{Vector{T}}  # Coordinates of stencil points (stored as Vector{T} for efficiency)
+    data::AbstractVector{Vector{T}}
     is_boundary::Vector{Bool}
     boundary_conditions::Vector{BoundaryCondition{T}}
-    normals::Vector{Vector{T}}  # Normals stored as Vector{T}
+    normals::Vector{Vector{T}}
 
     # Generic constructor that accepts both Vector{T} and StaticVector{N,T} inputs
     function HermiteStencilData(
@@ -65,7 +86,7 @@ end
 function HermiteStencilData{T}(k::Int, dim::Int) where {T<:Real}
     data = [Vector{T}(undef, dim) for _ in 1:k]  # Pre-allocate with correct dimension
     is_boundary = Vector{Bool}(falses(k))
-    boundary_conditions = [Dirichlet(T) for _ in 1:k]
+    boundary_conditions = [Internal(T) for _ in 1:k]
     normals = [Vector{T}(undef, dim) for _ in 1:k]  # Pre-allocate with correct dimension
     return HermiteStencilData(data, is_boundary, boundary_conditions, normals)
 end
@@ -110,8 +131,8 @@ function update_stencil_data!(
             hermite_data.boundary_conditions[local_idx] = boundary_conditions[boundary_idx]
             hermite_data.normals[local_idx] .= normals[boundary_idx]  # Broadcasting works for both types
         else
-            # Set default Dirichlet for interior points (not used but keeps type consistency)
-            hermite_data.boundary_conditions[local_idx] = Dirichlet(T)
+            # Set default Internal for interior points (not used but keeps type consistency)
+            hermite_data.boundary_conditions[local_idx] = Internal(T)
             fill!(hermite_data.normals[local_idx], zero(T))
         end
     end

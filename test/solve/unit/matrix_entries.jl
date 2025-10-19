@@ -65,7 +65,7 @@ import RadialBasisFunctions as RBF
         @testset "Interior-Interior entries" begin
             # Setup interior points (no boundary)
             is_boundary = [false, false, false]
-            bcs = [Dirichlet(), Dirichlet(), Dirichlet()]  # Unused for interior
+            bcs = [Internal(), Internal(), Internal()]  # Interior sentinel values
             normals = [[0.0], [0.0], [0.0]]  # Unused for interior
 
             hermite_data = RBF.HermiteStencilData(data_1d, is_boundary, bcs, normals)
@@ -80,9 +80,9 @@ import RadialBasisFunctions as RBF
 
         @testset "Interior-Boundary entries" begin
             @testset "Interior-Dirichlet" begin
-                # Setup: point 1 interior, point 2 Dirichlet boundary
+                # Setup: point 1 interior, point 2 Dirichlet boundary, point 3 interior
                 is_boundary = [false, true, false]
-                bcs = [Dirichlet(), Dirichlet(), Dirichlet()]
+                bcs = [Internal(), Dirichlet(), Internal()]  # Interior/Boundary/Interior
                 normals = [[0.0], [1.0], [0.0]]  # Normal for point 2
 
                 hermite_data = RBF.HermiteStencilData(data_1d, is_boundary, bcs, normals)
@@ -139,9 +139,9 @@ import RadialBasisFunctions as RBF
 
         @testset "Boundary-Interior entries" begin
             @testset "Dirichlet-Interior" begin
-                # Setup: point 1 Dirichlet boundary, point 2 interior
+                # Setup: point 1 Dirichlet boundary, points 2 and 3 interior
                 is_boundary = [true, false, false]
-                bcs = [Dirichlet(), Dirichlet(), Dirichlet()]
+                bcs = [Dirichlet(), Internal(), Internal()]  # Boundary/Interior/Interior
                 normals = [[1.0], [0.0], [0.0]]  # Normal for point 1
 
                 hermite_data = RBF.HermiteStencilData(data_1d, is_boundary, bcs, normals)
@@ -172,9 +172,9 @@ import RadialBasisFunctions as RBF
 
         @testset "Boundary-Boundary entries" begin
             @testset "Dirichlet-Dirichlet" begin
-                # Setup: both points Dirichlet boundary
+                # Setup: both points 1 and 2 Dirichlet boundary, point 3 interior
                 is_boundary = [true, true, false]
-                bcs = [Dirichlet(), Dirichlet(), Dirichlet()]
+                bcs = [Dirichlet(), Dirichlet(), Internal()]  # Boundary/Boundary/Interior
                 normals = [[1.0], [-1.0], [0.0]]  # Normals for points 1,2
 
                 hermite_data = RBF.HermiteStencilData(data_1d, is_boundary, bcs, normals)
@@ -237,9 +237,9 @@ import RadialBasisFunctions as RBF
 
         @testset "2D Hermite entries" begin
             @testset "2D Neumann boundaries" begin
-                # Setup 2D problem with Neumann boundary
+                # Setup 2D problem with Neumann boundary at point 2, others interior
                 is_boundary_2d = [false, true, false, false]
-                bcs_2d = [Dirichlet(), Neumann(), Dirichlet(), Dirichlet()]
+                bcs_2d = [Internal(), Neumann(), Internal(), Internal()]  # Interior/Boundary/Interior/Interior
                 normals_2d = [[0.0, 0.0], [1.0, 0.0], [0.0, 0.0], [0.0, 0.0]]  # x-direction normal
 
                 hermite_data_2d = RBF.HermiteStencilData(
@@ -257,7 +257,7 @@ import RadialBasisFunctions as RBF
             @testset "2D different normal directions" begin
                 # Test with y-direction normal
                 is_boundary_2d = [false, true, false, false]
-                bcs_2d = [Dirichlet(), Neumann(), Dirichlet(), Dirichlet()]
+                bcs_2d = [Internal(), Neumann(), Internal(), Internal()]  # Interior/Boundary/Interior/Interior
                 normals_2d = [[0.0, 0.0], [0.0, 1.0], [0.0, 0.0], [0.0, 0.0]]  # y-direction normal
 
                 hermite_data_2d = RBF.HermiteStencilData(
@@ -322,9 +322,9 @@ import RadialBasisFunctions as RBF
             end
 
             @testset "Dirichlet polynomial entries" begin
-                # Setup Dirichlet boundary point
+                # Setup Dirichlet boundary point (point 1), points 2 and 3 interior
                 is_boundary = [true, false, false]
-                bcs = [Dirichlet(), Dirichlet(), Dirichlet()]
+                bcs = [Dirichlet(), Internal(), Internal()]  # Boundary/Interior/Interior
                 normals = [[1.0], [0.0], [0.0]]
 
                 hermite_data = RBF.HermiteStencilData(data_1d, is_boundary, bcs, normals)
@@ -384,9 +384,9 @@ import RadialBasisFunctions as RBF
             end
 
             @testset "2D polynomial entries" begin
-                # Setup 2D Neumann boundary
+                # Setup 2D Neumann boundary at point 1, others interior
                 is_boundary_2d = [true, false, false, false]
-                bcs_2d = [Neumann(), Dirichlet(), Dirichlet(), Dirichlet()]
+                bcs_2d = [Neumann(), Internal(), Internal(), Internal()]  # Boundary/Interior/Interior/Interior
                 normals_2d = [[1.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]  # x-direction normal
 
                 hermite_data_2d = RBF.HermiteStencilData(
@@ -420,7 +420,7 @@ import RadialBasisFunctions as RBF
         @testset "Type dispatch correctness" begin
             # Setup both standard data and Hermite data
             is_boundary = [false, false, false]
-            bcs = [Dirichlet(), Dirichlet(), Dirichlet()]
+            bcs = [Internal(), Internal(), Internal()]  # Interior sentinel values
             normals = [[0.0], [0.0], [0.0]]
 
             hermite_data = RBF.HermiteStencilData(data_1d, is_boundary, bcs, normals)
@@ -440,9 +440,9 @@ import RadialBasisFunctions as RBF
             # Create different boundary condition setups
             is_boundary = [true, false, false]
 
-            bc_dirichlet = [Dirichlet(), Dirichlet(), Dirichlet()]
-            bc_neumann = [Neumann(), Dirichlet(), Dirichlet()]
-            bc_robin = [Robin(1.0, 1.0), Dirichlet(), Dirichlet()]
+            bc_dirichlet = [Dirichlet(), Internal(), Internal()]  # Boundary/Interior/Interior
+            bc_neumann = [Neumann(), Internal(), Internal()]  # Boundary/Interior/Interior
+            bc_robin = [Robin(1.0, 1.0), Internal(), Internal()]  # Boundary/Interior/Interior
 
             hermite_dirichlet = RBF.HermiteStencilData(
                 data_1d, is_boundary, bc_dirichlet, normals

@@ -35,8 +35,8 @@ include("solve.jl")
 
 # New clean Hermite implementation
 include("solve_hermite.jl")
-export BoundaryCondition, Dirichlet, Neumann, Robin
-export α, β, is_dirichlet, is_neumann, is_robin
+export BoundaryCondition, Dirichlet, Neumann, Robin, Internal
+export α, β, is_dirichlet, is_neumann, is_robin, is_internal
 export HermiteBoundaryInfo, StencilType, InternalStencil, HermiteStencil
 export stencil_type, has_boundary_points
 
