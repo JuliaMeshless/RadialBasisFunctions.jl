@@ -228,7 +228,7 @@ import RadialBasisFunctions as RBF
         @testset "Interior points (no boundary)" begin
             # Test that interior points produce same result as standard
             is_boundary = [false, false, false]
-            bcs = [Dirichlet(), Dirichlet(), Dirichlet()]
+            bcs = [Internal(), Internal(), Internal()]  # Interior sentinel values
             normals = [[0.0], [0.0], [0.0]]
             hermite_data = RBF.HermiteStencilData(data_1d, is_boundary, bcs, normals)
 
@@ -258,9 +258,9 @@ import RadialBasisFunctions as RBF
         end
 
         @testset "Dirichlet boundary RHS" begin
-            # Test RHS with Dirichlet boundary conditions
+            # Test RHS with Dirichlet boundary conditions (point 2 is boundary, 1 and 3 are interior)
             is_boundary = [false, true, false]
-            bcs = [Dirichlet(), Dirichlet(), Dirichlet()]
+            bcs = [Internal(), Dirichlet(), Internal()]  # Interior/Boundary/Interior
             normals = [[0.0], [1.0], [0.0]]
             hermite_data = RBF.HermiteStencilData(data_1d, is_boundary, bcs, normals)
 

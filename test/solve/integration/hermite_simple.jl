@@ -91,7 +91,7 @@ import RadialBasisFunctions as RBF
 
                 # Hermite case with all interior points (should be similar)
                 is_boundary = [false, false, false]
-                bcs = [RBF.Dirichlet(), RBF.Dirichlet(), RBF.Dirichlet()]
+                bcs = [RBF.Internal(), RBF.Internal(), RBF.Internal()]  # Interior sentinel values
                 normals = [[0.0], [0.0], [0.0]]
                 hermite_data = RBF.HermiteStencilData(data_1d, is_boundary, bcs, normals)
 
@@ -219,7 +219,7 @@ import RadialBasisFunctions as RBF
 
                 # Hermite data should use Hermite path
                 is_boundary = [false, false, false]  # All interior for simplicity
-                bcs = [RBF.Dirichlet(), RBF.Dirichlet(), RBF.Dirichlet()]
+                bcs = [RBF.Internal(), RBF.Internal(), RBF.Internal()]  # Interior sentinel values
                 normals = [[0.0], [0.0], [0.0]]
                 hermite_data = RBF.HermiteStencilData(data_1d, is_boundary, bcs, normals)
 

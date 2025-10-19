@@ -117,7 +117,7 @@ end
 
         # Check defaults
         @test all(hsd.is_boundary .== false)
-        @test all(is_dirichlet.(hsd.boundary_conditions))
+        @test all(is_internal.(hsd.boundary_conditions))
 
         # Float32 version
         hsd32 = RBF.HermiteStencilData{Float32}(3, 1)
@@ -173,7 +173,7 @@ end
         # Check boundary conditions  
         # neighbors[1] = 2 -> is_boundary[2] = true -> boundary_idx = global_to_boundary[2] = 1 -> boundary_conditions[1] = Dirichlet()
         @test is_dirichlet(hsd.boundary_conditions[1])  # boundary_conditions[1] is Dirichlet  
-        @test is_dirichlet(hsd.boundary_conditions[2])  # Default for interior
+        @test is_internal(hsd.boundary_conditions[2])  # Default for interior
         # neighbors[3] = 4 -> is_boundary[4] = true -> boundary_idx = global_to_boundary[4] = 2 -> boundary_conditions[2] = Neumann()
         @test is_neumann(hsd.boundary_conditions[3])  # boundary_conditions[2] is Neumann
 

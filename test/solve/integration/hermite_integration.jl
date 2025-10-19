@@ -57,7 +57,7 @@ using SparseArrays
             data = [SVector(0.0), SVector(0.5), SVector(1.0)]
             is_boundary = [false, true, false]
             # HermiteStencilData constructor requires boundary_conditions array to be same length as data
-            bcs = [RBF.Dirichlet(), RBF.Neumann(), RBF.Dirichlet()]  # One for each point
+            bcs = [RBF.Internal(), RBF.Neumann(), RBF.Internal()]  # One for each point
             normals = [SVector(0.0), SVector(1.0), SVector(0.0)]
 
             @test_nowarn hermite_data = RBF.HermiteStencilData(
