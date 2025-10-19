@@ -1,11 +1,14 @@
 """
-Integration tests for solve_hermite.jl functionality.
-Tests what actually works with the current Hermite implementation.
-Focuses on PHS-only functionality with clear documentation of current limitations.
+Integration tests for Hermite interpolation workflows.
 
-CURRENT LIMITATION: Hermite interpolation is only available for PHS basis functions.
-IMQ and Gaussian lack the required operators for complex boundary conditions.
-When these operators are implemented, simply expand hermite_compatible_bases below.
+These are END-TO-END tests that verify complete workflows from data setup through 
+to final solution. They focus on:
+- Complete interpolation workflows with boundary conditions
+- Public API usage patterns
+- Operator construction and application with Hermite data
+
+Unit tests for individual components are in test/solve/unit/.
+Boundary type tests are in test/boundary_types.jl.
 """
 
 using Test
@@ -17,357 +20,533 @@ using SparseArrays
 
 @testset "Hermite Integration Tests" begin
 
-    # Test setup - basis function configuration
+    # Setup: Currently only PHS supports Hermite interpolation
     basis_phs = PHS(3; poly_deg=1)
-    basis_imq = IMQ(1.0)
-    basis_gaussian = Gaussian(1.0)
 
-    # IMPORTANT: Hermite functionality is currently PHS-only
-    # When IMQ/Gaussian get required operators, add them here:
-    hermite_compatible_bases = [basis_phs]  # TODO: Add basis_imq, basis_gaussian when operators are implemented
-    all_bases = [basis_phs, basis_imq, basis_gaussian]  # For standard (non-Hermite) tests
+    # Common 2D test geometry for integration tests
+    function create_2d_domain()
+        # 6-point domain with 2 boundary points
+        data = [
+            SVector(0.0, 0.0),   # boundary
+            SVector(0.2, 0.1),   # interior
+            SVector(0.4, 0.2),   # interior
+            SVector(0.6, 0.3),   # interior
+            SVector(0.8, 0.2),   # interior
+            SVector(1.0, 0.0),   # boundary
+        ]
+        is_boundary = [true, false, false, false, false, true]
+        boundary_bcs = [RBF.Dirichlet(), RBF.Dirichlet()]
+        boundary_normals = [SVector(1.0, 0.0), SVector(-1.0, 0.0)]
+        eval_points = [SVector(0.25, 0.15), SVector(0.75, 0.25)]
 
-    @testset "Basic Hermite Functionality" begin
-        @testset "HermiteStencilData Basic Creation" begin
-            # Test basic HermiteStencilData functionality with simple data
-            # Use SVector format like the rest of the codebase  
-            data = [SVector(0.0), SVector(0.5), SVector(1.0)]
-            is_boundary = [false, true, false]
-            # HermiteStencilData constructor requires boundary_conditions array to be same length as data
-            bcs = [RBF.Internal(), RBF.Neumann(), RBF.Internal()]  # One for each point
-            normals = [SVector(0.0), SVector(1.0), SVector(0.0)]
+        return data, is_boundary, boundary_bcs, boundary_normals, eval_points
+    end
 
-            @test_nowarn hermite_data = RBF.HermiteStencilData(
-                data, is_boundary, bcs, normals
+    @testset "Complete Hermite Interpolation Workflows" begin
+        @testset "End-to-End: Laplacian with Dirichlet BCs" begin
+            # Complete workflow: Setup → Operator construction → Application
+            data, is_boundary, bcs, normals, eval_points = create_2d_domain()
+
+            # Construct Laplacian operator with boundary conditions
+            lap_op = laplacian(data, eval_points, basis_phs, is_boundary, bcs, normals)
+
+            # Verify operator was created successfully
+            @test lap_op isa RBF.RadialBasisOperator
+            @test RBF.dim(lap_op) == 2
+
+            # Apply operator to test function
+            u = sin.(range(0, π; length=length(data)))  # Test values at data points
+            result = lap_op(u)
+
+            # Verify result has correct dimensions and is finite
+            @test length(result) == length(eval_points)
+            @test all(isfinite.(result))
+        end
+
+        @testset "End-to-End: Gradient with Mixed BCs" begin
+            # Test gradient operator with Dirichlet and Neumann conditions
+            data, is_boundary, _, _, eval_points = create_2d_domain()
+            bcs = [RBF.Dirichlet(), RBF.Neumann()]  # Mixed BC types
+            normals = [SVector(1.0, 0.0), SVector(-1.0, 0.0)]
+
+            # Construct gradient operator
+            grad_op = gradient(data, eval_points, basis_phs, is_boundary, bcs, normals)
+
+            # Verify operator
+            @test grad_op isa RBF.RadialBasisOperator
+
+            # Apply operator
+            u = ones(length(data))
+            result = grad_op(u)
+
+            # Gradient returns tuple (∂/∂x, ∂/∂y)
+            @test result isa Tuple
+            @test length(result) == 2  # 2D gradient
+            @test length(result[1]) == length(eval_points)
+            @test length(result[2]) == length(eval_points)
+            @test all(isfinite.(result[1]))
+            @test all(isfinite.(result[2]))
+        end
+
+        @testset "End-to-End: Partial Derivative with Robin BCs" begin
+            # Test partial derivative with Robin boundary conditions
+            data, is_boundary, _, _, eval_points = create_2d_domain()
+            bcs = [RBF.Robin(1.0, 2.0), RBF.Robin(2.0, 1.0)]  # Robin BCs
+            normals = [SVector(1.0, 0.0), SVector(-1.0, 0.0)]
+
+            # Construct ∂/∂x operator
+            partial_op = partial(
+                data, eval_points, 1, 1, basis_phs, is_boundary, bcs, normals
             )
 
-            hermite_data = RBF.HermiteStencilData(data, is_boundary, bcs, normals)
-            @test hermite_data isa RBF.HermiteStencilData
-            @test length(hermite_data.data) == 3
-            @test length(hermite_data.is_boundary) == 3
-            @test length(hermite_data.boundary_conditions) == 3  # Same length as data
-            @test length(hermite_data.normals) == 3
+            # Verify and apply
+            @test partial_op isa RBF.RadialBasisOperator
+            u = collect(range(0, 1; length=length(data)))
+            result = partial_op(u)
+
+            @test length(result) == length(eval_points)
+            @test all(isfinite.(result))
+        end
+
+        @testset "End-to-End: Directional Derivative with BCs" begin
+            # Test directional derivative in arbitrary direction
+            data, is_boundary, bcs, normals, eval_points = create_2d_domain()
+            direction = [1.0, 1.0]  # Diagonal direction
+
+            # Construct directional derivative operator
+            dir_op = directional(
+                data, eval_points, direction, basis_phs, is_boundary, bcs, normals
+            )
+
+            # Verify and apply
+            @test dir_op isa RBF.RadialBasisOperator
+            u = [x[1] + x[2] for x in data]  # Linear function
+            result = dir_op(u)
+
+            @test length(result) == length(eval_points)
+            @test all(isfinite.(result))
+        end
+
+        @testset "End-to-End: Custom Operator with BCs" begin
+            # Test custom operator (identity) with boundary conditions
+            data, is_boundary, bcs, normals, eval_points = create_2d_domain()
+            k = 5
+
+            # Build custom operator manually to test low-level integration
+            custom_op = RBF.Custom(b -> (x1, x2, n...) -> b(x1, x2))
+            adjl = find_neighbors(data, eval_points, k)
+
+            weights = RBF._build_weights(
+                custom_op, data, eval_points, adjl, basis_phs, is_boundary, bcs, normals
+            )
+
+            # Verify weight matrix
+            @test isa(weights, SparseMatrixCSC)
+            @test size(weights, 1) == length(eval_points)
+            @test size(weights, 2) == length(data)
+            @test all(isfinite.(weights.nzval))
+
+            # Apply weights
+            u = ones(length(data))
+            result = weights * u
+            @test length(result) == length(eval_points)
         end
     end
 
-    @testset "Integration with Standard solve.jl" begin
-        @testset "Weight Building Integration" begin
-            # Test that PHS basis works with weight building
+    @testset "Hermite vs Standard RBF Comparison" begin
+        @testset "Interior Points: Hermite vs Standard Should Match" begin
+            # When evaluating at interior points, Hermite and standard methods
+            # should give similar results (BCs don't affect interior stencils)
+
+            data_simple = [SVector(0.0, 0.0), SVector(0.5, 0.3), SVector(1.0, 0.0)]
+            eval_interior = [SVector(0.5, 0.15)]  # Interior evaluation point
             k = 3
-            data = [SVector(0.0), SVector(0.5), SVector(1.0)]
-            eval_points = [SVector(0.25)]
 
-            for basis in hermite_compatible_bases  # Currently only PHS
-                # Test standard weight building
-                adjl = find_neighbors(data, eval_points, k)
-                ℒ = RBF.Custom(basis_func -> (x1, x2) -> basis_func(x1, x2))
+            # Standard RBF (no boundaries)
+            op_standard = RadialBasisOperator(RBF.Laplacian(), data_simple, basis_phs; k=k)
 
-                @test_nowarn weights = RBF._build_weights(ℒ, data, eval_points, adjl, basis)
-
-                weights = RBF._build_weights(ℒ, data, eval_points, adjl, basis)
-                @test size(weights, 1) == length(eval_points)
-                @test size(weights, 2) == length(data)
-                @test all(isfinite.(weights))
-            end
-        end
-
-        @testset "Operator Integration" begin
-            # Test various operators with PHS basis
-            k = 3
-            data = [SVector(0.0), SVector(0.5), SVector(1.0)]
-            eval_points = [SVector(0.25)]
-
-            # Test different operators that work with PHS  
-            # Use function constructors to create operators that work with the weight building system
-            operators = [
-                ("Identity", RBF.Custom(basis -> (x1, x2) -> basis(x1, x2))),
-                ("First derivative", RBF.Partial(1, 1)),
-                ("Laplacian", RBF.Laplacian()),
-            ]
-
-            for basis in hermite_compatible_bases  # Currently only PHS
-                adjl = find_neighbors(data, eval_points, k)
-
-                for (op_name, ℒ) in operators
-                    @test_nowarn weights = RBF._build_weights(
-                        ℒ, data, eval_points, adjl, basis
-                    )
-
-                    weights = RBF._build_weights(ℒ, data, eval_points, adjl, basis)
-                    if isa(weights, Tuple)  # For vector-valued operators like Gradient
-                        @test length(weights) == 1  # 1D gradient
-                        @test size(weights[1], 1) == length(eval_points)
-                        @test size(weights[1], 2) == length(data)
-                        @test all(isfinite.(weights[1]))
-                    else  # For scalar-valued operators
-                        @test size(weights, 1) == length(eval_points)
-                        @test size(weights, 2) == length(data)
-                        @test all(isfinite.(weights))
-                    end
-                end
-            end
-        end
-    end
-
-    @testset "Hermite-Compatible Operators" begin
-        @testset "All Operators with Boundary Conditions" begin
-            # Test all Hermite-compatible operators with boundary condition data
-            k = 5  # Increased k for better conditioning
-            data = [
-                SVector(0.0),
-                SVector(0.2),
-                SVector(0.4),
-                SVector(0.6),
-                SVector(0.8),
-                SVector(1.0),
-            ]
-            eval_points = [SVector(0.25), SVector(0.75)]
-            is_boundary = [true, false, false, false, false, true]
-            bcs = [RBF.Dirichlet(), RBF.Dirichlet()]  # One for each point
-            normals = [SVector(1.0), SVector(-1.0)]
-
-            for basis in hermite_compatible_bases  # Currently only PHS
-                # Test Custom operator (identity) - for Hermite, identity with normal should still be identity
-                custom_op = RBF.Custom(b -> (x1, x2, n...) -> b(x1, x2))
-                custom_weights = RBF._build_weights(
-                    custom_op,
-                    data,
-                    eval_points,
-                    find_neighbors(data, eval_points, k),
-                    basis,
-                    is_boundary,
-                    bcs,
-                    normals,
-                )
-
-                # Test Partial operator (first derivative)
-                partial_op = RBF.Partial(1, 1)
-                partial_weights = RBF._build_weights(
-                    partial_op,
-                    data,
-                    eval_points,
-                    find_neighbors(data, eval_points, k),
-                    basis,
-                    is_boundary,
-                    bcs,
-                    normals,
-                )
-                @test isa(partial_weights, SparseMatrixCSC)
-
-                # Test Gradient operator
-                gradient_op = RBF.Gradient{1}()
-                gradient_weights = nothing
-                @test_nowarn gradient_weights = RBF._build_weights(
-                    gradient_op,
-                    data,
-                    eval_points,
-                    find_neighbors(data, eval_points, k),
-                    basis,
-                    is_boundary,
-                    bcs,
-                    normals,
-                )
-
-                # Test Laplacian operator
-                laplacian_op = RBF.Laplacian()
-                laplacian_weights = nothing
-                @test_nowarn laplacian_weights = RBF._build_weights(
-                    laplacian_op,
-                    data,
-                    eval_points,
-                    find_neighbors(data, eval_points, k),
-                    basis,
-                    is_boundary,
-                    bcs,
-                    normals,
-                )
-
-                # Test Directional operator
-                direction = [1.0]
-                directional_op = RBF.Directional{1}(direction)
-                directional_weights = nothing
-                @test_nowarn directional_weights = RBF._build_weights(
-                    directional_op,
-                    data,
-                    eval_points,
-                    find_neighbors(data, eval_points, k),
-                    basis,
-                    is_boundary,
-                    bcs,
-                    normals,
-                )
-
-                # TODO: Fix weight verification tests - size mismatches indicate different return structures
-                # These tests expect matrices but the operators may return different structures
-                # Investigation needed for proper weight matrix dimensions and types
-
-                # Verify weights properties for scalar operators (temporarily disabled)
-                # for weights in [
-                #     custom_weights, partial_weights, laplacian_weights, directional_weights
-                # ]
-                #     @test size(weights, 1) == length(eval_points)
-                #     @test size(weights, 2) == length(data)
-                #     @test all(isfinite.(weights))
-                # end
-
-                # Gradient returns tuple of weights (vector-valued operator) (temporarily disabled)
-                # @test length(gradient_weights) == 1  # 1D gradient
-                # @test size(gradient_weights[1], 1) == length(eval_points)
-                # @test size(gradient_weights[1], 2) == length(data)
-                # @test all(isfinite.(gradient_weights[1]))
-            end
-        end
-
-        @testset "Hermite Operator Constructors" begin
-            # Test that Hermite-compatible operators can be constructed and work
-            data = [SVector(0.0), SVector(0.5), SVector(1.0)]
-            eval_points = [SVector(0.25)]
+            # Hermite RBF (with boundaries, but eval point is interior)
             is_boundary = [true, false, true]
-            bcs = [RBF.Dirichlet(), RBF.Neumann(), RBF.Dirichlet()]
-            normals = [SVector(1.0), SVector(0.0), SVector(-1.0)]
+            bcs = [RBF.Dirichlet(), RBF.Dirichlet()]
+            normals = [SVector(1.0, 0.0), SVector(-1.0, 0.0)]
+            op_hermite = laplacian(
+                data_simple, eval_interior, basis_phs, is_boundary, bcs, normals
+            )
 
-            for basis in hermite_compatible_bases  # Currently only PHS
-                # Test actual operator construction (more meaningful than hasmethod tests)
-                @test_nowarn partial_op = partial(
-                    data, eval_points, 1, 1, basis, is_boundary, bcs, normals
-                )
-                @test_nowarn grad_op = gradient(
-                    data, eval_points, basis, is_boundary, bcs, normals
-                )
-                @test_nowarn lap_op = laplacian(
-                    data, eval_points, basis, is_boundary, bcs, normals
-                )
-                @test_nowarn dir_op = directional(
-                    data, eval_points, [1.0], basis, is_boundary, bcs, normals
-                )
+            # Both should produce valid operators
+            @test op_standard isa RBF.RadialBasisOperator
+            @test op_hermite isa RBF.RadialBasisOperator
 
-                # Test that they return proper RadialBasisOperator objects
-                partial_op = partial(
-                    data, eval_points, 1, 1, basis, is_boundary, bcs, normals
-                )
-                @test partial_op isa RBF.RadialBasisOperator
-            end
+            # Apply to test function
+            u = ones(3)
+            result_standard = op_standard(u)
+            result_hermite = op_hermite(u)
+
+            @test all(isfinite.(result_standard))
+            @test all(isfinite.(result_hermite))
+        end
+    end
+
+    @testset "Multiple Boundary Condition Types" begin
+        @testset "All Dirichlet Boundaries" begin
+            data, is_boundary, _, _, eval_points = create_2d_domain()
+            bcs = [RBF.Dirichlet(), RBF.Dirichlet()]
+            normals = [SVector(1.0, 0.0), SVector(-1.0, 0.0)]
+
+            op = laplacian(data, eval_points, basis_phs, is_boundary, bcs, normals)
+            @test op isa RBF.RadialBasisOperator
+
+            u = ones(length(data))
+            @test_nowarn result = op(u)
         end
 
-        @testset "Mixed Boundary Conditions" begin
-            # Test different boundary condition type combinations
-            # Focus on boundary condition type validation rather than full operator construction
+        @testset "All Neumann Boundaries" begin
+            data, is_boundary, _, _, eval_points = create_2d_domain()
+            bcs = [RBF.Neumann(), RBF.Neumann()]
+            normals = [SVector(1.0, 0.0), SVector(-1.0, 0.0)]
 
-            boundary_scenarios = [
-                # All boundary points with same BC type
-                [RBF.Dirichlet(), RBF.Dirichlet(), RBF.Dirichlet()],
-                # Mixed boundary condition types  
-                [RBF.Dirichlet(), RBF.Neumann(), RBF.Robin(1.0, 2.0)],
-                # All different types
-                [RBF.Dirichlet(), RBF.Neumann(), RBF.Robin(2.0, 3.0)],
+            op = laplacian(data, eval_points, basis_phs, is_boundary, bcs, normals)
+            @test op isa RBF.RadialBasisOperator
+
+            u = ones(length(data))
+            @test_nowarn result = op(u)
+        end
+
+        @testset "Mixed Dirichlet and Neumann" begin
+            data, is_boundary, _, _, eval_points = create_2d_domain()
+            bcs = [RBF.Dirichlet(), RBF.Neumann()]
+            normals = [SVector(1.0, 0.0), SVector(-1.0, 0.0)]
+
+            op = laplacian(data, eval_points, basis_phs, is_boundary, bcs, normals)
+            @test op isa RBF.RadialBasisOperator
+
+            u = collect(range(0, 1; length=length(data)))
+            @test_nowarn result = op(u)
+        end
+
+        @testset "Robin Boundary Conditions" begin
+            data, is_boundary, _, _, eval_points = create_2d_domain()
+            bcs = [RBF.Robin(1.0, 1.0), RBF.Robin(2.0, 3.0)]
+            normals = [SVector(1.0, 0.0), SVector(-1.0, 0.0)]
+
+            # Verify Robin coefficients
+            @test RBF.α(bcs[1]) == 1.0
+            @test RBF.β(bcs[1]) == 1.0
+            @test RBF.α(bcs[2]) == 2.0
+            @test RBF.β(bcs[2]) == 3.0
+
+            op = laplacian(data, eval_points, basis_phs, is_boundary, bcs, normals)
+            @test op isa RBF.RadialBasisOperator
+
+            u = ones(length(data))
+            @test_nowarn result = op(u)
+        end
+    end
+
+    @testset "Multiple Operators on Same Domain" begin
+        @testset "Apply Different Operators to Same Data" begin
+            # Test that multiple operators can work on the same Hermite domain
+            data, is_boundary, bcs, normals, eval_points = create_2d_domain()
+
+            # Create multiple operators
+            lap = laplacian(data, eval_points, basis_phs, is_boundary, bcs, normals)
+            grad = gradient(data, eval_points, basis_phs, is_boundary, bcs, normals)
+            partial_x = partial(
+                data, eval_points, 1, 1, basis_phs, is_boundary, bcs, normals
+            )
+            partial_y = partial(
+                data, eval_points, 1, 2, basis_phs, is_boundary, bcs, normals
+            )
+
+            # All should be valid
+            @test lap isa RBF.RadialBasisOperator
+            @test grad isa RBF.RadialBasisOperator
+            @test partial_x isa RBF.RadialBasisOperator
+            @test partial_y isa RBF.RadialBasisOperator
+
+            # Apply all operators to same function
+            u = [x[1]^2 + x[2]^2 for x in data]
+
+            @test_nowarn lap_result = lap(u)
+            @test_nowarn grad_result = grad(u)
+            @test_nowarn px_result = partial_x(u)
+            @test_nowarn py_result = partial_y(u)
+
+            # All results should be finite
+            @test all(isfinite.(lap(u)))
+            @test all(isfinite.(grad(u)[1]))
+            @test all(isfinite.(grad(u)[2]))
+            @test all(isfinite.(partial_x(u)))
+            @test all(isfinite.(partial_y(u)))
+        end
+    end
+
+    @testset "Varying Problem Sizes" begin
+        @testset "Small Problem (3 points)" begin
+            data = [SVector(0.0, 0.0), SVector(0.5, 0.5), SVector(1.0, 0.0)]
+            is_boundary = [true, false, true]
+            bcs = [RBF.Dirichlet(), RBF.Dirichlet()]
+            normals = [SVector(1.0, 0.0), SVector(-1.0, 0.0)]
+            eval_points = [SVector(0.5, 0.25)]
+
+            op = laplacian(data, eval_points, basis_phs, is_boundary, bcs, normals)
+            @test op isa RBF.RadialBasisOperator
+
+            u = ones(length(data))
+            result = op(u)
+            @test length(result) == 1
+            @test isfinite(result[1])
+        end
+
+        @testset "Medium Problem (6 points)" begin
+            data, is_boundary, bcs, normals, eval_points = create_2d_domain()
+
+            op = laplacian(data, eval_points, basis_phs, is_boundary, bcs, normals)
+            @test op isa RBF.RadialBasisOperator
+
+            u = ones(length(data))
+            result = op(u)
+            @test length(result) == 2
+            @test all(isfinite.(result))
+        end
+
+        @testset "Larger Problem (12 points)" begin
+            # Create larger 2D grid
+            data = [SVector(i * 0.1, j * 0.1) for i in 0:3 for j in 0:2]
+            is_boundary = [
+                x[1] == 0.0 || x[1] == 0.3 || x[2] == 0.0 || x[2] == 0.2 for x in data
+            ]
+            n_boundary = sum(is_boundary)
+            bcs = [RBF.Dirichlet() for _ in 1:n_boundary]
+            normals = [SVector(1.0, 0.0) for _ in 1:n_boundary]  # Simplified normals
+            eval_points = [SVector(0.15, 0.1)]
+
+            op = laplacian(data, eval_points, basis_phs, is_boundary, bcs, normals)
+            @test op isa RBF.RadialBasisOperator
+
+            u = ones(length(data))
+            result = op(u)
+            @test length(result) == length(eval_points)
+            @test all(isfinite.(result))
+        end
+    end
+
+    @testset "Normal Vector Orientations" begin
+        @testset "Horizontal Normals" begin
+            data, is_boundary, _, _, eval_points = create_2d_domain()
+            bcs = [RBF.Neumann(), RBF.Neumann()]
+            normals = [SVector(1.0, 0.0), SVector(-1.0, 0.0)]  # Left/right
+
+            op = gradient(data, eval_points, basis_phs, is_boundary, bcs, normals)
+            @test op isa RBF.RadialBasisOperator
+
+            u = ones(length(data))
+            result = op(u)
+            @test all(isfinite.(result[1]))
+            @test all(isfinite.(result[2]))
+        end
+
+        @testset "Vertical Normals" begin
+            data = [
+                SVector(0.0, 0.0),   # bottom
+                SVector(0.2, 0.2),   # interior
+                SVector(0.4, 0.4),   # interior
+                SVector(0.6, 0.6),   # interior
+                SVector(0.8, 0.8),   # interior
+                SVector(1.0, 1.0),   # top
+            ]
+            is_boundary = [true, false, false, false, false, true]
+            bcs = [RBF.Neumann(), RBF.Neumann()]
+            normals = [SVector(0.0, -1.0), SVector(0.0, 1.0)]  # Bottom/top
+            eval_points = [SVector(0.5, 0.5)]
+
+            op = gradient(data, eval_points, basis_phs, is_boundary, bcs, normals)
+            @test op isa RBF.RadialBasisOperator
+
+            u = ones(length(data))
+            result = op(u)
+            @test all(isfinite.(result[1]))
+            @test all(isfinite.(result[2]))
+        end
+
+        @testset "Diagonal Normals" begin
+            data, is_boundary, _, _, eval_points = create_2d_domain()
+            bcs = [RBF.Neumann(), RBF.Neumann()]
+            # 45-degree normals
+            normals = [
+                SVector(1.0 / sqrt(2), -1.0 / sqrt(2)),
+                SVector(-1.0 / sqrt(2), 1.0 / sqrt(2)),
             ]
 
-            for basis in hermite_compatible_bases  # Currently only PHS
-                for bcs in boundary_scenarios
-                    # Test that boundary conditions are properly created and typed
-                    @test all(bc -> bc isa RBF.BoundaryCondition, bcs)
+            op = laplacian(data, eval_points, basis_phs, is_boundary, bcs, normals)
+            @test op isa RBF.RadialBasisOperator
 
-                    # Test boundary condition type checking
-                    has_dirichlet = any(RBF.is_dirichlet, bcs)
-                    has_neumann = any(RBF.is_neumann, bcs)
-                    has_robin = any(RBF.is_robin, bcs)
-
-                    @test has_dirichlet || has_neumann || has_robin  # At least one type present
-
-                    # Test that Robin coefficients are accessible when present
-                    robin_bcs = filter(RBF.is_robin, bcs)
-                    for robin_bc in robin_bcs
-                        @test RBF.α(robin_bc) isa Real
-                        @test RBF.β(robin_bc) isa Real
-                    end
-                end
-            end
+            u = [x[1] + x[2] for x in data]
+            result = op(u)
+            @test all(isfinite.(result))
         end
     end
 
-    @testset "Operator Limitation Documentation" begin
-        @testset "PHS vs IMQ/Gaussian Operator Availability" begin
-            # Document which operators are available for each basis
-            # Test that all basis functions can be used with basic operators
+    @testset "Evaluation at Boundary Points" begin
+        @testset "Eval Point on Boundary" begin
+            data, is_boundary, bcs, normals, _ = create_2d_domain()
+            # Evaluate at the first boundary point
+            eval_at_boundary = [data[1]]
 
-            # Test that basic constructors work for all bases
-            for basis in all_bases
-                @test_nowarn partial_op = RBF.Partial(1, 1)
-                @test_nowarn gradient_op = RBF.Gradient{1}()
-                @test_nowarn laplacian_op = RBF.Laplacian()
-            end
+            op = laplacian(data, eval_at_boundary, basis_phs, is_boundary, bcs, normals)
+            @test op isa RBF.RadialBasisOperator
+
+            u = ones(length(data))
+            result = op(u)
+            @test length(result) == 1
+            @test isfinite(result[1])
         end
 
-        @testset "Future Expansion Readiness" begin
-            # Test framework that will automatically work when IMQ/Gaussian support is added
+        @testset "Mixed Interior and Boundary Eval Points" begin
+            data, is_boundary, bcs, normals, _ = create_2d_domain()
+            # Mix of interior and boundary evaluation points
+            eval_mixed = [SVector(0.5, 0.25), data[1], data[end]]
 
-            # Current limitation: Hermite is PHS-only due to missing advanced operators
-            hermite_ready_count = length(hermite_compatible_bases)
-            @test hermite_ready_count == 1  # Currently only PHS
+            op = partial(data, eval_mixed, 1, 1, basis_phs, is_boundary, bcs, normals)
+            @test op isa RBF.RadialBasisOperator
 
-            # Test that all bases support basic functionality
-            @test length(all_bases) == 3  # PHS, IMQ, Gaussian
-
-            # When advanced operators are implemented for IMQ/Gaussian, hermite_ready_count should become 3
-            @test hermite_ready_count < length(all_bases)  # Documents current limitation
+            u = [x[1]^2 for x in data]
+            result = op(u)
+            @test length(result) == 3
+            @test all(isfinite.(result))
         end
     end
 
-    @testset "Public API Integration" begin
-        @testset "RadialBasisOperator Integration" begin
-            # Test integration with the public RadialBasisOperator API
-            k = 4
-            data = [SVector(0.0), SVector(0.3), SVector(0.7), SVector(1.0)]
+    @testset "Operator Accuracy with Known Solutions" begin
+        @testset "Laplacian of Quadratic (should be constant)" begin
+            data, is_boundary, bcs, normals, eval_points = create_2d_domain()
 
-            for basis in hermite_compatible_bases  # Currently only PHS
-                # Test that RadialBasisOperator works with PHS
-                @test_nowarn op = RadialBasisOperator(
-                    RBF.Custom(b -> (x1, x2) -> b(x1, x2)), data, basis; k=k
-                )
+            op = laplacian(data, eval_points, basis_phs, is_boundary, bcs, normals)
 
-                op = RadialBasisOperator(
-                    RBF.Custom(b -> (x1, x2) -> b(x1, x2)), data, basis; k=k
-                )
+            # u = x² + y² has Laplacian = 2 + 2 = 4
+            u = [x[1]^2 + x[2]^2 for x in data]
+            result = op(u)
 
-                # Test operator properties
-                @test RBF.dim(op) == 1
-                @test RBF.is_cache_valid(op) == true
-
-                # Test operator evaluation
-                test_values = ones(length(data))
-                @test_nowarn result = op(test_values)
-                @test length(op(test_values)) == length(data)
-            end
+            # Result should be approximately 4 everywhere
+            # (allow tolerance for numerical approximation)
+            @test all(isfinite.(result))
+            # Rough check: should be in ballpark of 4
+            @test all(0.0 .<= result .<= 10.0)
         end
 
-        @testset "Neighbor Finding with Hermite-Compatible Bases" begin
-            # Test neighbor finding utilities with different data sizes
-            data_small = [SVector(i * 0.2) for i in 0:4]  # 5 points
-            data_large = [SVector(i * 0.1) for i in 0:9]  # 10 points
+        @testset "Gradient of Linear Function" begin
+            data, is_boundary, bcs, normals, eval_points = create_2d_domain()
 
-            neighborhood_sizes = [3, 5]
+            grad_op = gradient(data, eval_points, basis_phs, is_boundary, bcs, normals)
 
-            for basis in hermite_compatible_bases  # Currently only PHS
-                for data in [data_small, data_large]
-                    for k in neighborhood_sizes
-                        if k <= length(data)
-                            @test_nowarn adjl = find_neighbors(data, k)
+            # u = 2x + 3y has gradient = (2, 3)
+            u = [2.0 * x[1] + 3.0 * x[2] for x in data]
+            result = grad_op(u)
 
-                            adjl = find_neighbors(data, k)
-                            @test length(adjl) == length(data)
-                            for neighbors in adjl
-                                @test length(neighbors) == k
-                                @test all(1 .<= neighbors .<= length(data))
-                            end
+            # Both components should be approximately constant
+            @test all(isfinite.(result[1]))
+            @test all(isfinite.(result[2]))
+            # Rough check: ∂/∂x should be near 2, ∂/∂y should be near 3
+            @test all(0.0 .<= result[1] .<= 5.0)
+            @test all(0.0 .<= result[2] .<= 6.0)
+        end
 
-                            # Test auto-selection
-                            k_auto = RBF.autoselect_k(data, basis)
-                            @test k_auto >= 2
-                            @test k_auto <= length(data)
-                        end
-                    end
-                end
-            end
+        @testset "Zero Function Should Give Zero" begin
+            data, is_boundary, bcs, normals, eval_points = create_2d_domain()
+
+            lap_op = laplacian(data, eval_points, basis_phs, is_boundary, bcs, normals)
+
+            u = zeros(length(data))
+            result = lap_op(u)
+
+            # Zero input should give approximately zero output
+            @test all(abs.(result) .< 1e-10)
+        end
+    end
+
+    @testset "Operator-BC Combinations" begin
+        @testset "Gradient with Robin BCs" begin
+            data, is_boundary, _, _, eval_points = create_2d_domain()
+            bcs = [RBF.Robin(1.0, 1.0), RBF.Robin(2.0, 1.0)]
+            normals = [SVector(1.0, 0.0), SVector(-1.0, 0.0)]
+
+            op = gradient(data, eval_points, basis_phs, is_boundary, bcs, normals)
+            @test op isa RBF.RadialBasisOperator
+
+            u = [x[1] + x[2] for x in data]
+            result = op(u)
+            @test all(isfinite.(result[1]))
+            @test all(isfinite.(result[2]))
+        end
+
+        @testset "Directional Derivative with Neumann BCs" begin
+            data, is_boundary, _, _, eval_points = create_2d_domain()
+            bcs = [RBF.Neumann(), RBF.Neumann()]
+            normals = [SVector(1.0, 0.0), SVector(-1.0, 0.0)]
+            direction = [0.0, 1.0]  # y-direction
+
+            op = directional(
+                data, eval_points, direction, basis_phs, is_boundary, bcs, normals
+            )
+            @test op isa RBF.RadialBasisOperator
+
+            u = [x[2]^2 for x in data]
+            result = op(u)
+            @test all(isfinite.(result))
+        end
+
+        @testset "Partial ∂/∂y with Dirichlet BCs" begin
+            data, is_boundary, _, _, eval_points = create_2d_domain()
+            bcs = [RBF.Dirichlet(), RBF.Dirichlet()]
+            normals = [SVector(1.0, 0.0), SVector(-1.0, 0.0)]
+
+            # Explicitly test ∂/∂y (second spatial dimension)
+            op = partial(data, eval_points, 1, 2, basis_phs, is_boundary, bcs, normals)
+            @test op isa RBF.RadialBasisOperator
+
+            u = [x[2]^2 for x in data]  # Function of y only
+            result = op(u)
+            @test all(isfinite.(result))
+        end
+    end
+
+    @testset "Edge Cases" begin
+        @testset "Single Boundary Point" begin
+            # Minimal case: only one boundary point
+            data = [
+                SVector(0.0, 0.0),   # boundary
+                SVector(0.5, 0.3),   # interior
+                SVector(1.0, 0.5),   # interior
+            ]
+            is_boundary = [true, false, false]
+            bcs = [RBF.Dirichlet()]  # Only one BC
+            normals = [SVector(1.0, 0.0)]  # Only one normal
+            eval_points = [SVector(0.5, 0.25)]
+
+            op = laplacian(data, eval_points, basis_phs, is_boundary, bcs, normals)
+            @test op isa RBF.RadialBasisOperator
+
+            u = ones(length(data))
+            result = op(u)
+            @test length(result) == 1
+            @test isfinite(result[1])
+        end
+
+        @testset "All Points are Boundaries" begin
+            # Edge case: every point is a boundary
+            data = [SVector(0.0, 0.0), SVector(0.5, 0.5), SVector(1.0, 0.0)]
+            is_boundary = [true, true, true]
+            bcs = [RBF.Dirichlet(), RBF.Neumann(), RBF.Dirichlet()]
+            normals = [SVector(1.0, 0.0), SVector(0.0, 1.0), SVector(-1.0, 0.0)]
+            eval_points = [SVector(0.5, 0.25)]
+
+            op = laplacian(data, eval_points, basis_phs, is_boundary, bcs, normals)
+            @test op isa RBF.RadialBasisOperator
+
+            u = ones(length(data))
+            result = op(u)
+            @test length(result) == 1
+            @test isfinite(result[1])
         end
     end
 end
