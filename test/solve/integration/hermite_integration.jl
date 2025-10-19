@@ -28,29 +28,6 @@ using SparseArrays
     all_bases = [basis_phs, basis_imq, basis_gaussian]  # For standard (non-Hermite) tests
 
     @testset "Basic Hermite Functionality" begin
-        @testset "Boundary Condition Type Detection" begin
-            # Test boundary condition constructor functions and type detection
-            bc_dirichlet = RBF.Dirichlet()
-            bc_neumann = RBF.Neumann()
-            bc_robin = RBF.Robin(1.0, 2.0)
-
-            @test RBF.is_dirichlet(bc_dirichlet)
-            @test !RBF.is_neumann(bc_dirichlet)
-            @test !RBF.is_robin(bc_dirichlet)
-
-            @test !RBF.is_dirichlet(bc_neumann)
-            @test RBF.is_neumann(bc_neumann)
-            @test !RBF.is_robin(bc_neumann)
-
-            @test !RBF.is_dirichlet(bc_robin)
-            @test !RBF.is_neumann(bc_robin)
-            @test RBF.is_robin(bc_robin)
-
-            # Test Robin coefficients
-            @test RBF.α(bc_robin) == 1.0
-            @test RBF.β(bc_robin) == 2.0
-        end
-
         @testset "HermiteStencilData Basic Creation" begin
             # Test basic HermiteStencilData functionality with simple data
             # Use SVector format like the rest of the codebase  
@@ -146,22 +123,8 @@ using SparseArrays
             ]
             eval_points = [SVector(0.25), SVector(0.75)]
             is_boundary = [true, false, false, false, false, true]
-            bcs = [
-                RBF.Dirichlet(),
-                RBF.Dirichlet(),
-                RBF.Dirichlet(),
-                RBF.Dirichlet(),
-                RBF.Dirichlet(),
-                RBF.Dirichlet(),
-            ]  # One for each point
-            normals = [
-                SVector(1.0),
-                SVector(0.0),
-                SVector(0.0),
-                SVector(0.0),
-                SVector(0.0),
-                SVector(-1.0),
-            ]
+            bcs = [RBF.Dirichlet(), RBF.Dirichlet()]  # One for each point
+            normals = [SVector(1.0), SVector(-1.0)]
 
             for basis in hermite_compatible_bases  # Currently only PHS
                 # Test Custom operator (identity) - for Hermite, identity with normal should still be identity

@@ -1,6 +1,9 @@
 """
 Unit tests for RHS vector building functions.
 Tests both standard and Hermite variants of _build_rhs! and related functions.
+
+Focus: Tests the integration of operators with RHS building, not the operators themselves.
+Operator correctness is tested in test/operators/. Monomial derivatives are tested in test/basis/monomial.jl.
 """
 
 using Test
@@ -11,326 +14,280 @@ import RadialBasisFunctions as RBF
 
 @testset "RHS Vector Building" begin
 
-    # Test setup - common data for all tests
+    # ============================================================================
+    # Test Fixtures
+    # ============================================================================
+
+    # Basis functions
     basis_phs = PHS(3; poly_deg=1)
     basis_imq = IMQ(1.0)
     basis_gaussian = Gaussian(1.0)
-    mon_1d = MonomialBasis(1, 1)
-    mon_2d = MonomialBasis(2, 1)
+    all_bases = [basis_phs, basis_imq, basis_gaussian]
 
-    # CURRENT LIMITATION: Hermite RHS building requires extensive operator support
-    # beyond just directional∂². For Robin boundary conditions, we need:
-    # - ∇(basis) for normal derivatives
-    # - directional∂²(basis, v1, v2) for mixed derivatives  
-    # - Potentially higher-order operators depending on the differential operator
-    # Currently only PHS has complete operator implementations
-    hermite_compatible_bases = [basis_phs]  # Only PHS for now
-    all_bases = [basis_phs, basis_imq, basis_gaussian]  # For standard (non-Hermite) tests
+    # Hermite compatibility: Only PHS has directional∂² for Robin-Robin interactions
+    hermite_compatible_bases = [basis_phs]
 
-    # 1D test data
-    data_1d = [[0.0], [0.5], [1.0]]
-    eval_point_1d = [0.25]
-    k_1d = 3
-
-    # 2D test data  
-    data_2d = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]
+    # 2D test data (consistent with matrix_entries.jl)
+    data_2d = [[0.0, 0.0], [0.5, 0.3], [1.0, 0.0], [0.5, 0.7]]
     eval_point_2d = [0.5, 0.5]
     k_2d = 4
 
-    @testset "Standard RHS Vector" begin
-        @testset "Identity operator RHS" begin
-            # Test RHS with identity operator (no derivatives)
-            identity_op_1d = RBF.Custom(basis -> (x1, x2) -> basis(x1, x2))
-            identity_op_mon = RBF.Custom(mon -> (arr, x) -> mon(arr, x))
+    # Monomial bases for different polynomial degrees
+    mon_deg1 = MonomialBasis(2, 1)  # [1, x, y]
+    mon_deg2 = MonomialBasis(2, 2)  # [1, x, y, xy, x², y²]
+    mon_deg3 = MonomialBasis(2, 3)  # [1, x, y, ..., x³, y³]
 
-            for basis in all_bases
-                ℒrbf = identity_op_1d(basis)
-                ℒmon = identity_op_mon(mon_1d)
+    nmon_deg1 = 3
+    nmon_deg2 = 6
+    nmon_deg3 = 10
 
-                nmon_1d = 2  # 1D linear: [1, x]
-                n_1d = k_1d + nmon_1d
-                b = zeros(Float64, n_1d, 1)
+    # ============================================================================
+    # Helper Functions
+    # ============================================================================
 
-                # Build RHS vector
-                @test_nowarn RBF._build_rhs!(
-                    b, ℒrbf, ℒmon, data_1d, eval_point_1d, basis, k_1d
-                )
+    """Test RHS building with identity operator for given polynomial degree."""
+    function test_identity_rhs(basis, mon, data, eval_point, k, nmon)
+        identity_op_rbf = RBF.Custom(b -> (x1, x2) -> b(x1, x2))
+        identity_op_mon = RBF.Custom(m -> (arr, x) -> m(arr, x))
 
-                # Check RHS structure
-                @test size(b) == (n_1d, 1)
-                @test all(isfinite.(b))
+        ℒrbf = identity_op_rbf(basis)
+        ℒmon = identity_op_mon(mon)
 
-                # RBF part should match basis evaluations
-                for i in 1:k_1d
-                    expected = basis(eval_point_1d, data_1d[i])
-                    @test b[i, 1] ≈ expected
-                end
+        n = k + nmon
+        b = zeros(Float64, n, 1)
 
-                # Polynomial part should match monomial evaluations
-                poly_vals = zeros(nmon_1d)
-                mon_1d(poly_vals, eval_point_1d)
-                for i in 1:nmon_1d
-                    @test b[k_1d + i, 1] ≈ poly_vals[i]
-                end
-            end
+        RBF._build_rhs!(b, ℒrbf, ℒmon, data, eval_point, basis, k)
+
+        # Check structure
+        @test size(b) == (n, 1)
+        @test all(isfinite.(b))
+
+        # RBF part should match basis evaluations
+        for i in 1:k
+            expected = basis(eval_point, data[i])
+            @test b[i, 1] ≈ expected
         end
 
-        @testset "Partial derivative operator RHS" begin
-            # Test RHS with partial derivative operator ∂/∂x
-            partial_op_1d = RBF.Custom(basis -> RBF.∂(basis, 1))
-            partial_op_mon = RBF.Custom(mon -> RBF.∂(mon, 1))
-
-            for basis in all_bases
-                ℒrbf = partial_op_1d(basis)
-                ℒmon = partial_op_mon(mon_1d)
-
-                nmon_1d = 2
-                n_1d = k_1d + nmon_1d
-                b = zeros(Float64, n_1d, 1)
-
-                @test_nowarn RBF._build_rhs!(
-                    b, ℒrbf, ℒmon, data_1d, eval_point_1d, basis, k_1d
-                )
-
-                # Check basic properties
-                @test size(b) == (n_1d, 1)
-                @test all(isfinite.(b))
-
-                # RBF part should be derivatives of basis functions
-                for i in 1:k_1d
-                    expected = RBF.∂(basis, 1)(eval_point_1d, data_1d[i])
-                    @test b[i, 1] ≈ expected
-                end
-
-                # Polynomial part: ∂/∂x of [1, x] = [0, 1]
-                @test b[k_1d + 1, 1] ≈ 0.0  # ∂(1)/∂x = 0
-                @test b[k_1d + 2, 1] ≈ 1.0  # ∂(x)/∂x = 1
-            end
-        end
-
-        @testset "Second derivative operator RHS" begin
-            # Test RHS with second derivative operator ∂²/∂x²
-            second_deriv_op_1d = RBF.Custom(basis -> RBF.∂²(basis, 1))
-            second_deriv_op_mon = RBF.Custom(mon -> RBF.∂²(mon, 1))
-
-            for basis in all_bases
-                ℒrbf = second_deriv_op_1d(basis)
-                ℒmon = second_deriv_op_mon(mon_1d)
-
-                nmon_1d = 2
-                n_1d = k_1d + nmon_1d
-                b = zeros(Float64, n_1d, 1)
-
-                @test_nowarn RBF._build_rhs!(
-                    b, ℒrbf, ℒmon, data_1d, eval_point_1d, basis, k_1d
-                )
-
-                # Check basic properties
-                @test size(b) == (n_1d, 1)
-                @test all(isfinite.(b))
-
-                # Polynomial part: ∂²/∂x² of [1, x] = [0, 0]
-                @test b[k_1d + 1, 1] ≈ 0.0  # ∂²(1)/∂x² = 0
-                @test b[k_1d + 2, 1] ≈ 0.0  # ∂²(x)/∂x² = 0
-            end
-        end
-
-        @testset "2D gradient operator RHS" begin
-            # Test 2D RHS with gradient operator (tuple version)
-            # Gradient returns tuple of partial derivatives: (∂/∂x, ∂/∂y)
-
-            for basis in all_bases
-                # Create gradient operators as tuples
-                ℒrbf = (RBF.∂(basis, 1), RBF.∂(basis, 2))  # (∂/∂x, ∂/∂y)
-                ℒmon = (RBF.∂(mon_2d, 1), RBF.∂(mon_2d, 2))  # (∂/∂x, ∂/∂y) for monomials
-
-                nmon_2d = 3  # 2D linear: [1, x, y]
-                n_2d = k_2d + nmon_2d
-                b = zeros(Float64, n_2d, 2)  # 2 columns for 2D gradient
-
-                @test_nowarn RBF._build_rhs!(
-                    b, ℒrbf, ℒmon, data_2d, eval_point_2d, basis, k_2d
-                )
-
-                # Check basic properties
-                @test size(b) == (n_2d, 2)
-                @test all(isfinite.(b))
-
-                # Polynomial part: ∇[1, x, y] = [[0,0], [1,0], [0,1]]
-                @test b[k_2d + 1, 1] ≈ 0.0 && b[k_2d + 1, 2] ≈ 0.0  # ∇(1) = [0,0]
-                @test b[k_2d + 2, 1] ≈ 1.0 && b[k_2d + 2, 2] ≈ 0.0  # ∇(x) = [1,0]
-                @test b[k_2d + 3, 1] ≈ 0.0 && b[k_2d + 3, 2] ≈ 1.0  # ∇(y) = [0,1]
-            end
-        end
-
-        @testset "Laplacian operator RHS" begin
-            # Test 2D RHS with Laplacian operator ∇²
-            laplacian_op_2d = RBF.Custom(basis -> RBF.∇²(basis))
-            laplacian_op_mon = RBF.Custom(mon -> RBF.∇²(mon))
-
-            for basis in all_bases
-                ℒrbf = laplacian_op_2d(basis)
-                ℒmon = laplacian_op_mon(mon_2d)
-
-                nmon_2d = 3
-                n_2d = k_2d + nmon_2d
-                b = zeros(Float64, n_2d, 1)
-
-                @test_nowarn RBF._build_rhs!(
-                    b, ℒrbf, ℒmon, data_2d, eval_point_2d, basis, k_2d
-                )
-
-                # Check basic properties
-                @test size(b) == (n_2d, 1)
-                @test all(isfinite.(b))
-
-                # Polynomial part: ∇²[1, x, y] = [0, 0, 0]
-                @test b[k_2d + 1, 1] ≈ 0.0  # ∇²(1) = 0
-                @test b[k_2d + 2, 1] ≈ 0.0  # ∇²(x) = 0
-                @test b[k_2d + 3, 1] ≈ 0.0  # ∇²(y) = 0
-            end
-        end
-
-        @testset "RHS consistency across basis functions" begin
-            # Test that polynomial parts are consistent across different basis functions
-            identity_op_1d = RBF.Custom(basis -> (x1, x2) -> basis(x1, x2))
-            identity_op_mon = RBF.Custom(mon -> (arr, x) -> mon(arr, x))
-            ℒmon = identity_op_mon(mon_1d)
-
-            nmon_1d = 2
-            n_1d = k_1d + nmon_1d
-
-            rhs_vectors = []
-            for basis in all_bases
-                ℒrbf = identity_op_1d(basis)
-                b = zeros(Float64, n_1d, 1)
-                RBF._build_rhs!(b, ℒrbf, ℒmon, data_1d, eval_point_1d, basis, k_1d)
-                push!(rhs_vectors, b)
-            end
-
-            # Polynomial parts (last nmon_1d entries) should be identical
-            for i in 2:length(rhs_vectors)
-                poly_part_1 = rhs_vectors[1][(k_1d + 1):end, :]
-                poly_part_i = rhs_vectors[i][(k_1d + 1):end, :]
-                @test poly_part_1 ≈ poly_part_i
-            end
-
-            # RBF parts should be different (unless by coincidence)
-            @test rhs_vectors[1][1:k_1d, :] != rhs_vectors[2][1:k_1d, :]  # PHS vs IMQ
-            @test rhs_vectors[1][1:k_1d, :] != rhs_vectors[3][1:k_1d, :]  # PHS vs Gaussian
+        # Polynomial part should match monomial evaluations
+        poly_vals = zeros(nmon)
+        mon(poly_vals, eval_point)
+        for i in 1:nmon
+            @test b[k + i, 1] ≈ poly_vals[i]
         end
     end
 
+    """Test RHS building with partial derivative operator."""
+    function test_partial_rhs(basis, mon, data, eval_point, k, nmon, dim)
+        partial_op_rbf = RBF.Custom(b -> RBF.∂(b, dim))
+        partial_op_mon = RBF.Custom(m -> RBF.∂(m, dim))
+
+        ℒrbf = partial_op_rbf(basis)
+        ℒmon = partial_op_mon(mon)
+
+        n = k + nmon
+        b = zeros(Float64, n, 1)
+
+        RBF._build_rhs!(b, ℒrbf, ℒmon, data, eval_point, basis, k)
+
+        @test size(b) == (n, 1)
+        @test all(isfinite.(b))
+
+        # RBF part should match derivative evaluations
+        for i in 1:k
+            expected = RBF.∂(basis, dim)(eval_point, data[i])
+            @test b[i, 1] ≈ expected
+        end
+
+        # Polynomial part should match monomial derivative
+        poly_deriv = zeros(nmon)
+        RBF.∂(mon, dim)(poly_deriv, eval_point)
+        for i in 1:nmon
+            @test b[k + i, 1] ≈ poly_deriv[i]
+        end
+    end
+
+    # ============================================================================
+    # Standard RHS Vector Tests
+    # ============================================================================
+
+    @testset "Standard RHS Vector" begin
+        @testset "Identity operator - polynomial degree $deg" for (deg, mon, nmon) in [
+            (1, mon_deg1, nmon_deg1), (2, mon_deg2, nmon_deg2), (3, mon_deg3, nmon_deg3)
+        ]
+            for basis in all_bases
+                test_identity_rhs(basis, mon, data_2d, eval_point_2d, k_2d, nmon)
+            end
+        end
+
+        @testset "Partial derivative ∂/∂x - polynomial degree $deg" for (deg, mon, nmon) in
+                                                                        [
+            (1, mon_deg1, nmon_deg1), (2, mon_deg2, nmon_deg2), (3, mon_deg3, nmon_deg3)
+        ]
+            for basis in all_bases
+                test_partial_rhs(basis, mon, data_2d, eval_point_2d, k_2d, nmon, 1)
+            end
+        end
+
+        @testset "Partial derivative ∂/∂y - polynomial degree $deg" for (deg, mon, nmon) in
+                                                                        [
+            (1, mon_deg1, nmon_deg1), (2, mon_deg2, nmon_deg2), (3, mon_deg3, nmon_deg3)
+        ]
+            for basis in all_bases
+                test_partial_rhs(basis, mon, data_2d, eval_point_2d, k_2d, nmon, 2)
+            end
+        end
+
+        @testset "Second derivative ∂²/∂x² - polynomial degree $deg" for (deg, mon, nmon) in
+                                                                         [
+            (2, mon_deg2, nmon_deg2),  # Need at least deg 2 for non-zero second derivatives
+            (3, mon_deg3, nmon_deg3),
+        ]
+            second_deriv_op = RBF.Custom(b -> RBF.∂²(b, 1))
+            second_deriv_mon = RBF.Custom(m -> RBF.∂²(m, 1))
+
+            for basis in all_bases
+                ℒrbf = second_deriv_op(basis)
+                ℒmon = second_deriv_mon(mon)
+
+                n = k_2d + nmon
+                b = zeros(Float64, n, 1)
+
+                RBF._build_rhs!(b, ℒrbf, ℒmon, data_2d, eval_point_2d, basis, k_2d)
+
+                @test size(b) == (n, 1)
+                @test all(isfinite.(b))
+
+                # Verify polynomial part matches monomial second derivative
+                poly_deriv = zeros(nmon)
+                RBF.∂²(mon, 1)(poly_deriv, eval_point_2d)
+                for i in 1:nmon
+                    @test b[k_2d + i, 1] ≈ poly_deriv[i]
+                end
+            end
+        end
+
+        @testset "Gradient operator (tuple) - polynomial degree $deg" for (
+            deg, mon, nmon
+        ) in [
+            (1, mon_deg1, nmon_deg1), (2, mon_deg2, nmon_deg2), (3, mon_deg3, nmon_deg3)
+        ]
+            for basis in all_bases
+                # Gradient as tuple: (∂/∂x, ∂/∂y)
+                ℒrbf = (RBF.∂(basis, 1), RBF.∂(basis, 2))
+                ℒmon = (RBF.∂(mon, 1), RBF.∂(mon, 2))
+
+                n = k_2d + nmon
+                b = zeros(Float64, n, 2)  # 2 columns for gradient components
+
+                RBF._build_rhs!(b, ℒrbf, ℒmon, data_2d, eval_point_2d, basis, k_2d)
+
+                @test size(b) == (n, 2)
+                @test all(isfinite.(b))
+
+                # Verify polynomial part for each gradient component
+                for dim in 1:2
+                    poly_deriv = zeros(nmon)
+                    RBF.∂(mon, dim)(poly_deriv, eval_point_2d)
+                    for i in 1:nmon
+                        @test b[k_2d + i, dim] ≈ poly_deriv[i]
+                    end
+                end
+            end
+        end
+
+        @testset "Laplacian operator - polynomial degree $deg" for (deg, mon, nmon) in [
+            (2, mon_deg2, nmon_deg2),  # Need at least deg 2 for non-zero Laplacian
+            (3, mon_deg3, nmon_deg3),
+        ]
+            laplacian_op = RBF.Custom(b -> RBF.∇²(b))
+            laplacian_mon = RBF.Custom(m -> RBF.∇²(m))
+
+            for basis in all_bases
+                ℒrbf = laplacian_op(basis)
+                ℒmon = laplacian_mon(mon)
+
+                n = k_2d + nmon
+                b = zeros(Float64, n, 1)
+
+                RBF._build_rhs!(b, ℒrbf, ℒmon, data_2d, eval_point_2d, basis, k_2d)
+
+                @test size(b) == (n, 1)
+                @test all(isfinite.(b))
+
+                # Verify polynomial part
+                poly_laplacian = zeros(nmon)
+                RBF.∇²(mon)(poly_laplacian, eval_point_2d)
+                for i in 1:nmon
+                    @test b[k_2d + i, 1] ≈ poly_laplacian[i]
+                end
+            end
+        end
+
+        @testset "Polynomial consistency across basis functions" begin
+            # Test that polynomial parts are identical across different basis functions
+            identity_op = RBF.Custom(b -> (x1, x2) -> b(x1, x2))
+            identity_mon = RBF.Custom(m -> (arr, x) -> m(arr, x))
+            ℒmon = identity_mon(mon_deg1)
+
+            n = k_2d + nmon_deg1
+            rhs_vectors = []
+
+            for basis in all_bases
+                ℒrbf = identity_op(basis)
+                b = zeros(Float64, n, 1)
+                RBF._build_rhs!(b, ℒrbf, ℒmon, data_2d, eval_point_2d, basis, k_2d)
+                push!(rhs_vectors, b)
+            end
+
+            # Polynomial parts should be identical
+            for i in 2:length(rhs_vectors)
+                poly_part_1 = rhs_vectors[1][(k_2d + 1):end, :]
+                poly_part_i = rhs_vectors[i][(k_2d + 1):end, :]
+                @test poly_part_1 ≈ poly_part_i
+            end
+
+            # RBF parts should differ between basis types
+            @test rhs_vectors[1][1:k_2d, :] != rhs_vectors[2][1:k_2d, :]
+            @test rhs_vectors[1][1:k_2d, :] != rhs_vectors[3][1:k_2d, :]
+        end
+    end
+
+    # ============================================================================
+    # Hermite RHS Vector Tests
+    # ============================================================================
+
     @testset "Hermite RHS Vector" begin
-        # NOTE: Currently only testing PHS basis functions due to operator limitations
-        # Hermite RHS requires extensive operator support that IMQ/Gaussian lack
+        # Note: Only PHS has directional∂² for Robin-Robin interactions
 
-        @testset "Interior points (no boundary)" begin
-            # Test that interior points produce same result as standard
-            is_boundary = [false, false, false]
-            bcs = [Internal(), Internal(), Internal()]  # Interior sentinel values
-            normals = [[0.0], [0.0], [0.0]]
-            hermite_data = RBF.HermiteStencilData(data_1d, is_boundary, bcs, normals)
+        @testset "HermiteStencilData structure validation" begin
+            # Test data structure creation and consistency
+            is_boundary = [false, true, true, false]
+            bcs = [Internal(), Dirichlet(), Neumann(), Internal()]
+            normals = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [0.0, 0.0]]
+            hermite_data = RBF.HermiteStencilData(data_2d, is_boundary, bcs, normals)
 
-            # Identity operator for comparison
-            identity_op_1d = RBF.Custom(basis -> (x1, x2) -> basis(x1, x2))
-            identity_op_mon = RBF.Custom(mon -> (arr, x) -> mon(arr, x))
+            @test hermite_data isa RBF.HermiteStencilData{Float64}
+            @test length(hermite_data.data) == k_2d
+            @test length(hermite_data.is_boundary) == k_2d
+            @test length(hermite_data.boundary_conditions) == k_2d
+            @test length(hermite_data.normals) == k_2d
 
-            for basis in hermite_compatible_bases
-                ℒrbf = identity_op_1d(basis)
-                ℒmon = identity_op_mon(mon_1d)
-
-                nmon_1d = 2
-                n_1d = k_1d + nmon_1d
-
-                # Build standard RHS
-                b_standard = zeros(Float64, n_1d, 1)
-                RBF._build_rhs!(b_standard, ℒrbf, ℒmon, data_1d, eval_point_1d, basis, k_1d)
-
-                # Build Hermite RHS with no boundaries (should be identical)
-                b_hermite = zeros(Float64, n_1d, 1)
-                # Note: We would need RBF._build_rhs_hermite! but it might not exist yet
-                # For now, test that we can at least create the boundary data structure
-                @test hermite_data isa RBF.HermiteStencilData
-                @test length(hermite_data.data) == k_1d
-                @test all(hermite_data.is_boundary .== false)
-            end
-        end
-
-        @testset "Dirichlet boundary RHS" begin
-            # Test RHS with Dirichlet boundary conditions (point 2 is boundary, 1 and 3 are interior)
-            is_boundary = [false, true, false]
-            bcs = [Internal(), Dirichlet(), Internal()]  # Interior/Boundary/Interior
-            normals = [[0.0], [1.0], [0.0]]
-            hermite_data = RBF.HermiteStencilData(data_1d, is_boundary, bcs, normals)
-
-            # Test that boundary data is set up correctly
             @test hermite_data.is_boundary[2] == true
+            @test hermite_data.is_boundary[3] == true
             @test is_dirichlet(hermite_data.boundary_conditions[2])
-
-            # Dirichlet boundaries should behave like standard case
-            # (no modification to operators needed)
-            for basis in hermite_compatible_bases
-                @test hermite_data isa RBF.HermiteStencilData{Float64}
-                @test all(isfinite.(hermite_data.normals[2]))
-            end
+            @test is_neumann(hermite_data.boundary_conditions[3])
         end
 
-        @testset "Neumann boundary RHS - operator requirements" begin
-            # Test demonstrates why IMQ/Gaussian can't handle Neumann boundaries
-            is_boundary = [false, true, false]
-            bcs = [Dirichlet(), Neumann(), Dirichlet()]
-            normals = [[0.0], [1.0], [0.0]]
-            hermite_data = RBF.HermiteStencilData(data_1d, is_boundary, bcs, normals)
+        @testset "Operator availability for boundary conditions" begin
+            # Document which operators are available for different bases
 
-            @test hermite_data.is_boundary[2] == true
-            @test is_neumann(hermite_data.boundary_conditions[2])
-
-            # For Neumann boundaries, we need normal derivative operators
-            # Let's check which bases have the required ∂(basis, dim) implementation
-
-            # PHS should have ∂ operator
-            @test hasmethod(RBF.∂, (typeof(basis_phs), Int))
-
-            # IMQ and Gaussian should also have ∂ operator
-            @test hasmethod(RBF.∂, (typeof(basis_imq), Int))
-            @test hasmethod(RBF.∂, (typeof(basis_gaussian), Int))
-
-            # Test that we can compute normal derivatives for all bases
-            normal = hermite_data.normals[2]  # [1.0] in x-direction
-
+            # All bases have ∂ (needed for Neumann)
             for basis in all_bases
-                ∂_op = RBF.∂(basis, 1)  # ∂/∂x
-                @test_nowarn ∂_op(eval_point_1d, data_1d[2])
-                result = ∂_op(eval_point_1d, data_1d[2])
-                @test isfinite(result)
-            end
-        end
-
-        @testset "Robin boundary RHS - operator requirements" begin
-            # Test demonstrates the REAL limitation: Robin boundaries need directional∂²
-            is_boundary = [true, true, false]  # Multiple boundary points
-            bcs = [Robin(1.0, 0.5), Robin(0.5, 1.0), Dirichlet()]
-            normals = [[1.0], [-1.0], [0.0]]
-            hermite_data = RBF.HermiteStencilData(data_1d, is_boundary, bcs, normals)
-
-            @test hermite_data.is_boundary[1] == true
-            @test hermite_data.is_boundary[2] == true
-            @test is_robin(hermite_data.boundary_conditions[1])
-            @test is_robin(hermite_data.boundary_conditions[2])
-
-            # Robin-Robin interactions in RHS building would require:
-            # 1. ∇(basis) for normal derivatives - ALL bases have this
-            # 2. directional∂²(basis, v1, v2) for mixed derivatives - ONLY PHS has this
-
-            # Check ∇ availability
-            for basis in all_bases
+                @test hasmethod(RBF.∂, (typeof(basis), Int))
                 @test hasmethod(RBF.∇, (typeof(basis),))
-                ∇_op = RBF.∇(basis)
-                @test_nowarn ∇_op(eval_point_1d, data_1d[1])
             end
 
-            # Check directional∂² availability - THIS IS THE BLOCKER
+            # Only PHS has directional∂² (needed for Robin-Robin interactions)
             @test hasmethod(
                 RBF.directional∂², (typeof(basis_phs), AbstractVector, AbstractVector)
             )
@@ -341,173 +298,129 @@ import RadialBasisFunctions as RBF
                 RBF.directional∂², (typeof(basis_gaussian), AbstractVector, AbstractVector)
             )
 
-            # This is why only PHS works with complex Robin boundary conditions
-            v1, v2 = hermite_data.normals[1], hermite_data.normals[2]
+            # Test directional∂² functionality for PHS
+            v1 = [1.0, 0.0]
+            v2 = [0.0, 1.0]
+            dir_op = RBF.directional∂²(basis_phs, v1, v2)
+            @test_nowarn dir_op(eval_point_2d, data_2d[1])
+            @test isfinite(dir_op(eval_point_2d, data_2d[1]))
+        end
 
-            # PHS: works
+        @testset "Robin boundary operator requirements" begin
+            # Demonstrate why Robin-Robin needs directional∂²
+            is_boundary = [true, true, false, false]
+            bcs = [Robin(1.0, 0.5), Robin(0.5, 1.0), Internal(), Internal()]
+            normals = [[1.0, 0.0], [0.0, 1.0], [0.0, 0.0], [0.0, 0.0]]
+            hermite_data = RBF.HermiteStencilData(data_2d, is_boundary, bcs, normals)
+
+            @test is_robin(hermite_data.boundary_conditions[1])
+            @test is_robin(hermite_data.boundary_conditions[2])
+
+            # PHS can handle Robin-Robin interactions
+            v1, v2 = normals[1], normals[2]
             @test_nowarn RBF.directional∂²(basis_phs, v1, v2)
-            dir_op_phs = RBF.directional∂²(basis_phs, v1, v2)
-            @test_nowarn dir_op_phs(eval_point_1d, data_1d[1])
 
-            # IMQ: fails
+            # IMQ and Gaussian cannot
             @test_throws MethodError RBF.directional∂²(basis_imq, v1, v2)
-
-            # Gaussian: fails  
             @test_throws MethodError RBF.directional∂²(basis_gaussian, v1, v2)
-        end
-
-        @testset "Higher-order operator requirements" begin
-            # Test that demonstrates even MORE missing operators for complex scenarios
-
-            # Even if we implemented directional∂² for IMQ/Gaussian, we might need:
-            # - Higher-order mixed derivatives for complex boundary operators
-            # - Specialized operators for specific PDE types
-            # - Normal derivative operators ∂ₙ, ∂ₙ²
-
-            # Check what operators PHS has that others don't
-            phs_methods = methods(RBF.∂).ms
-            phs_specific = filter(
-                m -> (s -> occursin("PHS", s))(string(m.sig)), phs_methods
-            )
-
-            # Check for PHS-specific advanced operators that might be needed
-            # Note: This is more of a documentation test showing the scope of the problem
-
-            @test length(phs_specific) > 0  # PHS has specialized methods
-
-            # TODO: When implementing full Hermite support for IMQ/Gaussian:
-            # 1. Implement directional∂²(::IMQ, v1, v2)
-            # 2. Implement directional∂²(::Gaussian, v1, v2)  
-            # 3. Check if any higher-order operators are needed
-            # 4. Implement missing operators as needed
-            # 5. Add comprehensive testing for all boundary condition combinations
-        end
-
-        @testset "RHS vector structure validation" begin
-            # Test that Hermite RHS maintains proper structure even with limitations
-            is_boundary = [false, true, false]
-            bcs = [Dirichlet(), Neumann(), Dirichlet()]  # Safe case for all bases
-            normals = [[0.0], [1.0], [0.0]]
-            hermite_data = RBF.HermiteStencilData(data_1d, is_boundary, bcs, normals)
-
-            # Test boundary data structure is valid
-            @test length(hermite_data.data) == k_1d
-            @test length(hermite_data.is_boundary) == k_1d
-            @test length(hermite_data.boundary_conditions) == k_1d
-            @test length(hermite_data.normals) == k_1d
-
-            # Test that we can identify the limitation programmatically
-            function can_handle_hermite_boundaries(basis, boundary_conditions, normals)
-                # Check if basis can handle the required operators for given boundaries
-                has_directional_second = hasmethod(
-                    RBF.directional∂², (typeof(basis), AbstractVector, AbstractVector)
-                )
-
-                # Check if we need directional∂² (Robin-Robin interactions)
-                robin_count = sum(is_robin.(boundary_conditions))
-                needs_directional_second = robin_count >= 2
-
-                return !needs_directional_second || has_directional_second
-            end
-
-            # Test the limitation detector
-            robin_bcs = [Robin(1.0, 1.0), Robin(1.0, 1.0), Dirichlet()]
-            simple_bcs = [Dirichlet(), Neumann(), Dirichlet()]
-
-            @test can_handle_hermite_boundaries(basis_phs, robin_bcs, normals)      # PHS: OK
-            @test !can_handle_hermite_boundaries(basis_imq, robin_bcs, normals)    # IMQ: NO
-            @test !can_handle_hermite_boundaries(basis_gaussian, robin_bcs, normals) # Gaussian: NO
-
-            @test can_handle_hermite_boundaries(basis_phs, simple_bcs, normals)     # PHS: OK
-            @test can_handle_hermite_boundaries(basis_imq, simple_bcs, normals)     # IMQ: OK
-            @test can_handle_hermite_boundaries(basis_gaussian, simple_bcs, normals) # Gaussian: OK
         end
     end
 
+    # ============================================================================
+    # RHS Building Integration Tests
+    # ============================================================================
+
     @testset "RHS Building Integration" begin
-        @testset "Function dispatch and signatures" begin
-            # Verify that RHS building functions exist and have correct signatures
+        @testset "Function signatures" begin
+            # Verify core RHS building function exists with correct signature
             @test hasmethod(
                 RBF._build_rhs!,
                 (Any, Any, Any, AbstractVector, Any, AbstractRadialBasis, Int),
             )
-
-            # Test with simple operators
-            identity_op_1d = RBF.Custom(basis -> (x1, x2) -> basis(x1, x2))
-            identity_op_mon = RBF.Custom(mon -> (arr, x) -> mon(arr, x))
-
-            for basis in all_bases
-                ℒrbf = identity_op_1d(basis)
-                ℒmon = identity_op_mon(mon_1d)
-
-                nmon_1d = 2
-                n_1d = k_1d + nmon_1d
-                b = zeros(Float64, n_1d, 1)
-
-                @test_nowarn RBF._build_rhs!(
-                    b, ℒrbf, ℒmon, data_1d, eval_point_1d, basis, k_1d
-                )
-                @test all(isfinite.(b))
-            end
         end
 
-        @testset "Vector size consistency" begin
-            # Test that RHS vectors have correct dimensions for different problem sizes
-            identity_op_1d = RBF.Custom(basis -> (x1, x2) -> basis(x1, x2))
-            identity_op_mon = RBF.Custom(mon -> (arr, x) -> mon(arr, x))
+        @testset "Vector size consistency - varying dimensions" begin
+            # Test RHS dimensions for different problem sizes
+            identity_op = RBF.Custom(b -> (x1, x2) -> b(x1, x2))
+            identity_mon = RBF.Custom(m -> (arr, x) -> m(arr, x))
 
-            test_sizes = [(3, 1, 2), (5, 1, 2), (4, 2, 3)]  # (k, dim, nmon)
+            test_configs = [
+                (4, 2, 1, 3),   # (k=4, dim=2, poly_deg=1, nmon=3)
+                (5, 2, 2, 6),   # (k=5, dim=2, poly_deg=2, nmon=6)
+                (6, 3, 1, 4),   # (k=6, dim=3, poly_deg=1, nmon=4)
+            ]
 
-            for (k, dim, expected_nmon) in test_sizes
+            for (k, dim, poly_deg, expected_nmon) in test_configs
                 data_test = [rand(dim) for _ in 1:k]
                 eval_point_test = rand(dim)
-                mon_test = MonomialBasis(dim, 1)  # Linear polynomials
+                mon_test = MonomialBasis(dim, poly_deg)
                 n_test = k + expected_nmon
 
                 for basis in all_bases
-                    ℒrbf = identity_op_1d(basis)
-                    ℒmon = identity_op_mon(mon_test)
+                    ℒrbf = identity_op(basis)
+                    ℒmon = identity_mon(mon_test)
 
                     b = zeros(Float64, n_test, 1)
                     @test_nowarn RBF._build_rhs!(
                         b, ℒrbf, ℒmon, data_test, eval_point_test, basis, k
                     )
                     @test size(b) == (n_test, 1)
+                    @test all(isfinite.(b))
                 end
             end
         end
 
-        @testset "Operator compatibility" begin
-            # Test that different operators work correctly with RHS building
-            operators_1d = [
-                ("Identity", RBF.Custom(basis -> (x1, x2) -> basis(x1, x2))),
-                ("First derivative", RBF.Custom(basis -> RBF.∂(basis, 1))),
-                ("Second derivative", RBF.Custom(basis -> RBF.∂²(basis, 1))),
+        @testset "Operator compatibility matrix" begin
+            # Test various operator combinations work correctly
+            operators_2d = [
+                ("Identity", RBF.Custom(b -> (x1, x2) -> b(x1, x2))),
+                ("∂/∂x", RBF.Custom(b -> RBF.∂(b, 1))),
+                ("∂/∂y", RBF.Custom(b -> RBF.∂(b, 2))),
+                ("∂²/∂x²", RBF.Custom(b -> RBF.∂²(b, 1))),
+                ("∇²", RBF.Custom(b -> RBF.∇²(b))),
             ]
 
-            mon_operators_1d = [
-                ("Identity", RBF.Custom(mon -> (arr, x) -> mon(arr, x))),
-                ("First derivative", RBF.Custom(mon -> RBF.∂(mon, 1))),
-                ("Second derivative", RBF.Custom(mon -> RBF.∂²(mon, 1))),
+            mon_operators_2d = [
+                ("Identity", RBF.Custom(m -> (arr, x) -> m(arr, x))),
+                ("∂/∂x", RBF.Custom(m -> RBF.∂(m, 1))),
+                ("∂/∂y", RBF.Custom(m -> RBF.∂(m, 2))),
+                ("∂²/∂x²", RBF.Custom(m -> RBF.∂²(m, 1))),
+                ("∇²", RBF.Custom(m -> RBF.∇²(m))),
             ]
 
-            for (op_name, op_rbf) in operators_1d
-                for (mon_op_name, op_mon) in mon_operators_1d
+            for (rbf_name, rbf_op) in operators_2d
+                for (mon_name, mon_op) in mon_operators_2d
                     for basis in all_bases
-                        ℒrbf = op_rbf(basis)
-                        ℒmon = op_mon(mon_1d)
+                        ℒrbf = rbf_op(basis)
+                        ℒmon = mon_op(mon_deg2)  # Use deg 2 for non-zero second derivatives
 
-                        nmon_1d = 2
-                        n_1d = k_1d + nmon_1d
-                        b = zeros(Float64, n_1d, 1)
+                        n = k_2d + nmon_deg2
+                        b = zeros(Float64, n, 1)
 
                         @test_nowarn RBF._build_rhs!(
-                            b, ℒrbf, ℒmon, data_1d, eval_point_1d, basis, k_1d
+                            b, ℒrbf, ℒmon, data_2d, eval_point_2d, basis, k_2d
                         )
                         @test all(isfinite.(b))
-                        @test size(b) == (n_1d, 1)
+                        @test size(b) == (n, 1)
                     end
                 end
+            end
+        end
+
+        @testset "Gradient tuple operator" begin
+            # Test special case: gradient returns tuple of operators
+            for basis in all_bases
+                ℒrbf = (RBF.∂(basis, 1), RBF.∂(basis, 2))
+                ℒmon = (RBF.∂(mon_deg2, 1), RBF.∂(mon_deg2, 2))
+
+                n = k_2d + nmon_deg2
+                b = zeros(Float64, n, 2)  # 2 columns for gradient
+
+                @test_nowarn RBF._build_rhs!(
+                    b, ℒrbf, ℒmon, data_2d, eval_point_2d, basis, k_2d
+                )
+                @test all(isfinite.(b))
+                @test size(b) == (n, 2)
             end
         end
     end
