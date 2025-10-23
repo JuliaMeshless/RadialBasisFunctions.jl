@@ -26,7 +26,7 @@ function Interpolator(x, y, basis::B=PHS()) where {B<:AbstractRadialBasis}
     data_type = promote_type(eltype(first(x)), eltype(y))
     A = Symmetric(zeros(data_type, n, n))
     _build_collocation_matrix!(A, x, basis, mon, k)
-    b = data_type[i <= k ? y[i] : 0 for i in 1:n]
+    b = vcat(y, zeros(data_type, npoly))
     w = A \ b
     return Interpolator(x, y, w[1:k], w[(k + 1):end], basis, mon)
 end
