@@ -31,3 +31,9 @@ Interpolator
 ├─Output type: Float64
 ├─Number of points: 10000
 └─Basis: Polyharmonic spline (r³) with degree 2 Monomial"""
+
+# verify last data point is handled correctly (https://github.com/JuliaMeshless/RadialBasisFunctions.jl/pull/46)
+x_test = [SVector(0.0), SVector(1.0)]
+y_test = [0.0, 1.0]
+interp_test = Interpolator(x_test, y_test, PHS(1; poly_deg=1))
+@test interp_test(x_test[2]) ≈ y_test[2]
