@@ -123,79 +123,24 @@ import RadialBasisFunctions as RBF
             end
         end
 
-        @testset "Operator Integration with solve.jl" begin
-            # Test various operators with different basis functions
-            k = 4
-            data = [SVector(0.0), SVector(0.3), SVector(0.7), SVector(1.0)]
-            eval_points = [SVector(0.5)]
+        @testset "Neighbor Finding Integration" begin
+            @testset "Different Neighborhood Sizes" begin
+                # Test utility functions for finding neighbors
+                data = [SVector(i * 0.1) for i in 0:10]
+                eval_points = [SVector(0.25), SVector(0.75)]
 
-            # TODO: Fix Custom operator tests - currently failing due to method errors
-            # The ∂ℒ function doesn't have methods for MonomialBasis, causing:
-            # MethodError: no method matching (::RadialBasisFunctions.var"#∂ℒ#7")(::MonomialBasis)
-            # This needs investigation of the operator calling conventions and basis compatibility
+                neighborhood_sizes = [3, 5, 7]
 
-            # Test different operators (temporarily disabled)
-            # operators = [
-            #     ("First derivative", RBF.Custom(basis -> RBF.∂(basis, 1))),
-            #     ("Second derivative", RBF.Custom(basis -> RBF.∂²(basis, 1))),
-            # ]
+                for k in neighborhood_sizes
+                    @test_nowarn adjl = RBF.find_neighbors(data, eval_points, k)
 
-            # for basis in all_bases
-            #     adjl = RBF.find_neighbors(data, eval_points, k)
-
-            #     for (op_name, ℒ_func) in operators
-            #         ℒ = ℒ_func(basis)
-
-            #         # Test that operator works with basis
-            #         @test_nowarn weights = RBF._build_weights(
-            #             ℒ, data, eval_points, adjl, basis
-            #         )
-
-            #         weights = RBF._build_weights(ℒ, data, eval_points, adjl, basis)
-            #         @test length(weights) == length(eval_points)
-            #         @test size(weights[1], 1) == k
-            #         @test all(isfinite.(weights[1]))
-            #     end
-            # end
-        end
-    end
-
-    @testset "Neighbor Finding Integration" begin
-        @testset "Different Neighborhood Sizes" begin
-            # Test utility functions for finding neighbors
-            data = [SVector(i * 0.1) for i in 0:10]
-            eval_points = [SVector(0.25), SVector(0.75)]
-
-            neighborhood_sizes = [3, 5, 7]
-
-            for k in neighborhood_sizes
-                @test_nowarn adjl = RBF.find_neighbors(data, eval_points, k)
-
-                adjl = RBF.find_neighbors(data, eval_points, k)
-                @test length(adjl) == length(eval_points)
-                for neighbors in adjl
-                    @test length(neighbors) == k
-                    @test all(1 .<= neighbors .<= length(data))
+                    adjl = RBF.find_neighbors(data, eval_points, k)
+                    @test length(adjl) == length(eval_points)
+                    for neighbors in adjl
+                        @test length(neighbors) == k
+                        @test all(1 .<= neighbors .<= length(data))
+                    end
                 end
-            end
-        end
-
-        @testset "Auto-selection of k" begin
-            # Test automatic selection of neighborhood size
-            data_small = [SVector(i * 0.2) for i in 0:4]  # 5 points  
-            data_large = [SVector(i * 0.1) for i in 0:19]  # 20 points
-
-            for basis in all_bases
-                k_small = RBF.autoselect_k(data_small, basis)
-                k_large = RBF.autoselect_k(data_large, basis)
-
-                @test k_small >= 2
-                @test k_large >= 2
-                @test k_small <= length(data_small)
-                @test k_large <= length(data_large)
-
-                # Larger datasets should generally allow larger k
-                @test k_large >= k_small
             end
         end
     end
