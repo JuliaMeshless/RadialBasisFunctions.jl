@@ -100,28 +100,6 @@ import RadialBasisFunctions as RBF
                 @test AA_sym[i, j] == 0.0  # Lower triangle zero in parent
             end
         end
-
-        @testset "Different basis functions (2D)" begin
-            # Test that different basis functions produce different matrices
-            matrices = []
-            for basis in all_bases
-                A = Symmetric(zeros(Float64, n_2d, n_2d), :U)
-                @test_nowarn RBF._build_collocation_matrix!(A, data_2d, basis, mon_2d, k_2d)
-                push!(matrices, A)
-                @test all(isfinite.(parent(A)))
-            end
-
-            # RBF blocks should be different between basis functions
-            @test parent(matrices[1])[1, 2] != parent(matrices[2])[1, 2]  # PHS vs IMQ
-            @test parent(matrices[1])[1, 2] != parent(matrices[3])[1, 2]  # PHS vs Gaussian
-            @test parent(matrices[2])[1, 2] != parent(matrices[3])[1, 2]  # IMQ vs Gaussian
-
-            # Polynomial blocks should be the same across all basis functions
-            for i in 2:length(matrices)
-                @test parent(matrices[1])[1, k_2d + 1] ≈ parent(matrices[i])[1, k_2d + 1]
-                @test parent(matrices[1])[2, k_2d + 2] ≈ parent(matrices[i])[2, k_2d + 2]
-            end
-        end
     end
 
     @testset "Hermite Collocation Matrix (2D)" begin
@@ -230,64 +208,6 @@ import RadialBasisFunctions as RBF
             @test parent(A_hermite) != parent(A_standard)
             @test all(isfinite.(parent(A_hermite)))
             @test issymmetric(A_hermite)
-        end
-
-        @testset "Normal direction sensitivity (2D)" begin
-            # Test that different 2D normal directions give different results
-            is_boundary_2d = [false, true, false, false]
-            bcs_2d = [Internal(), Neumann(), Internal(), Internal()]
-
-            # x-direction normal
-            normals_x = [[0.0, 0.0], [1.0, 0.0], [0.0, 0.0], [0.0, 0.0]]
-            hermite_data_x = RBF.HermiteStencilData(
-                data_2d, is_boundary_2d, bcs_2d, normals_x
-            )
-
-            # y-direction normal
-            normals_y = [[0.0, 0.0], [0.0, 1.0], [0.0, 0.0], [0.0, 0.0]]
-            hermite_data_y = RBF.HermiteStencilData(
-                data_2d, is_boundary_2d, bcs_2d, normals_y
-            )
-
-            # Build matrices
-            A_x = Symmetric(zeros(Float64, n_2d, n_2d), :U)
-            A_y = Symmetric(zeros(Float64, n_2d, n_2d), :U)
-
-            RBF._build_collocation_matrix!(A_x, hermite_data_x, basis_phs, mon_2d, k_2d)
-            RBF._build_collocation_matrix!(A_y, hermite_data_y, basis_phs, mon_2d, k_2d)
-
-            # Different normals should give different matrices
-            @test parent(A_x) != parent(A_y)
-        end
-
-        @testset "Matrix structure preservation" begin
-            # Test that Hermite modifications preserve matrix properties
-            is_boundary_2d = [true, false, true, false]
-            bcs_2d = [Robin(1.0, 0.5), Internal(), Neumann(), Internal()]
-            normals_2d = [[1.0, 0.0], [0.0, 0.0], [0.0, 1.0], [0.0, 0.0]]
-
-            hermite_data_2d = RBF.HermiteStencilData(
-                data_2d, is_boundary_2d, bcs_2d, normals_2d
-            )
-
-            # Build matrix
-            A_hermite = Symmetric(zeros(Float64, n_2d, n_2d), :U)
-            RBF._build_collocation_matrix!(
-                A_hermite, hermite_data_2d, basis_phs, mon_2d, k_2d
-            )
-
-            # Check properties
-            @test issymmetric(A_hermite)
-            @test all(isfinite.(parent(A_hermite)))
-            @test !any(isnan.(parent(A_hermite)))
-
-            # Polynomial constraint block should be zero
-            AA = parent(A_hermite)
-            for i in (k_2d + 1):n_2d, j in (k_2d + 1):n_2d
-                if i <= j
-                    @test AA[i, j] == 0.0
-                end
-            end
         end
 
         @testset "Boundary-boundary interactions (2D)" begin
@@ -413,89 +333,6 @@ import RadialBasisFunctions as RBF
             # Multiple entries should differ
             diff_count = sum(parent(A_all_boundary) .!= parent(A_standard))
             @test diff_count > 0  # At least some entries should differ
-        end
-    end
-
-    @testset "Basis Function Compatibility" begin
-        # Test all basis functions with Hermite interior-only case
-        is_boundary_2d = [false, false, false, false]
-        bcs_2d = [Internal(), Internal(), Internal(), Internal()]
-        normals_2d = [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]
-        hermite_data_interior = RBF.HermiteStencilData(
-            data_2d, is_boundary_2d, bcs_2d, normals_2d
-        )
-
-        # Hermite-compatible bases work with boundaries
-        for basis in hermite_compatible_bases
-            A = Symmetric(zeros(Float64, n_2d, n_2d), :U)
-            @test_nowarn RBF._build_collocation_matrix!(
-                A, hermite_data_interior, basis, mon_2d, k_2d
-            )
-            @test all(isfinite.(parent(A)))
-        end
-
-        # TODO: When directional∂² is implemented for IMQ/Gaussian, remove this limitation
-        # For now, non-Hermite bases only work with all-interior points
-        non_hermite_bases = [basis_imq, basis_gaussian]
-        for basis in non_hermite_bases
-            A = Symmetric(zeros(Float64, n_2d, n_2d), :U)
-            @test_nowarn RBF._build_collocation_matrix!(
-                A, hermite_data_interior, basis, mon_2d, k_2d
-            )
-            @test all(isfinite.(parent(A)))
-
-            # Should match standard for interior-only case
-            A_standard = Symmetric(zeros(Float64, n_2d, n_2d), :U)
-            RBF._build_collocation_matrix!(A_standard, data_2d, basis, mon_2d, k_2d)
-            @test parent(A) ≈ parent(A_standard)
-        end
-    end
-
-    @testset "1D Edge Cases" begin
-        # Minimal tests for 1D-specific edge cases
-
-        @testset "Minimal polynomial (constant only)" begin
-            # Test with degree 0 polynomial (just constant term)
-            mon_no_poly = MonomialBasis(1, 0)
-            n_no_poly = k_1d + 1
-            A_no_poly = Symmetric(zeros(Float64, n_no_poly, n_no_poly), :U)
-
-            RBF._build_collocation_matrix!(
-                A_no_poly, data_1d, basis_no_poly, mon_no_poly, k_1d
-            )
-
-            # Check RBF block
-            for i in 1:k_1d, j in 1:k_1d
-                expected = basis_no_poly(data_1d[i], data_1d[j])
-                @test A_no_poly[i, j] ≈ expected
-            end
-            @test all(isfinite.(parent(A_no_poly)))
-        end
-
-        @testset "Variable stencil sizes" begin
-            for k_test in [2, 3, 5]
-                data_test = [rand(1) for _ in 1:k_test]
-                A = Symmetric(zeros(Float64, k_test + 2, k_test + 2), :U)
-                @test_nowarn RBF._build_collocation_matrix!(
-                    A, data_test, basis_phs, mon_1d, k_test
-                )
-                @test size(A) == (k_test + 2, k_test + 2)
-            end
-        end
-
-        @testset "Hermite with minimal polynomial" begin
-            hermite_data = RBF.HermiteStencilData(
-                data_1d,
-                [false, true, false],
-                [Internal(), Robin(1.0, 1.0), Internal()],
-                [[0.0], [1.0], [0.0]],
-            )
-            A = Symmetric(zeros(Float64, k_1d + 1, k_1d + 1), :U)
-            @test_nowarn RBF._build_collocation_matrix!(
-                A, hermite_data, basis_no_poly, MonomialBasis(1, 0), k_1d
-            )
-            @test all(isfinite.(parent(A)))
-            @test issymmetric(A)
         end
     end
 

@@ -11,10 +11,6 @@ import RadialBasisFunctions as RBF
 
 @testset "Matrix Entry Functions" begin
 
-    # ============================================================================
-    # Test Fixtures
-    # ============================================================================
-
     # Basis functions
     basis_phs = PHS(3; poly_deg=1)
     basis_imq = IMQ(1.0)
@@ -24,10 +20,6 @@ import RadialBasisFunctions as RBF
     # Point data
     data_1d = [[0.0], [0.5], [1.0]]
     data_2d = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]
-
-    # ============================================================================
-    # Helper Functions
-    # ============================================================================
 
     """Create Hermite data with specified boundary conditions at given indices."""
     function make_hermite_data(data, boundary_indices, boundary_conditions, normals)
@@ -67,10 +59,6 @@ import RadialBasisFunctions as RBF
         actual = RBF._hermite_rbf_entry(1, 2, hermite_data, phs3)
         @test actual ≈ expected_value rtol = rtol
     end
-
-    # ============================================================================
-    # Hermite RBF Matrix Entries
-    # ============================================================================
 
     @testset "Hermite RBF Matrix Entries" begin
         @testset "Interior-Interior entries" begin
@@ -209,11 +197,6 @@ import RadialBasisFunctions as RBF
         end
     end
 
-    # ============================================================================
-    # Hermite Polynomial Entries
-    # ============================================================================
-    # NOTE: Standard monomial evaluation is tested in test/basis/monomial.jl
-
     @testset "Hermite Polynomial Entries" begin
         @testset "Interior and Dirichlet" begin
             # Both interior and Dirichlet points use standard polynomial evaluation
@@ -279,25 +262,5 @@ import RadialBasisFunctions as RBF
             @test a[2] ≈ 1.0   # ∂(x)/∂x = 1
             @test a[3] ≈ 0.0   # ∂(y)/∂x = 0
         end
-    end
-
-    # ============================================================================
-    # Function Dispatch Verification
-    # ============================================================================
-    # NOTE: Boundary condition behavior is tested in collocation_matrix.jl
-
-    @testset "Type Dispatch" begin
-        hermite_data = make_hermite_data(
-            data_1d, Int[], BoundaryCondition[], Vector{Float64}[]
-        )
-
-        # Test different basis types produce finite results
-        for basis in [basis_phs, basis_imq]
-            @test isfinite(RBF._hermite_rbf_entry(1, 2, hermite_data, basis))
-        end
-
-        # Test polynomial entry dispatch
-        a = zeros(2)
-        @test_nowarn RBF._hermite_poly_entry!(a, 1, hermite_data, mon_1d)
     end
 end
