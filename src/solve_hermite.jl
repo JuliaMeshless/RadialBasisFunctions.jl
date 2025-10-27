@@ -153,9 +153,17 @@ This is the Hermite variant of _build_rhs! from solve.jl.
 
 When the evaluation point (center of stencil) has Neumann/Robin conditions,
 the differential operator must be modified according to the boundary operator.
+This is the comment I forgot to implement before, now added.
 """
 function _build_rhs!(
-    b, ℒrbf, ℒmon, data::HermiteStencilData{TD}, eval_point::TE, basis::B, k::K
+    b,
+    ℒrbf,
+    ℒmon,
+    data::HermiteStencilData{TD},
+    eval_point::TE,
+    basis::B,
+    mon::MonomialBasis,
+    k::K,
 ) where {TD,TE,B<:AbstractRadialBasis,K<:Int}
 
     # RBF section with Hermite modifications for stencil points
@@ -182,7 +190,38 @@ function _build_rhs!(
     if basis.poly_deg > -1
         N = length(b)
         bmono = view(b, (k + 1):N)
-        ℒmon(bmono, eval_point)
+
+        # Check if eval_point coincides with any stencil point that has Neumann/Robin BC
+        eval_idx = findfirst(i -> data.data[i] == eval_point, 1:k)
+        if eval_idx === nothing
+            error("Evaluation point not found in stencil data.")
+        end
+        if is_dirichlet(data.boundary_conditions[eval_idx])
+            error(
+                "Dirichlet eval nodes should be handled at the higher level (identity row)."
+            )
+        else
+            if data.is_boundary[eval_idx]
+                bc_eval = data.boundary_conditions[eval_idx]
+                n_eval = data.normals[eval_idx]
+                nmon = length(bmono)
+
+                T = eltype(bmono)
+                poly_vals = zeros(T, nmon)
+                mon(poly_vals, eval_point)
+
+                ∂ₙmon = ∂_normal(mon, n_eval)
+                deriv_vals = zeros(T, nmon)
+                ∂ₙmon(deriv_vals, eval_point)
+
+                # Apply boundary condition: α*P + β*∂ₙP
+                @inbounds for idx in 1:nmon
+                    bmono[idx] = α(bc_eval) * poly_vals[idx] + β(bc_eval) * deriv_vals[idx]
+                end
+            else
+                ℒmon(bmono, eval_point)
+            end
+        end
     end
 
     return nothing
@@ -198,6 +237,7 @@ function _build_rhs!(
     data::HermiteStencilData{TD},
     eval_point::TE,
     basis::B,
+    mon::MonomialBasis,
     k::K,
 ) where {TD,TE,B<:AbstractRadialBasis,K<:Int}
     @assert size(b, 2) == length(ℒrbf) == length(ℒmon) "b, ℒrbf, ℒmon must have the same length"
@@ -227,12 +267,49 @@ function _build_rhs!(
     # Monomial augmentation
     if basis.poly_deg > -1
         N = size(b, 1)
-        for (j, ℒ) in enumerate(ℒmon)
-            bmono = view(b, (k + 1):N, j)
-            ℒ(bmono, eval_point)
+
+        # Check if eval_point coincides with any stencil point
+        eval_idx = findfirst(i -> data.data[i] == eval_point, 1:k)
+        if eval_idx === nothing
+            error("Evaluation point not found in stencil data.")
+        end
+        if is_dirichlet(data.boundary_conditions[eval_idx])
+            error(
+                "Dirichlet eval nodes should be handled at the higher level (identity row)."
+            )
+        else
+            if data.is_boundary[eval_idx]
+                bc_eval = data.boundary_conditions[eval_idx]
+                n_eval = data.normals[eval_idx]
+                nmon = binomial(dim(mon) + degree(mon), dim(mon))
+                T = eltype(b)
+
+                # Evaluate P(eval_point)
+                poly_vals = zeros(T, nmon)
+                mon(poly_vals, eval_point)
+
+                # Evaluate ∂ₙP(eval_point)
+                ∂ₙmon = ∂_normal(mon, n_eval)
+                deriv_vals = zeros(T, nmon)
+                ∂ₙmon(deriv_vals, eval_point)
+
+                # Apply boundary condition to all operators: α*P + β*∂ₙP
+                for j in 1:length(ℒmon)
+                    bmono = view(b, (k + 1):N, j)
+                    @inbounds for idx in 1:nmon
+                        bmono[idx] =
+                            α(bc_eval) * poly_vals[idx] + β(bc_eval) * deriv_vals[idx]
+                    end
+                end
+            else
+                # Interior evaluation point: apply operator
+                for (j, ℒ_op) in enumerate(ℒmon)
+                    bmono = view(b, (k + 1):N, j)
+                    ℒ_op(bmono, eval_point)
+                end
+            end
         end
     end
-
     return nothing
 end
 
@@ -252,7 +329,7 @@ function _build_stencil!(
     k::Int,
 ) where {TD,TE,B<:AbstractRadialBasis}
     _build_collocation_matrix!(A, data, basis, mon, k)
-    _build_rhs!(b, ℒrbf, ℒmon, data, eval_point, basis, k)
+    _build_rhs!(b, ℒrbf, ℒmon, data, eval_point, basis, mon, k)
 
     return (A \ b)[1:k, :]
 end
