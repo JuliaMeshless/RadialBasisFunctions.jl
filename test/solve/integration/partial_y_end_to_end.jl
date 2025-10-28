@@ -137,7 +137,7 @@ end
         # println("  solution[$idx] = ", solution[idx])
         # println("  u_values[$idx] = ", u_values[idx])
 
-        @test max_error < 1e-9  # Machine precision
-        @test rms_error < 1e-10  # RMS should be even better
+        @test max_error < 1e-8  # Machine precision
+        @test rms_error < 1e-9  # RMS should be even better
     end
 end

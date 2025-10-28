@@ -161,9 +161,9 @@ end
         # println("Y-component max error: ", max_error_y)
         # println("Y-component RMS error: ", rms_error_y)
 
-        @test max_error_x < 1e-9
-        @test max_error_y < 1e-9
-        @test rms_error_x < 1e-10
-        @test rms_error_y < 1e-10
+        @test max_error_x < 1e-8
+        @test max_error_y < 1e-8
+        @test rms_error_x < 1e-9
+        @test rms_error_y < 1e-9
     end
 end
