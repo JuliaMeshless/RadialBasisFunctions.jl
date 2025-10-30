@@ -38,72 +38,145 @@ function _build_collocation_matrix!(
     return nothing
 end
 
+# Boundary point types for dispatch-based operator application
+abstract type BoundaryPointType end
+struct InteriorPoint <: BoundaryPointType end
+struct DirichletPoint <: BoundaryPointType end
+struct NeumannRobinPoint <: BoundaryPointType end
+
+"""
+Determine the boundary type of a point for dispatch.
+"""
+@inline function point_type(is_bound::Bool, bc::BoundaryCondition)
+    return is_bound ? (is_dirichlet(bc) ? DirichletPoint() : NeumannRobinPoint()) : InteriorPoint()
+end
+
 """
 Compute single RBF matrix entry for Hermite interpolation.
 Handles all combinations of interior/boundary points with appropriate operators.
+Dispatch-based implementation for clarity and maintainability.
 """
 function _hermite_rbf_entry(
     i::Int, j::Int, data::HermiteStencilData{T}, basis::B
 ) where {B<:AbstractRadialBasis,T}
     xi, xj = data.data[i], data.data[j]
-    is_bound_i = data.is_boundary[i]
-    is_bound_j = data.is_boundary[j]
+    type_i = point_type(data.is_boundary[i], data.boundary_conditions[i])
+    type_j = point_type(data.is_boundary[j], data.boundary_conditions[j])
 
-    # Standard case: both interior points
-    if !is_bound_i && !is_bound_j
-        return basis(xi, xj)
-    end
+    return _hermite_rbf_entry_dispatch(type_i, type_j, i, j, xi, xj, data, basis)
+end
 
-    # Get basis value and gradient
+# Dispatch implementations for all 9 combinations of point types
+
+"""
+Interior-Interior: Standard RBF evaluation.
+"""
+function _hermite_rbf_entry_dispatch(
+    ::InteriorPoint, ::InteriorPoint, i, j, xi, xj, data, basis
+)
+    return basis(xi, xj)
+end
+
+"""
+Interior-Dirichlet: Standard RBF evaluation.
+"""
+function _hermite_rbf_entry_dispatch(
+    ::InteriorPoint, ::DirichletPoint, i, j, xi, xj, data, basis
+)
+    return basis(xi, xj)
+end
+
+"""
+Interior-NeumannRobin: Apply boundary operator to second argument.
+"""
+function _hermite_rbf_entry_dispatch(
+    ::InteriorPoint, ::NeumannRobinPoint, i, j, xi, xj, data, basis
+)
     φ = basis(xi, xj)
     ∇φ = ∇(basis)(xi, xj)
+    bc_j = data.boundary_conditions[j]
+    nj = data.normals[j]
+    return α(bc_j) * φ + β(bc_j) * dot(nj, -∇φ)
+end
 
+"""
+Dirichlet-Interior: Standard RBF evaluation.
+"""
+function _hermite_rbf_entry_dispatch(
+    ::DirichletPoint, ::InteriorPoint, i, j, xi, xj, data, basis
+)
+    return basis(xi, xj)
+end
+
+"""
+Dirichlet-Dirichlet: Standard RBF evaluation.
+"""
+function _hermite_rbf_entry_dispatch(
+    ::DirichletPoint, ::DirichletPoint, i, j, xi, xj, data, basis
+)
+    return basis(xi, xj)
+end
+
+"""
+Dirichlet-NeumannRobin: Apply boundary operator to second argument.
+"""
+function _hermite_rbf_entry_dispatch(
+    ::DirichletPoint, ::NeumannRobinPoint, i, j, xi, xj, data, basis
+)
+    φ = basis(xi, xj)
+    ∇φ = ∇(basis)(xi, xj)
+    bc_j = data.boundary_conditions[j]
+    nj = data.normals[j]
+    return α(bc_j) * φ + β(bc_j) * dot(nj, -∇φ)
+end
+
+"""
+NeumannRobin-Interior: Apply boundary operator to first argument.
+"""
+function _hermite_rbf_entry_dispatch(
+    ::NeumannRobinPoint, ::InteriorPoint, i, j, xi, xj, data, basis
+)
+    φ = basis(xi, xj)
+    ∇φ = ∇(basis)(xi, xj)
+    bc_i = data.boundary_conditions[i]
+    ni = data.normals[i]
+    return α(bc_i) * φ + β(bc_i) * dot(ni, ∇φ)
+end
+
+"""
+NeumannRobin-Dirichlet: Apply boundary operator to first argument.
+"""
+function _hermite_rbf_entry_dispatch(
+    ::NeumannRobinPoint, ::DirichletPoint, i, j, xi, xj, data, basis
+)
+    φ = basis(xi, xj)
+    ∇φ = ∇(basis)(xi, xj)
+    bc_i = data.boundary_conditions[i]
+    ni = data.normals[i]
+    return α(bc_i) * φ + β(bc_i) * dot(ni, ∇φ)
+end
+
+"""
+NeumannRobin-NeumannRobin: Apply boundary operators to both arguments.
+Includes mixed derivative term for directional derivatives.
+"""
+function _hermite_rbf_entry_dispatch(
+    ::NeumannRobinPoint, ::NeumannRobinPoint, i, j, xi, xj, data, basis
+)
+    φ = basis(xi, xj)
+    ∇φ = ∇(basis)(xi, xj)
     bc_i = data.boundary_conditions[i]
     bc_j = data.boundary_conditions[j]
+    ni = data.normals[i]
+    nj = data.normals[j]
+    ∂i∂j_φ = directional∂²(basis, ni, nj)(xi, xj)
 
-    # Cases involving boundary points
-    if is_bound_i && !is_bound_j
-        # Boundary-Interior: Apply boundary operator to first argument
-        ni = data.normals[i]
-        if is_dirichlet(bc_i)
-            return φ
-        else
-            # Neumann/Robin: α*φ + β*∂ₙφ
-            return α(bc_i) * φ + β(bc_i) * dot(ni, ∇φ)
-        end
-
-    elseif !is_bound_i && is_bound_j
-        # Interior-Boundary: Apply boundary operator to second argument
-        nj = data.normals[j]
-        if is_dirichlet(bc_j)
-            return φ
-        else
-            # Neumann/Robin: α*φ + β*∂ₙφ (note sign flip for gradient w.r.t. second arg)
-            return α(bc_j) * φ + β(bc_j) * dot(nj, -∇φ)
-        end
-
-    else # is_bound_i && is_bound_j
-        # Boundary-Boundary: Apply boundary operators to both arguments
-        ni = data.normals[i]
-        nj = data.normals[j]
-
-        if is_dirichlet(bc_i) && is_dirichlet(bc_j)
-            return φ
-        elseif is_dirichlet(bc_i) && !is_dirichlet(bc_j)
-            return α(bc_j) * φ + β(bc_j) * dot(nj, -∇φ)
-        elseif !is_dirichlet(bc_i) && is_dirichlet(bc_j)
-            return α(bc_i) * φ + β(bc_i) * dot(ni, ∇φ)
-        else
-            # Both Neumann/Robin: mixed derivative term
-            ∂i∂j_φ = directional∂²(basis, ni, nj)(xi, xj)
-            return (
-                α(bc_i) * α(bc_j) * φ +
-                α(bc_i) * β(bc_j) * dot(nj, -∇φ) +
-                β(bc_i) * α(bc_j) * dot(ni, ∇φ) +
-                β(bc_i) * β(bc_j) * ∂i∂j_φ
-            )
-        end
-    end
+    return (
+        α(bc_i) * α(bc_j) * φ +
+        α(bc_i) * β(bc_j) * dot(nj, -∇φ) +
+        β(bc_i) * α(bc_j) * dot(ni, ∇φ) +
+        β(bc_i) * β(bc_j) * ∂i∂j_φ
+    )
 end
 
 """
@@ -148,6 +221,58 @@ function _hermite_poly_entry!(
 end
 
 """
+Helper: Apply boundary conditions to RBF operator evaluation.
+Handles Dirichlet (identity) and Neumann/Robin (α*φ + β*∂ₙφ) cases.
+"""
+@inline function _apply_boundary_to_rbf(
+    ℒrbf, eval_point, data_point, is_bound::Bool, bc::BoundaryCondition, normal
+)
+    if !is_bound
+        return ℒrbf(eval_point, data_point)
+    end
+
+    if is_dirichlet(bc)
+        return ℒrbf(eval_point, data_point)
+    else
+        # Neumann/Robin: α*ℒφ + β*ℒ(∂ₙφ)
+        return α(bc) * ℒrbf(eval_point, data_point) + β(bc) * ℒrbf(eval_point, data_point, normal)
+    end
+end
+
+"""
+Helper: Apply boundary conditions to monomial evaluation.
+For interior/Dirichlet: apply operator ℒmon to monomial basis
+For Neumann/Robin: α*ℒmon(P) + β*ℒmon(∂ₙP)
+
+Note: For interior/Dirichlet evaluation points, the operator ℒmon is applied to the standard
+monomial basis. For Neumann/Robin evaluation points at boundaries, the boundary operator
+modifies the monomial basis before the differential operator is applied.
+"""
+@inline function _apply_boundary_to_mono!(
+    bmono::AbstractVector, ℒmon, mon::MonomialBasis, eval_point,
+    is_bound::Bool, bc::BoundaryCondition, normal, T::Type
+)
+    if !is_bound || is_dirichlet(bc)
+        # Interior or Dirichlet: apply operator to standard monomial basis
+        ℒmon(bmono, eval_point)
+        return
+    end
+
+    # Neumann/Robin case: α*ℒmon(P) + β*ℒmon(∂ₙP)
+    # The boundary operator modifies how we evaluate the monomials
+    nmon = length(bmono)
+    poly_vals = zeros(T, nmon)
+    deriv_vals = zeros(T, nmon)
+
+    mon(poly_vals, eval_point)
+    ∂_normal(mon, normal)(deriv_vals, eval_point)
+
+    @inbounds for idx in 1:nmon
+        bmono[idx] = α(bc) * poly_vals[idx] + β(bc) * deriv_vals[idx]
+    end
+end
+
+"""
 Build RHS for Hermite interpolation with boundary conditions.
 This is the Hermite variant of _build_rhs! from solve.jl.
 
@@ -168,22 +293,10 @@ function _build_rhs!(
 
     # RBF section with Hermite modifications for stencil points
     @inbounds for i in 1:k
-        if data.is_boundary[i]
-            bc_i = data.boundary_conditions[i]
-            if is_dirichlet(bc_i)
-                b[i] = ℒrbf(eval_point, data.data[i])
-            else
-                # Neumann/Robin: Apply boundary operator to RBF operator
-                ni = data.normals[i]
-                b[i] = (
-                    α(bc_i) * ℒrbf(eval_point, data.data[i]) +
-                    β(bc_i) * ℒrbf(eval_point, data.data[i], ni)
-                )
-            end
-        else
-            # Interior point: standard evaluation
-            b[i] = ℒrbf(eval_point, data.data[i])
-        end
+        b[i] = _apply_boundary_to_rbf(
+            ℒrbf, eval_point, data.data[i],
+            data.is_boundary[i], data.boundary_conditions[i], data.normals[i]
+        )
     end
 
     # Monomial augmentation
@@ -191,37 +304,21 @@ function _build_rhs!(
         N = length(b)
         bmono = view(b, (k + 1):N)
 
-        # Check if eval_point coincides with any stencil point that has Neumann/Robin BC
+        # Find evaluation point index (it must be in the stencil)
         eval_idx = findfirst(i -> data.data[i] == eval_point, 1:k)
         if eval_idx === nothing
             error("Evaluation point not found in stencil data.")
         end
         if is_dirichlet(data.boundary_conditions[eval_idx])
-            error(
-                "Dirichlet eval nodes should be handled at the higher level (identity row)."
-            )
-        else
-            if data.is_boundary[eval_idx]
-                bc_eval = data.boundary_conditions[eval_idx]
-                n_eval = data.normals[eval_idx]
-                nmon = length(bmono)
-
-                T = eltype(bmono)
-                poly_vals = zeros(T, nmon)
-                mon(poly_vals, eval_point)
-
-                ∂ₙmon = ∂_normal(mon, n_eval)
-                deriv_vals = zeros(T, nmon)
-                ∂ₙmon(deriv_vals, eval_point)
-
-                # Apply boundary condition: α*P + β*∂ₙP
-                @inbounds for idx in 1:nmon
-                    bmono[idx] = α(bc_eval) * poly_vals[idx] + β(bc_eval) * deriv_vals[idx]
-                end
-            else
-                ℒmon(bmono, eval_point)
-            end
+            error("Dirichlet eval nodes should be handled at the higher level (identity row).")
         end
+
+        # Apply boundary conditions to monomial section
+        _apply_boundary_to_mono!(
+            bmono, ℒmon, mon, eval_point,
+            data.is_boundary[eval_idx], data.boundary_conditions[eval_idx],
+            data.normals[eval_idx], TD
+        )
     end
 
     return nothing
@@ -245,22 +342,10 @@ function _build_rhs!(
     # RBF section with Hermite modifications for stencil points
     for (j, ℒ) in enumerate(ℒrbf)
         @inbounds for i in 1:k
-            if data.is_boundary[i]
-                bc_i = data.boundary_conditions[i]
-                if is_dirichlet(bc_i)
-                    b[i, j] = ℒ(eval_point, data.data[i])
-                else
-                    # Neumann/Robin: Apply boundary operator to RBF operator
-                    ni = data.normals[i]
-                    b[i, j] = (
-                        α(bc_i) * ℒ(eval_point, data.data[i]) +
-                        β(bc_i) * ℒ(eval_point, data.data[i], ni)
-                    )
-                end
-            else
-                # Interior point: standard evaluation
-                b[i, j] = ℒ(eval_point, data.data[i])
-            end
+            b[i, j] = _apply_boundary_to_rbf(
+                ℒ, eval_point, data.data[i],
+                data.is_boundary[i], data.boundary_conditions[i], data.normals[i]
+            )
         end
     end
 
@@ -268,48 +353,44 @@ function _build_rhs!(
     if basis.poly_deg > -1
         N = size(b, 1)
 
-        # Check if eval_point coincides with any stencil point
+        # Find evaluation point index (it must be in the stencil)
         eval_idx = findfirst(i -> data.data[i] == eval_point, 1:k)
         if eval_idx === nothing
             error("Evaluation point not found in stencil data.")
         end
         if is_dirichlet(data.boundary_conditions[eval_idx])
-            error(
-                "Dirichlet eval nodes should be handled at the higher level (identity row)."
-            )
+            error("Dirichlet eval nodes should be handled at the higher level (identity row).")
+        end
+
+        # Apply boundary conditions to monomial section for all operators
+        if data.is_boundary[eval_idx]
+            # Boundary evaluation point: compute boundary-modified monomials once
+            bc_eval = data.boundary_conditions[eval_idx]
+            n_eval = data.normals[eval_idx]
+            nmon = binomial(dim(mon) + degree(mon), dim(mon))
+
+            # Pre-compute modified monomial values once
+            poly_vals = zeros(TD, nmon)
+            deriv_vals = zeros(TD, nmon)
+            mon(poly_vals, eval_point)
+            ∂_normal(mon, n_eval)(deriv_vals, eval_point)
+
+            # Apply to all operators
+            for j in 1:length(ℒmon)
+                bmono = view(b, (k + 1):N, j)
+                @inbounds for idx in 1:nmon
+                    bmono[idx] = α(bc_eval) * poly_vals[idx] + β(bc_eval) * deriv_vals[idx]
+                end
+            end
         else
-            if data.is_boundary[eval_idx]
-                bc_eval = data.boundary_conditions[eval_idx]
-                n_eval = data.normals[eval_idx]
-                nmon = binomial(dim(mon) + degree(mon), dim(mon))
-                T = eltype(b)
-
-                # Evaluate P(eval_point)
-                poly_vals = zeros(T, nmon)
-                mon(poly_vals, eval_point)
-
-                # Evaluate ∂ₙP(eval_point)
-                ∂ₙmon = ∂_normal(mon, n_eval)
-                deriv_vals = zeros(T, nmon)
-                ∂ₙmon(deriv_vals, eval_point)
-
-                # Apply boundary condition to all operators: α*P + β*∂ₙP
-                for j in 1:length(ℒmon)
-                    bmono = view(b, (k + 1):N, j)
-                    @inbounds for idx in 1:nmon
-                        bmono[idx] =
-                            α(bc_eval) * poly_vals[idx] + β(bc_eval) * deriv_vals[idx]
-                    end
-                end
-            else
-                # Interior evaluation point: apply operator
-                for (j, ℒ_op) in enumerate(ℒmon)
-                    bmono = view(b, (k + 1):N, j)
-                    ℒ_op(bmono, eval_point)
-                end
+            # Interior evaluation point: apply each operator directly
+            for (j, ℒ_op) in enumerate(ℒmon)
+                bmono = view(b, (k + 1):N, j)
+                ℒ_op(bmono, eval_point)
             end
         end
     end
+
     return nothing
 end
 

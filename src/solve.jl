@@ -73,43 +73,68 @@ function _build_collocation_matrix!(
     return nothing
 end
 
-function _build_rhs!(
-    b, ℒrbf, ℒmon, data::AbstractVector{TD}, eval_point::TE, basis::B, k::K
-) where {TD,TE,B<:AbstractRadialBasis,K<:Int}
-    # radial basis section
-    @inbounds for i in eachindex(data)
-        b[i] = ℒrbf(eval_point, data[i])
-    end
-
-    # monomial augmentation
-    if basis.poly_deg > -1
-        N = length(b)
-        bmono = view(b, (k + 1):N)
-        ℒmon(bmono, eval_point)
-    end
-
-    return nothing
-end
-
-function _build_rhs!(
-    b, ℒrbf::Tuple, ℒmon::Tuple, data::AbstractVector{TD}, eval_point::TE, basis::B, k::K
-) where {TD,TE,B<:AbstractRadialBasis,K<:Int}
-    @assert size(b, 2) == length(ℒrbf) == length(ℒmon) "b, ℒrbf, ℒmon must have the same length"
-    # radial basis section
-    for (j, ℒ) in enumerate(ℒrbf)
+# Unified RHS building core - handles both single and tuple operators
+function _build_rhs_core!(
+    b, ℒrbf, ℒmon, data::AbstractVector, eval_point, basis, k, num_ops,
+    get_rbf_op, get_mon_op, set_rbf_value!, get_mono_view
+)
+    # RBF section
+    for op_idx in 1:num_ops
+        ℒ = get_rbf_op(ℒrbf, op_idx)
         @inbounds for i in eachindex(data)
-            b[i, j] = ℒ(eval_point, data[i])
+            set_rbf_value!(b, i, op_idx, ℒ(eval_point, data[i]))
         end
     end
 
-    # monomial augmentation
+    # Monomial augmentation
     if basis.poly_deg > -1
-        N = size(b, 1)
-        for (j, ℒ) in enumerate(ℒmon)
-            bmono = view(b, (k + 1):N, j)
+        for op_idx in 1:num_ops
+            ℒ = get_mon_op(ℒmon, op_idx)
+            bmono = get_mono_view(b, k, op_idx)
             ℒ(bmono, eval_point)
         end
     end
 
     return nothing
+end
+
+# Single operator version - delegates to unified core
+function _build_rhs!(
+    b::AbstractVector, ℒrbf, ℒmon, data::AbstractVector{TD}, eval_point::TE, basis::B, k::K
+) where {TD,TE,B<:AbstractRadialBasis,K<:Int}
+    _build_rhs_core!(
+        b, ℒrbf, ℒmon, data, eval_point, basis, k, 1,
+        (ℒ, _) -> ℒ,  # get_rbf_op: always return the single operator
+        (ℒ, _) -> ℒ,  # get_mon_op: always return the single operator
+        (b, i, _, val) -> (b[i] = val),  # set_rbf_value!: 1D indexing
+        (b, k, _) -> view(b, (k + 1):length(b))  # get_mono_view: 1D slice
+    )
+end
+
+# Tuple operator version - delegates to unified core
+function _build_rhs!(
+    b::AbstractMatrix, ℒrbf::Tuple, ℒmon::Tuple, data::AbstractVector{TD}, eval_point::TE, basis::B, k::K
+) where {TD,TE,B<:AbstractRadialBasis,K<:Int}
+    @assert size(b, 2) == length(ℒrbf) == length(ℒmon) "b, ℒrbf, ℒmon must have the same length"
+    _build_rhs_core!(
+        b, ℒrbf, ℒmon, data, eval_point, basis, k, length(ℒrbf),
+        (ℒ, j) -> ℒ[j],  # get_rbf_op: index into tuple
+        (ℒ, j) -> ℒ[j],  # get_mon_op: index into tuple
+        (b, i, j, val) -> (b[i, j] = val),  # set_rbf_value!: 2D indexing
+        (b, k, j) -> view(b, (k + 1):size(b, 1), j)  # get_mono_view: 2D slice
+    )
+end
+
+# Compatibility method: Matrix with single operators (stores result in first column)
+function _build_rhs!(
+    b::AbstractMatrix, ℒrbf, ℒmon, data::AbstractVector{TD}, eval_point::TE, basis::B, k::K
+) where {TD,TE,B<:AbstractRadialBasis,K<:Int}
+    # Treat as single operator writing to first column of matrix
+    _build_rhs_core!(
+        b, ℒrbf, ℒmon, data, eval_point, basis, k, 1,
+        (ℒ, _) -> ℒ,  # get_rbf_op: always return the single operator
+        (ℒ, _) -> ℒ,  # get_mon_op: always return the single operator
+        (b, i, _, val) -> (b[i, 1] = val),  # set_rbf_value!: write to first column
+        (b, k, _) -> view(b, (k + 1):size(b, 1), 1)  # get_mono_view: view first column
+    )
 end

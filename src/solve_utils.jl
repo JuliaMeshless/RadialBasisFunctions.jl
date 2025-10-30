@@ -9,10 +9,25 @@ abstract type SparseAllocationStrategy end
 struct StandardAllocation <: SparseAllocationStrategy end
 struct OptimizedAllocation <: SparseAllocationStrategy end
 
-_num_ops(_) = 1
-_num_ops(ℒ::Tuple) = length(ℒ)
-_prepare_b(_, T, n) = zeros(T, n)
-_prepare_b(ℒ::Tuple, T, n) = zeros(T, n, length(ℒ))
+# Operator arity traits for type-stable dispatch
+abstract type OperatorArity end
+struct SingleOperator <: OperatorArity end
+struct MultiOperator{N} <: OperatorArity end
+
+# Extract arity information at compile time
+operator_arity(::T) where {T} = operator_arity(T)
+operator_arity(::Type{<:Tuple{Vararg{Any,N}}}) where {N} = MultiOperator{N}()
+operator_arity(::Type) = SingleOperator()
+
+# Type-stable number of operators
+_num_ops(::SingleOperator) = 1
+_num_ops(::MultiOperator{N}) where {N} = N
+_num_ops(ℒ) = _num_ops(operator_arity(ℒ))
+
+# Type-stable buffer preparation
+_prepare_b(::SingleOperator, T, n) = zeros(T, n)
+_prepare_b(::MultiOperator{N}, T, n) where {N} = zeros(T, n, N)
+_prepare_b(ℒ, T, n) = _prepare_b(operator_arity(ℒ), T, n)
 
 """
 Count the actual number of non-zero elements for optimized sparse matrix allocation.
@@ -86,9 +101,20 @@ May over-allocate but is simple and fast for standard (non-Hermite) cases.
 function _allocate_sparse_arrays(
     ::StandardAllocation, TD, k::Int, Na::Int, num_ops::Int, adjl
 )
-    I = zeros(Int, k * Na)
-    J = reduce(vcat, adjl)
-    V = zeros(TD, k * Na, num_ops)
+    total_entries = k * Na
+    I = Vector{Int}(undef, total_entries)
+    J = Vector{Int}(undef, total_entries)
+    V = Matrix{TD}(undef, total_entries, num_ops)
+
+    # Fill J in-place to avoid allocation from reduce(vcat, adjl)
+    idx = 1
+    for neighbors in adjl
+        for neighbor in neighbors
+            J[idx] = neighbor
+            idx += 1
+        end
+    end
+
     row_offsets = nothing  # Not needed for standard allocation
     return I, J, V, row_offsets
 end
