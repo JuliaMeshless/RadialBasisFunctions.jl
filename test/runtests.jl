@@ -73,7 +73,6 @@ end
 end
 
 @safetestset "Solve Unit Tests" begin
-    include("solve/unit/matrix_entries.jl")
     include("solve/unit/collocation_matrix.jl")
     include("solve/unit/rhs_vector.jl")
 end

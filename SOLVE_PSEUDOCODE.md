@@ -1,768 +1,536 @@
 # Pseudocode: RBF Weight Building System
 
-This document explains the code flow in `solve.jl`, `solve_hermite.jl`, and `solve_utils.jl`.
+This document explains the code flow in the solve system, which builds sparse weight matrices for RBF operators.
 
-## Overview
+## Architecture Overview
 
-The system builds sparse weight matrices for RBF operators using one of two approaches:
-1. **Standard**: For interior points only
-2. **Hermite**: For problems with boundary conditions (Dirichlet/Neumann/Robin)
+The solve system is organized into **three distinct layers**:
+
+```
+src/solve/
+├── types.jl          # Layer 0: Shared data structures & traits
+├── stencil_math.jl   # Layer 1: Pure mathematical operations
+├── kernel_exec.jl    # Layer 2: Parallel execution & allocation
+└── api.jl            # Layer 3: Entry points & routing
+```
+
+### Layer Responsibilities
+
+**Layer 0: `types.jl`** - Shared Data Structures
+- Boundary condition types (`BoundaryCondition`, `HermiteStencilData`)
+- Stencil classification types (`InteriorStencil`, `DirichletStencil`, `HermiteStencil`)
+- Operator arity traits (`SingleOperator`, `MultiOperator{N}`)
+
+**Layer 1: `stencil_math.jl`** - Pure Mathematics
+- Collocation matrix building (`_build_collocation_matrix!`)
+- RHS vector building (`_build_rhs!`)
+- Stencil assembly (`_build_stencil!`)
+- Hermite boundary modifications (dispatch-based)
+- **No I/O, no parallelism, fully testable**
+
+**Layer 2: `kernel_exec.jl`** - Parallel Execution
+- Memory allocation (`allocate_sparse_arrays`)
+- Kernel launching (`launch_kernel!`)
+- Batch processing and synchronization
+- Sparse matrix construction
+
+**Layer 3: `api.jl`** - Entry Points
+- Public `_build_weights` functions
+- Routing (standard vs Hermite paths)
+- Operator application to basis functions
 
 ---
 
-## Part 1: Entry Points & High-Level Flow
+## System Flow
 
-### Main Entry Points
+The system builds sparse weight matrices using exact allocation:
+- Interior points get k entries (full stencil)
+- Dirichlet boundary points get 1 entry (identity row)
+- Other boundary points get k entries (Hermite stencil)
 
-```pseudocode
-// Entry from operator construction (operators.jl)
-function _build_weights(operator, operator_config)
-    data = operator_config.data
-    eval_points = operator_config.eval_points
-    adjl = operator_config.adjl  // adjacency list (neighbors for each eval point)
-    basis = operator_config.basis
+```
+User Code
+    ↓
+api.jl: Route based on boundary conditions
+    ↓
+kernel_exec.jl: Allocate memory & launch parallel kernel
+    ↓
+stencil_math.jl: Build collocation matrix A, RHS b, solve A\b
+    ↓
+kernel_exec.jl: Construct sparse matrix
+    ↓
+Return to user
+```
 
-    // Apply operator to basis functions
-    ℒrbf = operator(basis)
-    ℒmon = operator(monomial_basis)
+---
 
-    // Route to appropriate implementation
-    if has_boundary_conditions(operator_config):
-        return _build_weights_hermite(...)  // Hermite path
-    else:
-        return _build_weights_standard(...)  // Standard path
+## Part 1: Entry Points (api.jl)
+
+### Main Entry from Operators
+
+```julia
+function _build_weights(ℒ, op)
+    # Extract configuration from operator
+    data = op.data
+    eval_points = op.eval_points
+    adjl = op.adjl
+    basis = op.basis
+
+    return _build_weights(ℒ, data, eval_points, adjl, basis)
 end
 ```
 
-### Standard Path (solve.jl)
+### Apply Operator to Basis
 
-```pseudocode
-function _build_weights_standard(data, eval_points, adjl, basis, ℒrbf, ℒmon, mon)
-    strategy = StandardAllocation()
-    boundary_data = nothing
+```julia
+function _build_weights(ℒ, data, eval_points, adjl, basis)
+    dim = length(first(data))
 
-    return _build_weights_unified(
-        strategy, data, eval_points, adjl,
-        basis, ℒrbf, ℒmon, mon, boundary_data
+    # Build monomial basis and apply operator
+    mon = MonomialBasis(dim, basis.poly_deg)
+    ℒmon = ℒ(mon)
+    ℒrbf = ℒ(basis)
+
+    return _build_weights(data, eval_points, adjl, basis, ℒrbf, ℒmon, mon)
+end
+```
+
+### Interior-Only Path (No Boundary Conditions)
+
+```julia
+function _build_weights(
+    data, eval_points, adjl, basis, ℒrbf, ℒmon, mon;
+    batch_size=10, device=CPU()
+)
+    # Create empty boundary data for interior-only case
+    TD = eltype(first(data))
+    is_boundary = fill(false, length(data))
+    boundary_conditions = BoundaryCondition{TD}[]
+    normals = similar(data, 0)
+    boundary_data = BoundaryData(is_boundary, boundary_conditions, normals)
+
+    return build_weights_kernel(
+        data, eval_points, adjl,
+        basis, ℒrbf, ℒmon, mon,
+        boundary_data;
+        batch_size=batch_size, device=device
     )
 end
 ```
 
-### Hermite Path (solve_hermite.jl)
+### Hermite Path (With Boundary Conditions)
 
-```pseudocode
-function _build_weights_hermite(data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
-                                is_boundary, boundary_conditions, normals)
-    strategy = OptimizedAllocation()  // More memory-efficient
-    boundary_data = (is_boundary, boundary_conditions, normals)
-
-    return _build_weights_unified(
-        strategy, data, eval_points, adjl,
-        basis, ℒrbf, ℒmon, mon, boundary_data
+```julia
+function _build_weights(
+    data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
+    is_boundary, boundary_conditions, normals;
+    batch_size=10, device=CPU()
+)
+    boundary_data = BoundaryData(is_boundary, boundary_conditions, normals)
+    return build_weights_kernel(
+        data, eval_points, adjl,
+        basis, ℒrbf, ℒmon, mon,
+        boundary_data;
+        batch_size=batch_size, device=device
     )
 end
 ```
 
 ---
 
-## Part 2: Unified Kernel Infrastructure (solve_utils.jl)
+## Part 2: Kernel Orchestration (kernel_exec.jl)
 
 ### Main Orchestrator
 
-```pseudocode
-function _build_weights_unified(strategy, data, eval_points, adjl,
-                               basis, ℒrbf, ℒmon, mon, boundary_data)
-    // Extract problem dimensions
-    N_eval = length(eval_points)          // Number of evaluation points
-    N_data = length(data)                 // Total data points
-    k = length(first(adjl))               // Stencil size
-    nmon = number_of_monomials(basis)     // Polynomial augmentation size
-    num_ops = count_operators(ℒrbf)       // 1 for single, N for tuple
+```julia
+function build_weights_kernel(
+    data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
+    boundary_data; batch_size=10, device=CPU()
+)
+    # Extract dimensions
+    TD = eltype(first(data))
+    k = length(first(adjl))
+    nmon = binomial(length(first(data)) + basis.poly_deg, basis.poly_deg)
+    num_ops = _num_ops(ℒrbf)
+    N_eval = length(eval_points)
 
-    // Allocate sparse matrix arrays (I, J, V)
+    # Allocate sparse arrays with exact counting
     I, J, V, row_offsets = allocate_sparse_arrays(
-        strategy, data_type, k, N_eval, num_ops, adjl, boundary_data
+        TD, k, N_eval, num_ops, adjl, boundary_data
     )
 
-    // Launch parallel kernel to fill arrays
-    launch_kernel(
-        strategy, I, J, V, data, eval_points, adjl,
-        basis, ℒrbf, ℒmon, mon, boundary_data, row_offsets
+    # Launch parallel kernel
+    n_batches = ceil(Int, N_eval / batch_size)
+    launch_kernel!(
+        I, J, V, data, eval_points, adjl,
+        basis, ℒrbf, ℒmon, mon, boundary_data, row_offsets,
+        batch_size, N_eval, n_batches, k, nmon, num_ops, device
     )
 
-    // Construct and return sparse matrix
-    if num_ops == 1:
-        return sparse(I, J, V[:, 1], N_eval, N_data)
-    else:
-        return tuple_of_sparse_matrices(I, J, V, num_ops, N_eval, N_data)
+    # Construct sparse matrix
+    nrows, ncols = N_eval, length(data)
+    if num_ops == 1
+        return sparse(I, J, V[:, 1], nrows, ncols)
+    else
+        return ntuple(i -> sparse(I, J, V[:, i], nrows, ncols), num_ops)
+    end
 end
 ```
 
-### Memory Allocation Strategies
+### Memory Allocation
 
-```pseudocode
-// Strategy 1: Standard (simple, may over-allocate)
-function allocate_sparse_arrays(StandardAllocation, TD, k, N_eval, num_ops, adjl)
-    total_entries = k * N_eval
-    I = Vector{Int}(undef, total_entries)
-    J = Vector{Int}(undef, total_entries)
-    V = Matrix{TD}(undef, total_entries, num_ops)
-
-    // Fill J with neighbor indices
-    idx = 1
-    for each_eval_point in 1:N_eval:
-        for neighbor in adjl[each_eval_point]:
-            J[idx] = neighbor
-            idx += 1
-
-    return I, J, V, nothing
-end
-
-// Strategy 2: Optimized (exact allocation for Hermite with many Dirichlet BCs)
-function allocate_sparse_arrays(OptimizedAllocation, TD, k, N_eval, num_ops, adjl,
-                                is_boundary, boundary_conditions)
-    // Count exact non-zeros (Dirichlet points only contribute diagonal)
-    total_nnz = 0
-    for eval_idx in 1:N_eval:
-        if is_boundary[eval_idx] && is_dirichlet(boundary_conditions[eval_idx]):
-            total_nnz += 1  // Only diagonal element
-        else:
-            total_nnz += k  // Full stencil
+```julia
+function allocate_sparse_arrays(TD, k, N_eval, num_ops, adjl, boundary_data)
+    # Count exact non-zeros:
+    # - Interior points: k entries (full stencil)
+    # - Dirichlet points: 1 entry (identity row)
+    # - Other boundary points: k entries (Hermite stencil)
+    total_nnz, row_offsets = count_nonzeros(
+        adjl, boundary_data.is_boundary, boundary_data.boundary_conditions
+    )
 
     I = Vector{Int}(undef, total_nnz)
     J = Vector{Int}(undef, total_nnz)
     V = Matrix{TD}(undef, total_nnz, num_ops)
-    row_offsets = compute_cumulative_offsets(...)
 
     return I, J, V, row_offsets
 end
 ```
 
----
+### Kernel Execution
 
-## Part 3: Kernel Execution (Parallel Processing)
-
-### Standard Kernel
-
-```pseudocode
-@kernel function standard_kernel(I, J, V, data, eval_points, adjl,
-                                basis, ℒrbf, ℒmon, mon, k, ...)
-    // Each kernel invocation processes a batch of evaluation points
-    batch_idx = get_global_index()
+```julia
+@kernel function weight_kernel(I, J, V, data, eval_points, adjl, boundary_data, ...)
+    batch_idx = @index(Global)
     start_idx, end_idx = calculate_batch_range(batch_idx, batch_size, N_eval)
 
-    // Pre-allocate work arrays (reused within batch)
-    n = k + nmon
-    A = Symmetric(zeros(n, n))  // Collocation matrix
-    b = prepare_buffer(ℒrbf, n)  // RHS vector(s)
+    # Pre-allocate work arrays (reused within batch)
+    A = Symmetric(zeros(TD, n, n), :U)
+    b = _prepare_buffer(ℒrbf, TD, n)
 
-    // Process each evaluation point in batch
-    for eval_idx in start_idx:end_idx:
-        // Get stencil data
-        neighbors = adjl[eval_idx]
-        local_data = data[neighbors]
-        eval_point = eval_points[eval_idx]
+    for eval_idx in start_idx:end_idx
+        # Classify stencil type based on boundary conditions
+        stype = classify_stencil(
+            boundary_data.is_boundary, boundary_data.boundary_conditions,
+            eval_idx, neighbors, global_to_boundary
+        )
 
-        // Build stencil weights
-        weights = build_stencil(A, b, ℒrbf, ℒmon, local_data, eval_point, basis, mon, k)
-
-        // Store in sparse matrix arrays
-        fill_sparse_entries(I, J, V, weights, eval_idx, neighbors, k)
-end
-```
-
-### Optimized Hermite Kernel
-
-```pseudocode
-@kernel function optimized_kernel(I, J, V, data, eval_points, adjl,
-                                 basis, ℒrbf, ℒmon, mon,
-                                 is_boundary, boundary_conditions, normals, ...)
-    batch_idx = get_global_index()
-    hermite_data = get_hermite_workspace(batch_idx)  // Pre-allocated workspace
-    start_idx, end_idx = calculate_batch_range(batch_idx, batch_size, N_eval)
-
-    // Pre-allocate work arrays
-    n = k + nmon
-    A = Symmetric(zeros(n, n))
-    b = prepare_buffer(ℒrbf, n)
-
-    for eval_idx in start_idx:end_idx:
-        start_pos = row_offsets[eval_idx]
-        neighbors = adjl[eval_idx]
-        eval_point = eval_points[eval_idx]
-
-        // Classify stencil type
-        stencil_type = classify_stencil(eval_idx, neighbors, is_boundary, boundary_conditions)
-
-        if stencil_type == DirichletStencil:
-            // Identity row: only diagonal is 1.0
-            fill_dirichlet_entry(I, J, V, eval_idx, start_pos)
-            continue
-
-        else if stencil_type == InternalStencil:
-            // Standard stencil (no boundary points)
+        if stype isa DirichletStencil
+            # Identity row: only diagonal is 1.0
+            fill_dirichlet_entry!(I, J, V, eval_idx, start_pos, num_ops)
+        elseif stype isa InteriorStencil
+            # Standard interior stencil (no boundary points)
             local_data = view(data, neighbors)
-            weights = build_stencil(A, b, ℒrbf, ℒmon, local_data, eval_point, basis, mon, k)
+            weights = _build_stencil!(A, b, ℒrbf, ℒmon, local_data, eval_point, basis, mon, k)
+            fill_entries!(I, J, V, weights, eval_idx, neighbors, start_pos, k, num_ops)
+        else  # HermiteStencil
+            # Mixed interior/boundary stencil
+            update_hermite_stencil_data!(hermite_data, data, neighbors, ...)
+            weights = _build_stencil!(A, b, ℒrbf, ℒmon, hermite_data, eval_point, basis, mon, k)
+            fill_entries!(I, J, V, weights, eval_idx, neighbors, start_pos, k, num_ops)
+        end
+    end
+end
+```
 
-        else if stencil_type == HermiteStencil:
-            // Mixed interior/boundary stencil
-            update_hermite_data(hermite_data, data, neighbors, is_boundary,
-                              boundary_conditions, normals)
-            weights = build_hermite_stencil(A, b, ℒrbf, ℒmon, hermite_data,
-                                          eval_point, basis, mon, k)
+Stencil classification via dispatch:
+- **DirichletStencil**: Identity row (only diagonal)
+- **InteriorStencil**: Standard stencil (all neighbors are interior)
+- **HermiteStencil**: Mixed interior/boundary stencil
 
-        // Store weights
-        fill_sparse_entries(I, J, V, weights, eval_idx, neighbors, start_pos, k)
+---
+
+## Part 3: Stencil Mathematics (stencil_math.jl)
+
+### Stencil Assembly
+
+```julia
+function _build_stencil!(A, b, ℒrbf, ℒmon, data, eval_point, basis, mon, k)
+    _build_collocation_matrix!(A, data, basis, mon, k)
+    _build_rhs!(b, ℒrbf, ℒmon, data, eval_point, basis, k)
+    return (A \ b)[1:k, :]
+end
+```
+
+**Key insight**: Multiple dispatch on `data` type automatically selects:
+- `data::AbstractVector` → Standard interior stencil
+- `data::HermiteStencilData` → Hermite boundary stencil
+
+### Collocation Matrix Building
+
+**Standard (Interior)**:
+```julia
+function _build_collocation_matrix!(A, data::AbstractVector, basis, mon, k)
+    AA = parent(A)
+    N = size(A, 2)
+
+    # RBF block (upper triangular)
+    for j in 1:k, i in 1:j
+        AA[i, j] = basis(data[i], data[j])  # Φ(xᵢ, xⱼ)
+    end
+
+    # Polynomial augmentation block
+    if basis.poly_deg > -1
+        for i in 1:k
+            a = view(AA, i, (k + 1):N)
+            mon(a, data[i])  # P(xᵢ)
+        end
+    end
+end
+```
+
+**Hermite (With Boundary Conditions)**:
+```julia
+function _build_collocation_matrix!(A, data::HermiteStencilData, basis, mon, k)
+    AA = parent(A)
+    N = size(A, 2)
+
+    # RBF block with Hermite modifications
+    for j in 1:k, i in 1:j
+        AA[i, j] = compute_hermite_rbf_entry(i, j, data, basis)
+    end
+
+    # Polynomial block with boundary modifications
+    if basis.poly_deg > -1
+        for i in 1:k
+            a = view(AA, i, (k + 1):N)
+            compute_hermite_poly_entry!(a, i, data, mon)
+        end
+    end
+end
+```
+
+### Hermite RBF Entry Dispatch
+
+Uses **9 dispatch methods** based on point types (Interior/Dirichlet/NeumannRobin):
+
+```julia
+function compute_hermite_rbf_entry(i, j, data, basis)
+    xi, xj = data.data[i], data.data[j]
+    type_i = point_type(data.is_boundary[i], data.boundary_conditions[i])
+    type_j = point_type(data.is_boundary[j], data.boundary_conditions[j])
+
+    return hermite_rbf_dispatch(type_i, type_j, i, j, xi, xj, data, basis)
+end
+```
+
+**Example dispatches**:
+
+```julia
+# Interior-Interior: Standard evaluation
+hermite_rbf_dispatch(::InteriorPoint, ::InteriorPoint, ...) = basis(xi, xj)
+
+# Interior-NeumannRobin: Apply boundary operator to second argument
+hermite_rbf_dispatch(::InteriorPoint, ::NeumannRobinPoint, ...) =
+    α(bc_j) * φ + β(bc_j) * dot(nj, -∇φ)
+
+# NeumannRobin-NeumannRobin: Apply to both arguments
+hermite_rbf_dispatch(::NeumannRobinPoint, ::NeumannRobinPoint, ...) =
+    α(bc_i) * α(bc_j) * φ +
+    α(bc_i) * β(bc_j) * dot(nj, -∇φ) +
+    β(bc_i) * α(bc_j) * dot(ni, ∇φ) +
+    β(bc_i) * β(bc_j) * ∂i∂j_φ
+```
+
+### RHS Vector Building
+
+Similar dispatch pattern:
+- `_build_rhs!(b::Vector, ℒrbf, ...)` → Single operator
+- `_build_rhs!(b::Matrix, ℒrbf::Tuple, ...)` → Multiple operators
+- `_build_rhs!(b, ..., data::AbstractVector, ...)` → Interior
+- `_build_rhs!(b, ..., data::HermiteStencilData, ...)` → Hermite
+
+---
+
+## Part 4: Data Structures (types.jl)
+
+### Boundary Condition
+
+```julia
+struct BoundaryCondition{T<:Real}
+    α::T  # Coefficient for value
+    β::T  # Coefficient for normal derivative
+end
+
+# Boundary operator: Bu = α*u + β*∂ₙu
+# Special cases:
+#   Dirichlet: α=1, β=0
+#   Neumann:   α=0, β=1
+#   Robin:     α≠0, β≠0
+```
+
+### Hermite Stencil Data
+
+```julia
+struct HermiteStencilData{T<:Real}
+    data::AbstractVector{Vector{T}}              # k stencil points
+    is_boundary::Vector{Bool}                    # k flags
+    boundary_conditions::Vector{BoundaryCondition{T}}  # k conditions
+    normals::Vector{Vector{T}}                   # k normal vectors
+end
+```
+
+### Stencil Classification
+
+```julia
+abstract type StencilType end
+struct InteriorStencil <: StencilType end   # All neighbors interior
+struct DirichletStencil <: StencilType end  # Eval point is Dirichlet
+struct HermiteStencil <: StencilType end    # Mixed interior/boundary
+
+function classify_stencil(is_boundary, boundary_conditions, eval_idx, neighbors, ...)
+    if sum(is_boundary[neighbors]) == 0
+        return InteriorStencil()
+    elseif is_boundary[eval_idx] && is_dirichlet(boundary_conditions[...])
+        return DirichletStencil()
+    else
+        return HermiteStencil()
+    end
 end
 ```
 
 ---
 
-## Part 4: Stencil Building (Core Math)
-
-### Standard Stencil (solve.jl)
-
-```pseudocode
-function build_stencil(A, b, ℒrbf, ℒmon, data, eval_point, basis, mon, k)
-    // Build collocation matrix A
-    build_collocation_matrix(A, data, basis, mon, k)
-
-    // Build RHS vector b
-    build_rhs(b, ℒrbf, ℒmon, data, eval_point, basis, k)
-
-    // Solve linear system
-    weights = solve(A, b)  // Returns first k rows (RBF part)
-    return weights[1:k, :]
-end
-```
-
-#### Collocation Matrix
-
-```pseudocode
-function build_collocation_matrix(A, data, basis, mon, k)
-    // Upper triangular part (symmetric matrix)
-    for j in 1:k:
-        for i in 1:j:
-            A[i, j] = basis(data[i], data[j])  // RBF Φ(xᵢ, xⱼ)
-
-    // Polynomial augmentation block
-    if has_polynomial_augmentation:
-        for i in 1:k:
-            A[i, k+1:end] = mon(data[i])  // P(xᵢ)
-
-    // Matrix structure:
-    // ┌─────────┬──────┐
-    // │ Φ(xᵢ,xⱼ)│ P(xᵢ)│  k×k RBF block + k×nmon polynomial block
-    // ├─────────┼──────┤
-    // │ P(xⱼ)ᵀ │  0   │  nmon×k polynomial block + nmon×nmon zero block
-    // └─────────┴──────┘
-end
-```
-
-#### RHS Vector (Standard)
-
-```pseudocode
-function build_rhs(b, ℒrbf, ℒmon, data, eval_point, basis, k)
-    // RBF part: apply operator at eval_point
-    for i in 1:k:
-        b[i] = ℒrbf(eval_point, data[i])  // ℒΦ(x_eval, xᵢ)
-
-    // Polynomial part: apply operator to monomials
-    if has_polynomial_augmentation:
-        bmono = view(b, k+1:end)
-        ℒmon(bmono, eval_point)  // ℒP(x_eval)
-end
-
-// Note: For tuple operators (ℒ₁, ℒ₂, ..., ℒₙ), process each operator separately
-// b becomes a matrix with columns [b₁, b₂, ..., bₙ]
-```
-
-### Hermite Stencil (solve_hermite.jl)
-
-```pseudocode
-function build_hermite_stencil(A, b, ℒrbf, ℒmon, hermite_data, eval_point, basis, mon, k)
-    // Build modified collocation matrix
-    build_hermite_collocation_matrix(A, hermite_data, basis, mon, k)
-
-    // Build modified RHS
-    build_hermite_rhs(b, ℒrbf, ℒmon, hermite_data, eval_point, basis, mon, k)
-
-    // Solve
-    weights = solve(A, b)
-    return weights[1:k, :]
-end
-```
-
-#### Hermite Collocation Matrix
-
-```pseudocode
-function build_hermite_collocation_matrix(A, hermite_data, basis, mon, k)
-    // Build RBF block with boundary modifications
-    for j in 1:k:
-        for i in 1:j:
-            A[i, j] = hermite_rbf_entry(i, j, hermite_data, basis)
-
-    // Build polynomial block with boundary modifications
-    if has_polynomial_augmentation:
-        for i in 1:k:
-            A[i, k+1:end] = hermite_poly_entry(i, hermite_data, mon)
-end
-```
-
-#### RBF Entry Calculation (Dispatch-Based)
-
-```pseudocode
-function hermite_rbf_entry(i, j, hermite_data, basis)
-    xi = hermite_data.data[i]
-    xj = hermite_data.data[j]
-
-    // Determine point types
-    type_i = point_type(hermite_data.is_boundary[i], hermite_data.bc[i])
-    type_j = point_type(hermite_data.is_boundary[j], hermite_data.bc[j])
-
-    // Dispatch to specialized method (9 combinations)
-    return hermite_rbf_entry_dispatch(type_i, type_j, i, j, xi, xj, hermite_data, basis)
-end
-
-// Example dispatches:
-
-// Interior-Interior: Standard evaluation
-function dispatch(InteriorPoint, InteriorPoint, i, j, xi, xj, data, basis)
-    return basis(xi, xj)  // Φ(xi, xj)
-end
-
-// Interior-NeumannRobin: Apply boundary operator to second point
-function dispatch(InteriorPoint, NeumannRobinPoint, i, j, xi, xj, data, basis)
-    φ = basis(xi, xj)
-    ∇φ = gradient(basis)(xi, xj)
-    bc_j = data.boundary_conditions[j]
-    nj = data.normals[j]
-
-    return α(bc_j) * φ + β(bc_j) * dot(nj, -∇φ)  // B_j[Φ(xi, ·)](xj)
-end
-
-// NeumannRobin-NeumannRobin: Apply boundary operators to both points
-function dispatch(NeumannRobinPoint, NeumannRobinPoint, i, j, xi, xj, data, basis)
-    φ = basis(xi, xj)
-    ∇φ = gradient(basis)(xi, xj)
-    bc_i = data.boundary_conditions[i]
-    bc_j = data.boundary_conditions[j]
-    ni = data.normals[i]
-    nj = data.normals[j]
-
-    // Mixed second derivative term
-    ∂i∂j_φ = directional_second_derivative(basis, ni, nj)(xi, xj)
-
-    return (
-        α(bc_i) * α(bc_j) * φ +
-        α(bc_i) * β(bc_j) * dot(nj, -∇φ) +
-        β(bc_i) * α(bc_j) * dot(ni, ∇φ) +
-        β(bc_i) * β(bc_j) * ∂i∂j_φ
-    )
-end
-
-// Similar dispatches for all 9 combinations:
-// Interior × {Interior, Dirichlet, NeumannRobin}
-// Dirichlet × {Interior, Dirichlet, NeumannRobin}
-// NeumannRobin × {Interior, Dirichlet, NeumannRobin}
-```
-
-#### Hermite RHS Building
-
-```pseudocode
-function build_hermite_rhs(b, ℒrbf, ℒmon, hermite_data, eval_point, basis, mon, k)
-    // RBF part: apply boundary conditions to each stencil point
-    for i in 1:k:
-        b[i] = apply_boundary_to_rbf(
-            ℒrbf, eval_point, hermite_data.data[i],
-            hermite_data.is_boundary[i],
-            hermite_data.boundary_conditions[i],
-            hermite_data.normals[i]
-        )
-
-    // Polynomial part: apply boundary conditions at evaluation point
-    if has_polynomial_augmentation:
-        bmono = view(b, k+1:end)
-        eval_idx = find_eval_point_index(hermite_data.data, eval_point)
-
-        apply_boundary_to_mono(
-            bmono, ℒmon, mon, eval_point,
-            hermite_data.is_boundary[eval_idx],
-            hermite_data.boundary_conditions[eval_idx],
-            hermite_data.normals[eval_idx]
-        )
-end
-
-// Helper: Apply boundary conditions to RBF operator
-function apply_boundary_to_rbf(ℒrbf, eval_point, data_point, is_bound, bc, normal)
-    if !is_bound || is_dirichlet(bc):
-        return ℒrbf(eval_point, data_point)  // ℒΦ(x_eval, x_data)
-    else:
-        // Neumann/Robin: α*ℒΦ + β*ℒ(∂ₙΦ)
-        return α(bc) * ℒrbf(eval_point, data_point) +
-               β(bc) * ℒrbf(eval_point, data_point, normal)
-end
-
-// Helper: Apply boundary conditions to monomial operator
-function apply_boundary_to_mono(bmono, ℒmon, mon, eval_point, is_bound, bc, normal)
-    if !is_bound || is_dirichlet(bc):
-        ℒmon(bmono, eval_point)  // ℒP(x_eval)
-    else:
-        // Neumann/Robin: α*ℒP + β*ℒ(∂ₙP)
-        // Pre-compute polynomial values and derivatives
-        poly_vals = mon(eval_point)
-        deriv_vals = ∂_normal(mon, normal)(eval_point)
-
-        for idx in 1:length(bmono):
-            bmono[idx] = α(bc) * poly_vals[idx] + β(bc) * deriv_vals[idx]
-end
-```
-
----
-
-## Part 5: Key Data Structures
-
-### HermiteStencilData
-
-```pseudocode
-struct HermiteStencilData:
-    data: Vector{Point}                    // k points in stencil
-    is_boundary: Vector{Bool}              // k flags
-    boundary_conditions: Vector{BC}        // k boundary conditions
-    normals: Vector{Normal}                // k outward normal vectors
-```
-
-### Boundary Condition Types
-
-```pseudocode
-// Base type
-abstract type BoundaryCondition
-
-// Concrete types
-struct Dirichlet <: BoundaryCondition:
-    value: Float64
-
-struct Neumann <: BoundaryCondition:
-    value: Float64
-
-struct Robin <: BoundaryCondition:
-    α: Float64  // coefficient for value
-    β: Float64  // coefficient for normal derivative
-
-// Boundary operator: Bu = α*u + β*∂ₙu
-```
-
----
-
-## Part 6: Call Graph Summary
+## Call Graph
 
 ```
-User Code
+User Code (e.g., Laplacian construction)
     │
-    ├─→ RadialBasisOperator construction
-    │       │
-    │       └─→ _build_weights(ℒ, op)
-    │               │
-    │               ├─→ ℒrbf = ℒ(basis)
-    │               ├─→ ℒmon = ℒ(mon)
-    │               │
-    │               └─→ _build_weights(data, eval_points, adjl, basis, ℒrbf, ℒmon, mon, [boundary_data])
-    │                       │
-    │                       ├─→ [Standard Path]
-    │                       │       └─→ _build_weights_unified(StandardAllocation, ...)
-    │                       │               │
-    │                       │               ├─→ allocate_sparse_arrays(StandardAllocation, ...)
-    │                       │               ├─→ launch_kernel(StandardAllocation, ...)
-    │                       │               │       │
-    │                       │               │       └─→ @kernel standard_kernel
-    │                       │               │               │
-    │                       │               │               └─→ FOR each eval_point:
-    │                       │               │                       │
-    │                       │               │                       ├─→ _build_stencil!
-    │                       │               │                       │       │
-    │                       │               │                       │       ├─→ _build_collocation_matrix!
-    │                       │               │                       │       ├─→ _build_rhs!
-    │                       │               │                       │       │       │
-    │                       │               │                       │       │       ├─→ _build_rhs_core!
-    │                       │               │                       │       │       │       ├─→ RBF section loop
-    │                       │               │                       │       │       │       └─→ Monomial section
-    │                       │               │                       │       │
-    │                       │               │                       │       └─→ solve(A, b)
-    │                       │               │                       │
-    │                       │               │                       └─→ fill_sparse_entries!
-    │                       │               │
-    │                       │               └─→ sparse(I, J, V)
-    │                       │
-    │                       └─→ [Hermite Path]
-    │                               └─→ _build_weights_unified(OptimizedAllocation, ...)
-    │                                       │
-    │                                       ├─→ allocate_sparse_arrays(OptimizedAllocation, ...)
-    │                                       ├─→ launch_kernel(OptimizedAllocation, ...)
-    │                                       │       │
-    │                                       │       └─→ @kernel optimized_kernel
-    │                                       │               │
-    │                                       │               └─→ FOR each eval_point:
-    │                                       │                       │
-    │                                       │                       ├─→ stencil_type(...)
-    │                                       │                       │       └─→ {DirichletStencil, InternalStencil, HermiteStencil}
-    │                                       │                       │
-    │                                       │                       ├─→ IF DirichletStencil:
-    │                                       │                       │       └─→ fill_dirichlet_entry! (I[row]=row, J[row]=row, V[row]=1.0)
-    │                                       │                       │
-    │                                       │                       ├─→ IF InternalStencil:
-    │                                       │                       │       └─→ _build_stencil! (standard)
-    │                                       │                       │
-    │                                       │                       └─→ IF HermiteStencil:
-    │                                       │                               └─→ _build_stencil!(HermiteStencilData)
-    │                                       │                                       │
-    │                                       │                                       ├─→ _build_collocation_matrix!(HermiteStencilData)
-    │                                       │                                       │       │
-    │                                       │                                       │       ├─→ FOR i,j: _hermite_rbf_entry(i, j, data, basis)
-    │                                       │                                       │       │       │
-    │                                       │                                       │       │       ├─→ point_type(i) + point_type(j)
-    │                                       │                                       │       │       └─→ dispatch to appropriate method (9 cases)
-    │                                       │                                       │       │
-    │                                       │                                       │       └─→ FOR i: _hermite_poly_entry!(i, data, mon)
-    │                                       │                                       │
-    │                                       │                                       ├─→ _build_rhs!(HermiteStencilData)
-    │                                       │                                       │       │
-    │                                       │                                       │       ├─→ FOR i: _apply_boundary_to_rbf(...)
-    │                                       │                                       │       └─→ _apply_boundary_to_mono!(...)
-    │                                       │                                       │
-    │                                       │                                       └─→ solve(A, b)
-    │                                       │
-    │                                       └─→ sparse(I, J, V)
-    │
-    └─→ Sparse weight matrices returned
+    └─→ api.jl: _build_weights(ℒ, op)
+            │
+            ├─→ Apply operator to basis: ℒrbf = ℒ(basis), ℒmon = ℒ(mon)
+            │
+            └─→ Route based on boundary conditions
+                    │
+                    └─→ kernel_exec.jl: build_weights_kernel(...)
+                            │
+                            ├─→ allocate_sparse_arrays(...)
+                            │       └─→ count_nonzeros → Exact allocation
+                            │
+                            ├─→ launch_kernel!(...)
+                            │       │
+                            │       └─→ @kernel weight_kernel
+                            │               │
+                            │               └─→ FOR each eval_point in batch:
+                            │                       │
+                            │                       ├─→ types.jl: classify_stencil(...)
+                            │                       │       └─→ {Dirichlet, Interior, Hermite}
+                            │                       │
+                            │                       ├─→ IF DirichletStencil:
+                            │                       │       └─→ Fill identity row
+                            │                       │
+                            │                       ├─→ IF InteriorStencil:
+                            │                       │       └─→ stencil_math.jl: _build_stencil!
+                            │                       │               (standard interior)
+                            │                       │
+                            │                       └─→ IF HermiteStencil:
+                            │                               │
+                            │                               ├─→ types.jl: update_hermite_stencil_data!
+                            │                               │
+                            │                               └─→ stencil_math.jl: _build_stencil!
+                            │                                       ├─→ _build_collocation_matrix!
+                            │                                       │       └─→ compute_hermite_rbf_entry
+                            │                                       │               └─→ hermite_rbf_dispatch
+                            │                                       │                       (9 point type combos)
+                            │                                       │
+                            │                                       ├─→ _build_rhs!
+                            │                                       │       ├─→ apply_boundary_to_rbf
+                            │                                       │       └─→ apply_boundary_to_mono!
+                            │                                       │
+                            │                                       └─→ solve(A, b)
+                            │
+                            └─→ sparse(I, J, V) → Return
 ```
 
 ---
 
-## Part 7: Key Concepts
+## Key Concepts
 
-### 1. Stencil
+### 1. Layer Separation
 
-A **stencil** is a local approximation of a differential operator at a point using nearby data points:
+**Why it matters**:
+- **stencil_math.jl** contains pure functions → easily testable
+- **kernel_exec.jl** handles parallelism → can benchmark separately
+- **api.jl** routes requests → single place to trace flow
+
+### 2. Stencil
+
+A **stencil** is a local approximation of a differential operator at a point:
 
 ```
 For a point x₀ with k neighbors {x₁, x₂, ..., xₖ}:
 
     ℒu(x₀) ≈ Σᵢ₌₁ᵏ wᵢ * u(xᵢ)
 
-where wᵢ are the weights we compute.
+where wᵢ are the weights we compute by solving A \ b.
 ```
 
-### 2. Collocation Matrix Structure
+### 3. Collocation Matrix Structure
 
 ```
 Standard (Interior):
 ┌─────────────────┬─────────┐
-│  Φ(xᵢ, xⱼ)      │ P(xᵢ)   │  k × k RBF block + k × nmon polynomial
+│  Φ(xᵢ, xⱼ)      │ P(xᵢ)   │  k×k RBF + k×nmon polynomial
 ├─────────────────┼─────────┤
-│  P(xⱼ)ᵀ         │   0     │  nmon × k polynomial + nmon × nmon zero
+│  P(xⱼ)ᵀ         │   0     │  nmon×k poly + nmon×nmon zero
 └─────────────────┴─────────┘
 
 Hermite (with Boundary):
 Same structure, but entries modified by boundary operators:
-- Interior-Interior: standard Φ(xᵢ, xⱼ)
+- Interior-Interior: Φ(xᵢ, xⱼ)
 - Interior-Boundary: BⱼΦ(xᵢ, xⱼ)
 - Boundary-Boundary: BᵢBⱼΦ(xᵢ, xⱼ)
 
 where Bᵢ = α*I + β*∂ₙᵢ is the boundary operator at point i
 ```
 
-### 3. Operator Types
+### 4. Multiple Dispatch Benefits
 
-```pseudocode
-// Single operator (returns 1 sparse matrix)
-ℒ = Laplacian(basis, data, ...)
-weights = ℒ.weights  // N_eval × N_data sparse matrix
+The code uses Julia's multiple dispatch to automatically select:
+- Vector vs Matrix RHS (single vs tuple operators)
+- AbstractVector vs HermiteStencilData (interior vs boundary)
+- Point type combinations (9 Hermite dispatch variants)
 
-// Tuple operators (returns tuple of sparse matrices)
-ℒ = (∂_x, ∂_y)  // Gradient
-weights = (W_x, W_y)  // Each is N_eval × N_data
-```
-
-### 4. Type Stability
-
-The refactored code uses **trait dispatch** to ensure type-stable buffer allocation:
-
-```pseudocode
-// OLD (type-unstable):
-function prepare_b(ℒ, T, n)
-    if ℒ isa Tuple:
-        return zeros(T, n, length(ℒ))  // Matrix
-    else:
-        return zeros(T, n)              // Vector
-    end
-end
-
-// NEW (type-stable):
-trait OperatorArity{N}  // N known at compile-time
-function prepare_b(SingleOperator, T, n)   → Vector{T}(undef, n)
-function prepare_b(MultiOperator{N}, T, n) → Matrix{T}(undef, n, N)
-```
+This eliminates explicit conditionals and improves type stability.
 
 ---
 
-## Part 8: Example Walkthrough
+## Performance Characteristics
 
-### Example: Laplacian with Mixed Boundary Conditions
+### Memory Allocation
+- Exact allocation via `count_nonzeros` (counts entries before allocating)
+- Interior points: k entries per stencil
+- Dirichlet points: 1 entry per stencil (identity row)
+- Other boundary points: k entries per stencil
+- No over-allocation for interior-only problems
 
-```pseudocode
-// Setup
-data = [interior_points..., boundary_points...]
-eval_points = data  // Collocation (eval at same points)
-basis = PHS(3)  // Polyharmonic spline r³
-operator = Laplacian
-boundary_conditions = [Dirichlet(0.0), Neumann(1.0), Robin(1.0, 0.5), ...]
-normals = [n₁, n₂, n₃, ...]
+### Parallelization
+- Batch processing prevents memory exhaustion
+- Work arrays reused within batch
+- KernelAbstractions.jl enables CPU/GPU execution
+- Type-stable buffers via operator arity traits
 
-// Step 1: Entry point
-ℒ = Laplacian(basis, data, eval_points, neighbors, boundary_conditions, normals)
-
-// Step 2: Build weights
-ℒrbf = Laplacian(basis)        // ∇²Φ(x, y)
-ℒmon = Laplacian(mon)          // ∇²P(x) = ∇²(1, x, y, x², xy, y², ...)
-weights = _build_weights_hermite(...)
-
-// Step 3: Unified infrastructure
-strategy = OptimizedAllocation  // Because we have boundary conditions
-boundary_data = (is_boundary, boundary_conditions, normals)
-_build_weights_unified(strategy, ..., boundary_data)
-
-// Step 4: Allocate exact memory
-//   - Interior points: k entries each
-//   - Dirichlet BCs: 1 entry each (diagonal only)
-//   - Neumann/Robin BCs: k entries each
-total_nnz = (num_interior + num_neumann_robin) * k + num_dirichlet
-allocate_sparse_arrays(OptimizedAllocation, ..., total_nnz)
-
-// Step 5: Launch kernel (parallel processing)
-@kernel optimized_kernel:
-    FOR eval_idx in batch:
-        neighbors = adjl[eval_idx]
-
-        // Classify stencil
-        IF eval_point is Dirichlet:
-            // Identity row: u(x₀) = boundary_value
-            I[row] = eval_idx
-            J[row] = eval_idx
-            V[row] = 1.0
-
-        ELSE IF all neighbors are interior:
-            // Standard stencil (no boundary modifications)
-            build_stencil(standard)
-
-        ELSE:
-            // Hermite stencil (mixed interior/boundary)
-
-            // Build collocation matrix A
-            FOR i, j in neighbors:
-                IF both interior:
-                    A[i,j] = basis(xᵢ, xⱼ)  // r³
-
-                ELSE IF i interior, j Neumann:
-                    // Apply boundary operator to j
-                    φ = r³
-                    ∇φ = [3r²cos(θ), 3r²sin(θ)]
-                    A[i,j] = α * φ + β * dot(nⱼ, -∇φ)
-
-                ELSE IF both Neumann/Robin:
-                    // Mixed derivative term
-                    φ = r³
-                    ∇φ = ...
-                    ∂ᵢ∂ⱼφ = directional_second_derivative(nᵢ, nⱼ)
-                    A[i,j] = αᵢαⱼφ + αᵢβⱼ·(∇φ·nⱼ) + βᵢαⱼ·(∇φ·nᵢ) + βᵢβⱼ∂ᵢ∂ⱼφ
-
-            // Build RHS b
-            FOR i in neighbors:
-                IF interior:
-                    b[i] = ∇²r³(x₀, xᵢ)
-                ELSE IF Neumann:
-                    b[i] = α*∇²r³(x₀, xᵢ) + β*∇²(∂ₙr³)(x₀, xᵢ)
-
-            // Monomial part (if eval_point is Neumann/Robin)
-            IF eval_point has Neumann/Robin BC:
-                // Boundary operator modifies monomial evaluation
-                poly_vals = [1, x₀, y₀, x₀², ...]
-                deriv_vals = ∂ₙ[1, x₀, y₀, x₀², ...] = [0, n_x, n_y, 2x₀n_x, ...]
-                bmono = α*poly_vals + β*deriv_vals
-            ELSE:
-                bmono = ∇²[1, x₀, y₀, x₀², ...] = [0, 0, 0, 2, ...]
-
-            // Solve: A * weights = b
-            weights = solve(A, b)[1:k]
-
-        // Store in sparse arrays
-        fill_sparse_entries(I, J, V, eval_idx, neighbors, weights)
-
-// Step 6: Construct sparse matrix
-return sparse(I, J, V, N_eval, N_data)
-```
+### Stencil Classification
+- Runtime dispatch via `classify_stencil`
+- Zero overhead for interior-only problems (all stencils classify as InteriorStencil)
+- Dirichlet points bypass expensive matrix assembly
 
 ---
 
-## Part 9: Summary
+## Summary
 
-### Code Flow Pipeline
+The unified solve system achieves:
 
-```
-Operator Construction
-    ↓
-Dispatch to Standard or Hermite
-    ↓
-Unified Infrastructure (_build_weights_unified)
-    ├─→ Allocate sparse arrays (strategy-based)
-    ├─→ Launch parallel kernel
-    │      ├─→ Process batches of evaluation points
-    │      ├─→ Build local stencils (A\b)
-    │      │      ├─→ Build collocation matrix
-    │      │      ├─→ Build RHS vector
-    │      │      └─→ Solve linear system
-    │      └─→ Fill sparse matrix entries
-    └─→ Construct final sparse matrix
+1. **Clear organization**: 3 layers with distinct responsibilities
+2. **Single code path**: One allocation strategy, one kernel for all cases
+3. **Better testability**: Pure math layer has no side effects
+4. **Easy navigation**: "Where's X?" → Obvious file location
+5. **Zero overhead**: Multiple dispatch is compile-time optimization
+6. **Exact allocation**: No over-allocation for any problem type
+7. **Backward compatible**: All exports maintained
 
-Return: Sparse weight matrix W where W * u ≈ ℒu
-```
-
-### Key Differences: Standard vs Hermite
-
-| Aspect | Standard | Hermite |
-|--------|----------|---------|
-| **Stencil Points** | All interior | Mix of interior and boundary |
-| **Collocation Matrix** | Standard RBF evaluation | Modified by boundary operators |
-| **RHS Vector** | Standard operator evaluation | Modified by boundary conditions |
-| **Memory Strategy** | Simple (k*N allocation) | Optimized (exact counting) |
-| **Dirichlet BCs** | N/A | Identity rows (trivial stencil) |
-| **Neumann/Robin BCs** | N/A | Normal derivatives in equations |
-
-### Performance Characteristics
-
-```
-Standard Path:
-  - Simpler logic
-  - Slightly over-allocates memory
-  - No boundary condition overhead
-  - Best for interior-only problems
-
-Hermite Path:
-  - More complex logic (9 dispatch cases)
-  - Exact memory allocation
-  - Handles all BC types
-  - Best for PDEs with boundary conditions
-  - Dirichlet BCs are "free" (identity rows)
-```
-
----
-
-## Questions or Clarifications?
-
-This document should give you a complete mental model of how the weight-building system works. The key insights are:
-
-1. **Unified infrastructure**: Both paths use the same kernel template
-2. **Dispatch-based flexibility**: Type system handles complexity
-3. **Local stencils**: Each evaluation point has its own small linear system
-4. **Boundary conditions**: Modify the collocation matrix and RHS, not the solve
-
-Let me know if you'd like me to expand on any particular section!
+**File Mapping**:
+- Want to modify math? → `stencil_math.jl`
+- Need better parallelism? → `kernel_exec.jl`
+- Adding new operator entry point? → `api.jl`
+- New boundary condition type? → `types.jl`
