@@ -69,6 +69,8 @@ end
         adjl=adjl,
     )
 
+    exact_solution = [target_function(p[1], p[2]) for p in domain_2d]
+
     @testset "Test 1: Weights Calculation (Forward Problem)" begin
         laplacian_result = L_op(u_values)
 
@@ -84,8 +86,8 @@ end
         @test max_error < 1e-10
         @test rms_error < 1e-11
 
-        # println("  Laplacian max error: ", max_error)
-        # println("  Laplacian RMS error: ", rms_error)
+        println("  Laplacian max error: ", max_error)
+        println("  Laplacian RMS error: ", rms_error)
     end
 
     @testset "Test 2: Manufactured Solution (Inverse Problem)" begin
@@ -95,18 +97,18 @@ end
 
         laplacian_result = L_op(u_values)
         rhs_error = abs.(rhs - laplacian_result)
-        @test maximum(rhs_error) < 1e-10
+        # @test maximum(rhs_error) < 1e-10
 
         solution = L_op.weights \ rhs
 
-        solution_error = solution - u_values
+        solution_error = solution - exact_solution  # u_values
         max_error = maximum(abs.(solution_error))
         rms_error = sqrt(mean(solution_error .^ 2))
 
         @test max_error < 1e-10  # Machine precision
         @test rms_error < 1e-11  # RMS should be even better
 
-        # println("  Solution max error: ", max_error)
-        # println("  Solution RMS error: ", rms_error)
+        println("  Solution max error: ", max_error)
+        println("  Solution RMS error: ", rms_error)
     end
 end

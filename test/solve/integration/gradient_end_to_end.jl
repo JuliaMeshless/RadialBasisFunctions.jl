@@ -74,6 +74,7 @@ end
         k=k,
         adjl=adjl,
     )
+    exact_solution = [target_function(p[1], p[2]) for p in domain_2d]
 
     @testset "Test 1: Weights Calculation (Forward Problem)" begin
         gradient_result = G_op(u_values)
@@ -131,8 +132,8 @@ end
         # println("Condition number of weights[1]: ", cond_x)
         # println("Condition number of weights[2]: ", cond_y)
 
-        forward_x = G_op.weights[1] * u_values
-        forward_y = G_op.weights[2] * u_values
+        forward_x = G_op.weights[1] * exact_solution #u_values
+        forward_y = G_op.weights[2] * exact_solution #u_values
         forward_error_x = maximum(abs.(forward_x - rhs[1]))
         forward_error_y = maximum(abs.(forward_y - rhs[2]))
         # println("Max error in weights[1] * u_values vs rhs[1]: ", forward_error_x)
@@ -148,18 +149,18 @@ end
         # println("Max residual for x: ", maximum(abs.(residual_x)))
         # println("Max residual for y: ", maximum(abs.(residual_y)))
 
-        solution_x_error = solution_x - u_values
-        solution_y_error = solution_y - u_values
+        solution_x_error = solution_x - exact_solution #u_values
+        solution_y_error = solution_y - exact_solution #u_values
 
         max_error_x = maximum(abs.(solution_x_error))
         max_error_y = maximum(abs.(solution_y_error))
         rms_error_x = sqrt(mean(solution_x_error .^ 2))
         rms_error_y = sqrt(mean(solution_y_error .^ 2))
 
-        # println("X-component max error: ", max_error_x)
-        # println("X-component RMS error: ", rms_error_x)
-        # println("Y-component max error: ", max_error_y)
-        # println("Y-component RMS error: ", rms_error_y)
+        println("X-component max error: ", max_error_x)
+        println("X-component RMS error: ", rms_error_x)
+        println("Y-component max error: ", max_error_y)
+        println("Y-component RMS error: ", rms_error_y)
 
         @test max_error_x < 1e-8
         @test max_error_y < 1e-8

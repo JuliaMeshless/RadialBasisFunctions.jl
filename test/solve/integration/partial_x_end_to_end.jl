@@ -81,6 +81,8 @@ end
         adjl=adjl,
     )
 
+    exact_solution = [target_function(p[1], p[2]) for p in domain_2d]
+
     @testset "Test 1: Weights Calculation (Forward Problem)" begin
         # Apply operator to u_values
         partial_x_result = Dx_op(u_values)
@@ -134,13 +136,12 @@ end
         # Check residuals
         residual = Dx_op.weights * solution - rhs
         # println("Max residual: ", maximum(abs.(residual)))
-
-        solution_error = solution - u_values
+        solution_error = solution - exact_solution #u_values
         max_error = maximum(abs.(solution_error))
         rms_error = sqrt(mean(solution_error .^ 2))
 
-        # println("Max error: ", max_error)
-        # println("RMS error: ", rms_error)
+        println("Max error: ", max_error)
+        println("RMS error: ", rms_error)
 
         @test max_error < 1e-8  # Machine precision
         @test rms_error < 1e-9  # RMS should be even better

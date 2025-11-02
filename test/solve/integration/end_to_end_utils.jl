@@ -95,23 +95,11 @@ end
 function construct_u_values_hermite(
     domain_2d, is_boundary, boundary_conditions, normals, RBF
 )
+    # SIMPLIFIED VERSION: All points store function values
+    # This matches the new Hermite approach where:
+    # - Dirichlet points: known function values (enforced via identity row)
+    # - Neumann/Robin points: UNKNOWN function values (we solve for them)
     u_values = [target_function(p[1], p[2]) for p in domain_2d]
-    bnd_counter = 0
-    for i in eachindex(domain_2d)
-        if is_boundary[i]
-            bnd_counter += 1
-            normal = normals[bnd_counter]
-            if RBF.is_neumann(boundary_conditions[bnd_counter])
-                u_values[i] = target_Neumann_bc(domain_2d[i][1], domain_2d[i][2], normal)
-            elseif RBF.is_robin(boundary_conditions[bnd_counter])
-                u_values[i] =
-                    0.5 * target_function(domain_2d[i][1], domain_2d[i][2]) +
-                    0.5 * target_Neumann_bc(domain_2d[i][1], domain_2d[i][2], normal)
-            elseif RBF.is_dirichlet(boundary_conditions[bnd_counter])
-                u_values[i] = target_function(domain_2d[i][1], domain_2d[i][2])
-            end
-        end
-    end
     return u_values
 end
 

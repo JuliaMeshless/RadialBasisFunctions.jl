@@ -75,6 +75,7 @@ end
         k=k,
         adjl=adjl,
     )
+    exact_solution = [target_function(p[1], p[2]) for p in domain_2d]
 
     @testset "Test 1: Weights Calculation (Forward Problem)" begin
         partial_y_result = Dy_op(u_values)
@@ -116,7 +117,7 @@ end
         cond_num = cond(Matrix(Dy_op.weights))
         # println("Condition number of weights: ", cond_num)
 
-        forward_result = Dy_op.weights * u_values
+        forward_result = Dy_op.weights * exact_solution #u_values
         forward_error = maximum(abs.(forward_result - rhs))
         # println("Max error in weights * u_values vs rhs: ", forward_error)
 
@@ -124,13 +125,12 @@ end
 
         residual = Dy_op.weights * solution - rhs
         # println("Max residual: ", maximum(abs.(residual)))
-
-        solution_error = solution - u_values
+        solution_error = solution - exact_solution #u_values
         max_error = maximum(abs.(solution_error))
         rms_error = sqrt(mean(solution_error .^ 2))
 
-        # println("Max error: ", max_error)
-        # println("RMS error: ", rms_error)
+        println("Max error: ", max_error)
+        println("RMS error: ", rms_error)
 
         idx = argmax(abs.(solution_error))
         # println("  Index: ", idx, " at ", domain_2d[idx], " is_boundary=", is_boundary[idx])
