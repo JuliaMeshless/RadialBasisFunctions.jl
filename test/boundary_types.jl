@@ -197,39 +197,24 @@ end
         boundary_conditions = [Dirichlet(), Neumann(), Robin(1.0, 2.0)]
         global_to_boundary = [0, 1, 0, 2, 3]
 
-        # Internal stencil (no boundary points in neighbors)
-        neighbors = [1, 3]  # All interior points
-        result = RBF.stencil_type(
-            is_boundary, boundary_conditions, 1, neighbors, global_to_boundary
-        )
+        # Internal stencil (eval point is interior)
+        result = RBF.stencil_type(is_boundary, boundary_conditions, 1, global_to_boundary)
         @test result isa InternalStencil
 
         # Dirichlet stencil (eval point is boundary with Dirichlet condition)
-        neighbors = [1, 2, 3]
-        result = RBF.stencil_type(
-            is_boundary, boundary_conditions, 2, neighbors, global_to_boundary
-        )
+        result = RBF.stencil_type(is_boundary, boundary_conditions, 2, global_to_boundary)
         @test result isa RBF.DirichletStencil
 
         # Hermite stencil (eval point is boundary with Neumann condition)
-        neighbors = [1, 3, 4]
-        result = RBF.stencil_type(
-            is_boundary, boundary_conditions, 4, neighbors, global_to_boundary
-        )
+        result = RBF.stencil_type(is_boundary, boundary_conditions, 4, global_to_boundary)
         @test result isa HermiteStencil
 
         # Hermite stencil (eval point is boundary with Robin condition)
-        neighbors = [1, 3, 5]
-        result = RBF.stencil_type(
-            is_boundary, boundary_conditions, 5, neighbors, global_to_boundary
-        )
+        result = RBF.stencil_type(is_boundary, boundary_conditions, 5, global_to_boundary)
         @test result isa HermiteStencil
 
-        # Hermite stencil (eval point is interior but has boundary neighbors)
-        neighbors = [2, 4]  # Contains boundary points
-        result = RBF.stencil_type(
-            is_boundary, boundary_conditions, 1, neighbors, global_to_boundary
-        )
-        @test result isa HermiteStencil
+        # Another internal stencil test (eval point is interior, even with boundary neighbors)
+        result = RBF.stencil_type(is_boundary, boundary_conditions, 3, global_to_boundary)
+        @test result isa InternalStencil
     end
 end

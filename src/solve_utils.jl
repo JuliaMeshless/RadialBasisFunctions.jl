@@ -420,9 +420,8 @@ function _launch_unified_kernel!(
             neighbors = adjl[eval_idx]
             eval_point = eval_points[eval_idx]
 
-            # Handle different stencil types
             stencil_type_result = stencil_type(
-                is_boundary, boundary_conditions, eval_idx, neighbors, global_to_boundary
+                is_boundary, boundary_conditions, eval_idx, global_to_boundary
             )
 
             if isa(stencil_type_result, DirichletStencil)

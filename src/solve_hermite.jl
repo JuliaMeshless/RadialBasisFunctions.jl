@@ -9,38 +9,37 @@ both the collocation matrix and RHS to maintain symmetry and non-singularity.
 using LinearAlgebra: dot
 
 """
-Build collocation matrix for Hermite interpolation with boundary conditions.
+    _fill_boundary_monomial_rhs!(bmono, mon, eval_point, bc, n)
 
-SIMPLIFIED VERSION: Only Dirichlet boundaries are treated specially (as known values).
-Neumann/Robin boundaries are unknowns, so we use standard basis functions everywhere.
+Fill monomial contribution to RHS with boundary operator (α + β*∂ₙ) applied.
 
-The matrix is just standard RBF evaluation: φ(xᵢ, xⱼ) for all i,j
-This works because:
-- Interior points: solving for function values
-- Dirichlet boundaries: values are known (handled in global system assembly)
-- Neumann/Robin boundaries: solving for function values (BC enforced via RHS)
+This computes: bmono[i] = α(bc) * pᵢ(x) + β(bc) * ∂ₙpᵢ(x)
+where pᵢ are the monomial basis functions.
 """
-function _build_collocation_matrix!(
-    A::Symmetric,
-    data::HermiteStencilData,
-    basis::B,
-    mon::MonomialBasis{Dim,Deg},
-    k::K,
-    eval_point::TE,
-) where {B<:AbstractRadialBasis,K<:Int,Dim,Deg,TE}
-    AA = parent(A)
-    N = size(A, 2)
+function _fill_boundary_monomial_rhs!(
+    bmono::AbstractVector,
+    mon::MonomialBasis,
+    eval_point,
+    bc::BoundaryCondition,
+    n::AbstractVector,
+)
+    nmon = length(bmono)
+    α_val = α(bc)
+    β_val = β(bc)
 
-    # Build standard RBF matrix entries (no Hermite modifications!)
-    @inbounds for j in 1:k, i in 1:j
-        AA[i, j] = basis(data.data[i], data.data[j])
+    # Fill with polynomial values scaled by α
+    mon(bmono, eval_point)
+    @inbounds for idx in 1:nmon
+        bmono[idx] *= α_val
     end
 
-    # Polynomial augmentation (standard evaluation)
-    if Deg > -1
-        @inbounds for i in 1:k
-            a = view(AA, i, (k + 1):N)
-            mon(a, data.data[i])
+    # Add normal derivative contribution scaled by β
+    if !iszero(β_val)
+        ∂ₙmon = ∂_normal(mon, n)
+        deriv_vals = similar(bmono)
+        ∂ₙmon(deriv_vals, eval_point)
+        @inbounds for idx in 1:nmon
+            bmono[idx] += β_val * deriv_vals[idx]
         end
     end
 
@@ -50,12 +49,13 @@ end
 """
 Build RHS for Hermite interpolation with boundary conditions.
 
-SIMPLIFIED VERSION: 
-- Interior eval_point: apply differential operator ℒ to all basis functions
-- Dirichlet eval_point: identity row (extract value)
-- Neumann/Robin eval_point: apply boundary operator (α + β*∂ₙ) to all basis functions
+NOTE: This function is ONLY called for HermiteStencil cases (determined by stencil_type()).
+Dirichlet stencils are handled separately in solve_utils.jl via _handle_dirichlet_optimized!.
+Internal stencils (no boundary neighbors) use the standard solve.jl implementation.
 
-Since the matrix uses standard basis everywhere, the RHS must match accordingly.
+Two cases handled here:
+- Neumann/Robin eval_point: apply boundary operator (α + β*∂ₙ) to all basis functions
+- Interior eval_point with boundary neighbors: apply differential operator ℒ to all basis functions
 """
 function _build_rhs!(
     b,
@@ -68,70 +68,40 @@ function _build_rhs!(
     k::K,
 ) where {TD,TE,B<:AbstractRadialBasis,K<:Int}
     eval_idx = findfirst(i -> data.data[i] == eval_point, 1:k)
-    if eval_idx === nothing
-        error("Evaluation point not found in stencil data.")
+    eval_idx === nothing && error("Evaluation point not found in stencil data.")
+    if !data.is_boundary[eval_idx]
+        error("Dispatch to standard _build_rhs! expected for interior eval points.")
     end
+    bc_eval = data.boundary_conditions[eval_idx]
+    n_eval = data.normals[eval_idx]
 
-    eval_is_boundary = data.is_boundary[eval_idx]
+    is_dirichlet(bc_eval) && error("Dirichlet boundary should not be handled here.")
 
-    # Neumann/Robin boundary - apply boundary operator to all basis functions
-    if eval_is_boundary && !is_dirichlet(data.boundary_conditions[eval_idx])
-        bc_eval = data.boundary_conditions[eval_idx]
-        n_eval = data.normals[eval_idx]
-
-        # Apply boundary operator (α + β*∂ₙ) to each basis function
-        @inbounds for i in 1:k
-            xi = data.data[i]
-            φ = basis(eval_point, xi)
-            ∇φ = ∇(basis)(eval_point, xi)
-            # Boundary operator: α*φ + β*∂ₙφ
-            b[i] = α(bc_eval) * φ + β(bc_eval) * dot(n_eval, ∇φ)
-        end
-
-        # Monomial augmentation with boundary operator
-        if basis.poly_deg > -1
-            N = length(b)
-            bmono = view(b, (k + 1):N)
-            nmon = length(bmono)
-
-            T = eltype(bmono)
-            poly_vals = zeros(T, nmon)
-            mon(poly_vals, eval_point)
-
-            ∂ₙmon = ∂_normal(mon, n_eval)
-            deriv_vals = zeros(T, nmon)
-            ∂ₙmon(deriv_vals, eval_point)
-
-            # Apply boundary condition: α*P + β*∂ₙP
-            @inbounds for idx in 1:nmon
-                bmono[idx] = α(bc_eval) * poly_vals[idx] + β(bc_eval) * deriv_vals[idx]
-            end
-        end
-        return nothing
-    end
-
-    # Interior point - apply differential operator to all basis functions
     @inbounds for i in 1:k
-        b[i] = ℒrbf(eval_point, data.data[i])
+        xi = data.data[i]
+        φ = basis(eval_point, xi)
+        ∇φ = ∇(basis)(eval_point, xi)
+        b[i] = α(bc_eval) * φ + β(bc_eval) * dot(n_eval, ∇φ)
     end
 
-    # Monomial augmentation with differential operator
     if basis.poly_deg > -1
         N = length(b)
         bmono = view(b, (k + 1):N)
-        ℒmon(bmono, eval_point)
+        _fill_boundary_monomial_rhs!(bmono, mon, eval_point, bc_eval, n_eval)
     end
 
     return nothing
 end
 
 """
-Multi-operator version of Hermite RHS building (simplified).
+Multi-operator version of Hermite RHS building.
 
-SIMPLIFIED VERSION: Same three-case logic as single-operator version.
-- Interior eval_point: apply differential operators ℒ to all basis functions
-- Dirichlet eval_point: identity row (extract value)
+NOTE: This function is ONLY called for HermiteStencil cases (determined by stencil_type()).
+Dirichlet and purely internal stencils are handled elsewhere.
+
+Two cases handled here:
 - Neumann/Robin eval_point: apply boundary operator (α + β*∂ₙ) to all basis functions
+- Interior eval_point with boundary neighbors: apply differential operators ℒ to all basis functions
 """
 function _build_rhs!(
     b,
@@ -146,65 +116,32 @@ function _build_rhs!(
     @assert size(b, 2) == length(ℒrbf) == length(ℒmon) "b, ℒrbf, ℒmon must have the same length"
 
     eval_idx = findfirst(i -> data.data[i] == eval_point, 1:k)
-    if eval_idx === nothing
-        error("Evaluation point not found in stencil data.")
+    eval_idx === nothing && error("Evaluation point not found in stencil data.")
+    if !data.is_boundary[eval_idx]
+        error("Dispatch to standard _build_rhs! expected for interior eval points.")
     end
 
-    eval_is_boundary = data.is_boundary[eval_idx]
+    # Neumann/Robin boundary - apply boundary operator (α + β*∂ₙ)
+    bc_eval = data.boundary_conditions[eval_idx]
+    n_eval = data.normals[eval_idx]
 
-    # Case 2: Neumann/Robin boundary - apply boundary operator to all basis functions
-    if eval_is_boundary && !is_dirichlet(data.boundary_conditions[eval_idx])
-        bc_eval = data.boundary_conditions[eval_idx]
-        n_eval = data.normals[eval_idx]
-
-        # Apply boundary operator (α + β*∂ₙ) to each basis function for all operators
-        for (j, _) in enumerate(ℒrbf)
-            @inbounds for i in 1:k
-                xi = data.data[i]
-                φ = basis(eval_point, xi)
-                ∇φ = ∇(basis)(eval_point, xi)
-                # Boundary operator: α*φ + β*∂ₙφ (same for all operators)
-                b[i, j] = α(bc_eval) * φ + β(bc_eval) * dot(n_eval, ∇φ)
-            end
-        end
-
-        # Monomial augmentation with boundary operator
-        if basis.poly_deg > -1
-            N = size(b, 1)
-            nmon = binomial(dim(mon) + degree(mon), dim(mon))
-
-            T = eltype(b)
-            poly_vals = zeros(T, nmon)
-            mon(poly_vals, eval_point)
-
-            ∂ₙmon = ∂_normal(mon, n_eval)
-            deriv_vals = zeros(T, nmon)
-            ∂ₙmon(deriv_vals, eval_point)
-
-            # Apply boundary condition: α*P + β*∂ₙP (same for all operators)
-            for j in 1:size(b, 2)
-                bmono = view(b, (k + 1):N, j)
-                @inbounds for idx in 1:nmon
-                    bmono[idx] = α(bc_eval) * poly_vals[idx] + β(bc_eval) * deriv_vals[idx]
-                end
-            end
-        end
-        return nothing
-    end
-
-    # Case 3: Interior point - apply differential operators to all basis functions
-    for (j, ℒ) in enumerate(ℒrbf)
+    is_dirichlet(bc_eval) && error("Dirichlet boundary should not be handled here.")
+    # Apply boundary operator to each basis function for all operators
+    for (j, _) in enumerate(ℒrbf)
         @inbounds for i in 1:k
-            b[i, j] = ℒ(eval_point, data.data[i])
+            xi = data.data[i]
+            φ = basis(eval_point, xi)
+            ∇φ = ∇(basis)(eval_point, xi)
+            b[i, j] = α(bc_eval) * φ + β(bc_eval) * dot(n_eval, ∇φ)
         end
     end
 
-    # Monomial augmentation with differential operators
+    # Monomial augmentation with boundary operator
     if basis.poly_deg > -1
         N = size(b, 1)
-        for (j, ℒ_op) in enumerate(ℒmon)
+        for j in 1:size(b, 2)
             bmono = view(b, (k + 1):N, j)
-            ℒ_op(bmono, eval_point)
+            _fill_boundary_monomial_rhs!(bmono, mon, eval_point, bc_eval, n_eval)
         end
     end
 
@@ -212,8 +149,10 @@ function _build_rhs!(
 end
 
 """
-Build complete Hermite stencil with boundary conditions.
-This is the Hermite variant of _build_stencil! from solve.jl.
+Hermite stencil builder - extracts data and delegates to standard implementation.
+
+This thin wrapper extracts `data.data` from HermiteStencilData and calls the standard
+_build_stencil! from solve.jl. The Hermite-specific logic is in _build_rhs! via dispatch.
 """
 function _build_stencil!(
     A::Symmetric,
@@ -226,26 +165,16 @@ function _build_stencil!(
     mon::MonomialBasis,
     k::Int,
 ) where {TD,TE,B<:AbstractRadialBasis}
-    _build_collocation_matrix!(A, data, basis, mon, k, eval_point)
+    _build_collocation_matrix!(A, data.data, basis, mon, k)
     _build_rhs!(b, ℒrbf, ℒmon, data, eval_point, basis, mon, k)
-
     return (A \ b)[1:k, :]
 end
 
-# Note: The SubArray method has been removed to delegate to solve.jl
-# When local_data is a SubArray{<:AbstractVector}, it will automatically
-# dispatch to the _build_stencil! method in solve.jl since SubArray <: AbstractVector
-
-# _build_rhs_standard! function removed - now using the one from solve.jl
-
 """
-Build weights for Hermite interpolation with sparse matrix construction.
-This function follows the solve_hermite.jl philosophy by extending the core
-_build_weights function to handle boundary conditions on both stencil points
-AND evaluation points.
+Core Hermite weight builder with explicit operators.
 
-This is the Hermite variant of _build_weights from solve.jl, optimized for
-sparse matrix construction with proper boundary condition handling.
+This is the low-level function that calls _build_weights_unified with OptimizedAllocation.
+Use this when you already have ℒrbf and ℒmon computed.
 """
 function _build_weights(
     data::Vector{<:AbstractVector},
@@ -261,8 +190,6 @@ function _build_weights(
     batch_size::Int=10,
     device=CPU(),
 )
-    # Use the unified kernel infrastructure with optimized allocation strategy
-    boundary_data = (is_boundary, boundary_conditions, normals)
     return _build_weights_unified(
         OptimizedAllocation(),
         data,
@@ -272,16 +199,17 @@ function _build_weights(
         ℒrbf,
         ℒmon,
         mon,
-        boundary_data;
+        (is_boundary, boundary_conditions, normals);
         batch_size=batch_size,
         device=device,
     )
 end
 
 """
-Generic Hermite dispatcher for operators.
-This eliminates repetitive _build_weights methods across operator files.
-All operators that can call ℒ(basis) and ℒ(mon) can use this dispatcher.
+High-level Hermite dispatcher for operators with boundary conditions.
+
+This is the public interface that matches the standard operator call pattern.
+It computes ℒrbf and ℒmon from the operator and delegates to the core implementation.
 """
 function _build_weights(
     ℒ::AbstractOperator,
@@ -293,18 +221,15 @@ function _build_weights(
     boundary_conditions::Vector{<:BoundaryCondition},
     normals::Vector{<:AbstractVector},
 )
-    dim = length(first(data))
-    mon = MonomialBasis(dim, basis.poly_deg)
-    ℒmon = ℒ(mon)
-    ℒrbf = ℒ(basis)
+    mon = MonomialBasis(length(first(data)), basis.poly_deg)
 
     return _build_weights(
         data,
         eval_points,
         adjl,
         basis,
-        ℒrbf,
-        ℒmon,
+        ℒ(basis),
+        ℒ(mon),
         mon,
         is_boundary,
         boundary_conditions,

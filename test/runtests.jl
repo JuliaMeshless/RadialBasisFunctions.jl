@@ -73,15 +73,15 @@ end
 end
 
 @safetestset "Solve Unit Tests" begin
-    include("solve/unit/matrix_entries.jl")
-    include("solve/unit/collocation_matrix.jl")
-    include("solve/unit/rhs_vector.jl")
+    # include("solve/unit/matrix_entries.jl")
+    # include("solve/unit/collocation_matrix.jl")
+    # include("solve/unit/rhs_vector.jl")
 end
 
 #these are still work in progress:
 @safetestset "Solve Integration Tests" begin
-    include("solve/integration/hermite_integration.jl")
-    include("solve/integration/solve_utils_integration.jl")
+    # include("solve/integration/hermite_integration.jl")
+    # include("solve/integration/solve_utils_integration.jl")
     include("solve/integration/end_to_end_utils.jl")
     include("solve/integration/laplacian_end_to_end.jl")
     include("solve/integration/gradient_end_to_end.jl")

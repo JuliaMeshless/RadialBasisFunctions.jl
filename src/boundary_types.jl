@@ -146,19 +146,28 @@ struct InternalStencil <: StencilType end
 struct DirichletStencil <: StencilType end
 struct HermiteStencil <: StencilType end
 
+"""
+Determine stencil type based on evaluation point properties.
+
+NOTE: Classification is based ONLY on the evaluation point, not the stencil neighbors.
+This simplifies dispatch:
+- InternalStencil: eval_point is interior (use standard RBF)
+- DirichletStencil: eval_point has Dirichlet BC (identity row)
+- HermiteStencil: eval_point has Neumann/Robin BC (apply boundary operator)
+
+Interior points with boundary neighbors are handled by InternalStencil with standard solve.jl.
+"""
 function stencil_type(
     is_boundary::Vector{Bool},
     boundary_conditions::Vector{BoundaryCondition{T}},
     eval_idx::Int,
-    neighbors::Vector{Int},
+    # neighbors::Vector{Int},
     global_to_boundary::Vector{Int},
-) where {T}
-    if sum(is_boundary[neighbors]) == 0
-        return InternalStencil()
-    elseif is_boundary[eval_idx] &&
-        is_dirichlet(boundary_conditions[global_to_boundary[eval_idx]])
-        return DirichletStencil()
-    else
-        return HermiteStencil()
-    end
+)::StencilType where {T}
+    !is_boundary[eval_idx] && return InternalStencil()
+
+    boundary_idx = global_to_boundary[eval_idx]
+    is_dirichlet(boundary_conditions[boundary_idx]) && return DirichletStencil()
+
+    return HermiteStencil()  # Neumann or Robin
 end

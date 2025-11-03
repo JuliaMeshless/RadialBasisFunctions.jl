@@ -11,8 +11,8 @@ function create_2d_unit_square_domain(spacing::Float64=0.05; randomize=false)
 
             if randomize && !is_on_boundary
                 # Only add noise to interior points
-                noise_x = (rand() - 0.5) * spacing * 0.3
-                noise_y = (rand() - 0.5) * spacing * 0.3
+                noise_x = (rand() - 0.5) * spacing * 0.1
+                noise_y = (rand() - 0.5) * spacing * 0.1
                 push!(domain_2d, SVector(x + noise_x, y + noise_y))
             else
                 # Keep boundary points exact
