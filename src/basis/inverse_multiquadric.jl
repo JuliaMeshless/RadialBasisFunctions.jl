@@ -48,10 +48,7 @@ function ∇²(rbf::IMQ)
 end
 
 function Base.show(io::IO, rbf::IMQ)
-    print(io, "Inverse Multiquadrics, 1/sqrt((r*ε)²+1)")
-    print(io, "\n├─Shape factor: ε = $(rbf.ε)")
-    print(io, "\n└─Polynomial augmentation: degree $(rbf.poly_deg)")
-    return nothing
+    return show_shape_basis(io, rbf, "Inverse Multiquadrics, 1/sqrt((r*ε)²+1)")
 end
 
 print_basis(rbf::IMQ) = "Inverse Multiquadric (ε = $(rbf.ε))"

@@ -43,10 +43,7 @@ function ∇²(rbf::Gaussian)
 end
 
 function Base.show(io::IO, rbf::Gaussian)
-    print(io, "Gaussian, exp(-(ε*r)²)")
-    print(io, "\n├─Shape factor: ε = $(rbf.ε)")
-    print(io, "\n└─Polynomial augmentation: degree $(rbf.poly_deg)")
-    return nothing
+    return show_shape_basis(io, rbf, "Gaussian, exp(-(ε*r)²)")
 end
 
 print_basis(rbf::Gaussian) = "Gaussian (ε = $(rbf.ε))"

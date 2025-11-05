@@ -75,8 +75,8 @@ function directional(
     )
 end
 
-function _build_weights(ℒ::Directional{Dim}, data, eval_points, adjl, basis) where {Dim}
-    v = ℒ.v
+# Helper function to validate directional vector dimensions
+function _validate_directional_vector(v, Dim, data)
     if !(length(v) == Dim || length(v) == length(data))
         throw(
             DomainError(
@@ -84,8 +84,10 @@ function _build_weights(ℒ::Directional{Dim}, data, eval_points, adjl, basis) w
             ),
         )
     end
-    weights = _build_weights(Gradient{Dim}(), data, eval_points, adjl, basis)
+end
 
+# Helper function to reduce gradient weights to directional weights
+function _reduce_gradient_to_directional(weights, v, Dim, data)
     if length(v) == Dim
         return mapreduce(+, zip(weights, v)) do zipped
             w, vᵢ = zipped
@@ -98,6 +100,13 @@ function _build_weights(ℒ::Directional{Dim}, data, eval_points, adjl, basis) w
             Diagonal(vᵢ) * w
         end
     end
+end
+
+function _build_weights(ℒ::Directional{Dim}, data, eval_points, adjl, basis) where {Dim}
+    v = ℒ.v
+    _validate_directional_vector(v, Dim, data)
+    weights = _build_weights(Gradient{Dim}(), data, eval_points, adjl, basis)
+    return _reduce_gradient_to_directional(weights, v, Dim, data)
 end
 
 """
@@ -116,13 +125,7 @@ function _build_weights(
     normals::Vector{<:AbstractVector},
 ) where {Dim}
     v = ℒ.v
-    if !(length(v) == Dim || length(v) == length(data))
-        throw(
-            DomainError(
-                "The geometrical vector for Directional() should match either the dimension of the input or the number of input points. The geometrical vector length is $(length(v)) while there are $(length(data)) points with a dimension of $Dim",
-            ),
-        )
-    end
+    _validate_directional_vector(v, Dim, data)
 
     # Build gradient weights using Hermite method
     dim = length(first(data))
@@ -144,18 +147,7 @@ function _build_weights(
         normals,
     )
 
-    if length(v) == Dim
-        return mapreduce(+, zip(weights, v)) do zipped
-            w, vᵢ = zipped
-            w * vᵢ
-        end
-    else
-        vv = ntuple(i -> getindex.(v, i), Dim)
-        return mapreduce(+, zip(weights, vv)) do zipped
-            w, vᵢ = zipped
-            Diagonal(vᵢ) * w
-        end
-    end
+    return _reduce_gradient_to_directional(weights, v, Dim, data)
 end
 
 # pretty printing

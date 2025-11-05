@@ -1,7 +1,5 @@
 function find_neighbors(data::AbstractVector, k::Int)
-    tree = KDTree(data)
-    adjl, _ = knn(tree, data, k, true)
-    return adjl
+    return find_neighbors(data, data, k)
 end
 
 function find_neighbors(data::AbstractVector, eval_points::AbstractVector, k::Int)
