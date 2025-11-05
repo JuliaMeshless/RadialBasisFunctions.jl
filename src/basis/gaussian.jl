@@ -20,12 +20,14 @@ function ∂(rbf::Gaussian, dim::Int)
     function ∂ℒ(x, xᵢ)
         return -2 * rbf.ε^2 * (x[dim] - xᵢ[dim]) * exp(-rbf.ε^2 * sqeuclidean(x, xᵢ))
     end
+    return ∂ℒ
 end
 
 function ∇(rbf::Gaussian)
     function ∇ℒ(x, xᵢ)
         return -2 * rbf.ε^2 * (x .- xᵢ) * exp(-rbf.ε^2 * sqeuclidean(x, xᵢ))
     end
+    return ∇ℒ
 end
 
 function ∂²(rbf::Gaussian, dim::Int)
@@ -33,6 +35,7 @@ function ∂²(rbf::Gaussian, dim::Int)
         ε2 = rbf.ε^2
         return (4 * ε2^2 * (x[dim] - xᵢ[dim])^2 - 2 * ε2) * exp(-ε2 * sqeuclidean(x, xᵢ))
     end
+    return ∂²ℒ
 end
 
 function ∇²(rbf::Gaussian)
@@ -40,6 +43,7 @@ function ∇²(rbf::Gaussian)
         ε2 = rbf.ε^2
         return sum((4 * ε2^2 * (x .- xᵢ) .^ 2 .- 2 * ε2) * exp(-ε2 * sqeuclidean(x, xᵢ)))
     end
+    return ∇²ℒ
 end
 
 function Base.show(io::IO, rbf::Gaussian)

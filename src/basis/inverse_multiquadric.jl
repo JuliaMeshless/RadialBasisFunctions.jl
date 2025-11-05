@@ -18,6 +18,7 @@ function ∂(rbf::IMQ, dim::Int=1)
         ε2 = rbf.ε .^ 2
         return (xᵢ[dim] - x[dim]) .* (ε2 / sqrt((ε2 * sqeuclidean(x, xᵢ) + 1)^3))
     end
+    return ∂ℒ
 end
 
 function ∇(rbf::IMQ)
@@ -25,6 +26,7 @@ function ∇(rbf::IMQ)
         ε2 = rbf.ε .^ 2
         return (xᵢ - x) .* (ε2 / sqrt((ε2 * sqeuclidean(x, xᵢ) + 1)^3))
     end
+    return ∇ℒ
 end
 
 function ∂²(rbf::IMQ, dim::Int=1)
@@ -35,6 +37,7 @@ function ∂²(rbf::IMQ, dim::Int=1)
         denom = (ε2 * sqeuclidean(x, xᵢ) + 1)
         return num1 / sqrt(denom^5) - ε2 / sqrt(denom^3)
     end
+    return ∂²ℒ
 end
 
 function ∇²(rbf::IMQ)
@@ -45,6 +48,7 @@ function ∇²(rbf::IMQ)
         denom = (ε2 * sqeuclidean(x, xᵢ) + 1)
         return sum(num1 / sqrt(denom^5) .- ε2 / sqrt(denom^3))
     end
+    return ∇²ℒ
 end
 
 function Base.show(io::IO, rbf::IMQ)
