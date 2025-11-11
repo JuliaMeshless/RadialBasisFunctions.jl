@@ -313,7 +313,7 @@ function launch_kernel!(
         ndrange=n_batches,
         workgroupsize=1,
     )
-    KernelAbstractions.synchronize(device)
+    return KernelAbstractions.synchronize(device)
 end
 
 # ============================================================================
