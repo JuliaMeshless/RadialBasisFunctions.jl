@@ -52,13 +52,13 @@ end
 @testset "Printing" begin
     ∂ = partial(x, 1, 1)
     @test repr(∂) == """
-    RadialBasisOperator
-    ├─Operator: ∂ⁿf/∂xᵢ (n = 1, i = 1)
-    ├─Data type: StaticArraysCore.SVector{2, Float64}
-    ├─Number of points: 100
-    ├─Stencil size: 12
-    └─Basis: Polyharmonic spline (r³) with degree 2 polynomial augmentation
-    """
+RadialBasisOperator
+├─Operator: ∂ⁿf/∂xᵢ (n = 1, i = 1)
+├─Data type: StaticArraysCore.SVector{2, Float64}
+├─Number of points: 100
+├─Stencil size: 12
+└─Basis: Polyharmonic spline (r³) with degree 2 polynomial augmentation
+"""
 
     @test RBF.print_op(∂.ℒ) == "∂ⁿf/∂xᵢ (n = 1, i = 1)"
 end

@@ -28,12 +28,7 @@ Allocate sparse matrix arrays for COO format sparse matrix construction.
 Exactly counts non-zeros: interior points get k entries, Dirichlet points get 1 entry.
 """
 function allocate_sparse_arrays(
-    TD,
-    k::Int,
-    N_eval::Int,
-    num_ops::Int,
-    adjl,
-    boundary_data::BoundaryData,
+    TD, k::Int, N_eval::Int, num_ops::Int, adjl, boundary_data::BoundaryData
 )
     # Count exact non-zeros needed
     total_nnz, row_offsets = count_nonzeros(
@@ -147,12 +142,24 @@ function build_weights_kernel(
 
     # Launch kernel
     launch_kernel!(
-        I, J, V,
-        data, eval_points, adjl,
-        basis, ℒrbf, ℒmon, mon,
-        boundary_data, row_offsets,
-        batch_size, N_eval, n_batches,
-        k, nmon, num_ops,
+        I,
+        J,
+        V,
+        data,
+        eval_points,
+        adjl,
+        basis,
+        ℒrbf,
+        ℒmon,
+        mon,
+        boundary_data,
+        row_offsets,
+        batch_size,
+        N_eval,
+        n_batches,
+        k,
+        nmon,
+        num_ops,
         device,
     )
 
@@ -178,12 +185,24 @@ Launch parallel kernel for weight computation.
 Handles Dirichlet/Interior/Hermite stencil classification via dispatch.
 """
 function launch_kernel!(
-    I, J, V,
-    data, eval_points, adjl,
-    basis, ℒrbf, ℒmon, mon,
-    boundary_data::BoundaryData, row_offsets,
-    batch_size, N_eval, n_batches,
-    k, nmon, num_ops,
+    I,
+    J,
+    V,
+    data,
+    eval_points,
+    adjl,
+    basis,
+    ℒrbf,
+    ℒmon,
+    mon,
+    boundary_data::BoundaryData,
+    row_offsets,
+    batch_size,
+    N_eval,
+    n_batches,
+    k,
+    nmon,
+    num_ops,
     device,
 )
     TD = eltype(first(data))
@@ -194,12 +213,28 @@ function launch_kernel!(
     global_to_boundary = construct_global_to_boundary(boundary_data.is_boundary)
 
     @kernel function weight_kernel(
-        I, J, V,
-        data, eval_points, adjl,
-        basis, ℒrbf, ℒmon, mon,
-        is_boundary, boundary_conditions, normals,
-        batch_hermite_datas, global_to_boundary, row_offsets,
-        batch_size, N_eval, nmon, k, num_ops, TD,
+        I,
+        J,
+        V,
+        data,
+        eval_points,
+        adjl,
+        basis,
+        ℒrbf,
+        ℒmon,
+        mon,
+        is_boundary,
+        boundary_conditions,
+        normals,
+        batch_hermite_datas,
+        global_to_boundary,
+        row_offsets,
+        batch_size,
+        N_eval,
+        nmon,
+        k,
+        num_ops,
+        TD,
     )
         batch_idx = @index(Global)
         hermite_data = batch_hermite_datas[batch_idx]
@@ -217,8 +252,7 @@ function launch_kernel!(
 
             # Classify stencil type
             stype = classify_stencil(
-                is_boundary, boundary_conditions,
-                eval_idx, neighbors, global_to_boundary
+                is_boundary, boundary_conditions, eval_idx, neighbors, global_to_boundary
             )
 
             if stype isa DirichletStencil
@@ -234,9 +268,13 @@ function launch_kernel!(
             else  # HermiteStencil
                 # Mixed interior/boundary stencil
                 update_hermite_stencil_data!(
-                    hermite_data, data, neighbors,
-                    is_boundary, boundary_conditions, normals,
-                    global_to_boundary
+                    hermite_data,
+                    data,
+                    neighbors,
+                    is_boundary,
+                    boundary_conditions,
+                    normals,
+                    global_to_boundary,
                 )
                 weights = _build_stencil!(
                     A, b, ℒrbf, ℒmon, hermite_data, eval_point, basis, mon, k
@@ -244,23 +282,34 @@ function launch_kernel!(
             end
 
             # Store weights in sparse arrays
-            fill_entries!(
-                I, J, V, weights, eval_idx, neighbors,
-                start_pos, k, num_ops
-            )
+            fill_entries!(I, J, V, weights, eval_idx, neighbors, start_pos, k, num_ops)
         end
     end
 
     kernel! = weight_kernel(device)
     kernel!(
-        I, J, V,
-        data, eval_points, adjl,
-        basis, ℒrbf, ℒmon, mon,
+        I,
+        J,
+        V,
+        data,
+        eval_points,
+        adjl,
+        basis,
+        ℒrbf,
+        ℒmon,
+        mon,
         boundary_data.is_boundary,
         boundary_data.boundary_conditions,
         boundary_data.normals,
-        batch_hermite_datas, global_to_boundary, row_offsets,
-        batch_size, N_eval, nmon, k, num_ops, TD;
+        batch_hermite_datas,
+        global_to_boundary,
+        row_offsets,
+        batch_size,
+        N_eval,
+        nmon,
+        k,
+        num_ops,
+        TD;
         ndrange=n_batches,
         workgroupsize=1,
     )
@@ -297,9 +346,7 @@ end
 end
 
 """Fill Dirichlet identity row for optimized allocation"""
-@inline function fill_dirichlet_entry!(
-    I, J, V, eval_idx::Int, start_pos::Int, num_ops::Int
-)
+@inline function fill_dirichlet_entry!(I, J, V, eval_idx::Int, start_pos::Int, num_ops::Int)
     I[start_pos] = eval_idx
     J[start_pos] = eval_idx
     @inbounds for op in 1:num_ops

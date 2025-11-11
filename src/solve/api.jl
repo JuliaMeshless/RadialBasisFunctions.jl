@@ -60,8 +60,7 @@ Build weights for interior-only problems (no boundary conditions).
 Creates empty BoundaryData to indicate all interior points.
 """
 function _build_weights(
-    data, eval_points, adjl, basis, ℒrbf, ℒmon, mon;
-    batch_size::Int=10, device=CPU()
+    data, eval_points, adjl, basis, ℒrbf, ℒmon, mon; batch_size::Int=10, device=CPU()
 )
     # Create empty boundary data for interior-only case
     TD = eltype(first(data))
@@ -71,8 +70,13 @@ function _build_weights(
     boundary_data = BoundaryData(is_boundary, boundary_conditions, normals)
 
     return build_weights_kernel(
-        data, eval_points, adjl,
-        basis, ℒrbf, ℒmon, mon,
+        data,
+        eval_points,
+        adjl,
+        basis,
+        ℒrbf,
+        ℒmon,
+        mon,
         boundary_data;
         batch_size=batch_size,
         device=device,
@@ -92,16 +96,28 @@ Build weights for problems with boundary conditions using Hermite interpolation.
 Exact allocation: Dirichlet points get single entry, others get full stencil.
 """
 function _build_weights(
-    data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
+    data,
+    eval_points,
+    adjl,
+    basis,
+    ℒrbf,
+    ℒmon,
+    mon,
     is_boundary::Vector{Bool},
     boundary_conditions::Vector{<:BoundaryCondition},
     normals::Vector{<:AbstractVector};
-    batch_size::Int=10, device=CPU()
+    batch_size::Int=10,
+    device=CPU(),
 )
     boundary_data = BoundaryData(is_boundary, boundary_conditions, normals)
     return build_weights_kernel(
-        data, eval_points, adjl,
-        basis, ℒrbf, ℒmon, mon,
+        data,
+        eval_points,
+        adjl,
+        basis,
+        ℒrbf,
+        ℒmon,
+        mon,
         boundary_data;
         batch_size=batch_size,
         device=device,
@@ -134,7 +150,15 @@ function _build_weights(
     ℒrbf = ℒ(basis)
 
     return _build_weights(
-        data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
-        is_boundary, boundary_conditions, normals
+        data,
+        eval_points,
+        adjl,
+        basis,
+        ℒrbf,
+        ℒmon,
+        mon,
+        is_boundary,
+        boundary_conditions,
+        normals,
     )
 end

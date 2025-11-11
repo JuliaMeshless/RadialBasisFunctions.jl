@@ -50,7 +50,9 @@ import RadialBasisFunctions as RBF
             total_nnz, row_offsets = RBF.count_nonzeros(
                 adjl_simple, is_boundary_none, bcs_none
             )
-            nnz_per_row = [row_offsets[i+1] - row_offsets[i] for i in 1:length(adjl_simple)]
+            nnz_per_row = [
+                row_offsets[i + 1] - row_offsets[i] for i in 1:length(adjl_simple)
+            ]
 
             @test length(nnz_per_row) == length(adjl_simple)
             @test length(row_offsets) == length(adjl_simple) + 1
@@ -64,7 +66,10 @@ import RadialBasisFunctions as RBF
             total_nnz_mixed, row_offsets_mixed = RBF.count_nonzeros(
                 adjl_simple, is_boundary_mixed, bcs_mixed
             )
-            nnz_per_row_mixed = [row_offsets_mixed[i+1] - row_offsets_mixed[i] for i in 1:length(adjl_simple)]
+            nnz_per_row_mixed = [
+                row_offsets_mixed[i + 1] - row_offsets_mixed[i] for
+                i in 1:length(adjl_simple)
+            ]
 
             @test length(nnz_per_row_mixed) == length(adjl_simple)
             @test total_nnz_mixed == sum(nnz_per_row_mixed)

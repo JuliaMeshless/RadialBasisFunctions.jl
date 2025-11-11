@@ -49,10 +49,10 @@ is_robin(bc::BoundaryCondition) = !iszero(bc.α) && !iszero(bc.β)
 is_internal(bc::BoundaryCondition) = iszero(bc.α) && iszero(bc.β)
 
 # Constructors
-Dirichlet(::Type{T}=Float64) where {T<:Real} = BoundaryCondition(one(T), zero(T))
-Neumann(::Type{T}=Float64) where {T<:Real} = BoundaryCondition(zero(T), one(T))
+Dirichlet((::Type{T})=Float64) where {T<:Real} = BoundaryCondition(one(T), zero(T))
+Neumann((::Type{T})=Float64) where {T<:Real} = BoundaryCondition(zero(T), one(T))
 Robin(α::Real, β::Real) = BoundaryCondition(α, β)
-Internal(::Type{T}=Float64) where {T<:Real} = BoundaryCondition(zero(T), zero(T))
+Internal((::Type{T})=Float64) where {T<:Real} = BoundaryCondition(zero(T), zero(T))
 
 # ============================================================================
 # Hermite Stencil Data
@@ -228,7 +228,11 @@ struct NeumannRobinPoint <: BoundaryPointType end
 
 """Determine boundary type of a single point"""
 @inline function point_type(is_bound::Bool, bc::BoundaryCondition)
-    return is_bound ? (is_dirichlet(bc) ? DirichletPoint() : NeumannRobinPoint()) : InteriorPoint()
+    return if is_bound
+        (is_dirichlet(bc) ? DirichletPoint() : NeumannRobinPoint())
+    else
+        InteriorPoint()
+    end
 end
 
 # ============================================================================
