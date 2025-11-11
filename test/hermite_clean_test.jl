@@ -10,8 +10,6 @@ using Test
 import RadialBasisFunctions as RBF
 
 @testset "Clean Hermite Implementation - Single Stencil" begin
-    println("Testing clean Hermite implementation with multiple dispatch...")
-
     # Create a simple 1D problem with 3 points: 2 interior + 1 Neumann boundary
     data = [[0.0], [0.5], [1.0]]  # points along line as Vector{Vector{Float64}}
     eval_point = SVector(0.5)  # evaluate at middle point
@@ -20,107 +18,90 @@ import RadialBasisFunctions as RBF
     basis = RBF.PHS(3; poly_deg=1)  # PHS3 with linear polynomial
     mon = RBF.MonomialBasis(1, 1)  # 1D linear monomial basis
 
-    # Test 1: Standard stencil (no boundary points)
-    println("  Test 1: Standard stencil (no boundary points)")
+    @testset "Standard stencil (no boundary points)" begin
 
-    # Create system matrices
-    k = 3
-    nmon = 2  # 1D linear: [1, x]
-    n = k + nmon
-    A_std = Symmetric(zeros(Float64, n, n), :U)
-    b_std = zeros(Float64, n, 1)
+        # Create system matrices
+        k = 3
+        nmon = 2  # 1D linear: [1, x]
+        n = k + nmon
+        A_std = Symmetric(zeros(Float64, n, n), :U)
+        b_std = zeros(Float64, n, 1)
 
-    # Create simple identity operators for testing  
-    identity_rbf = RBF.Custom(basis -> (x1, x2) -> basis(x1, x2))
-    identity_mon = RBF.Custom(mon -> (arr, x) -> mon(arr, x))
-    ℒrbf = identity_rbf(basis)  # Get the actual operator function
-    ℒmon = identity_mon(mon)    # Get the actual operator function
+        # Create simple identity operators for testing
+        identity_rbf = RBF.Custom(basis -> (x1, x2) -> basis(x1, x2))
+        identity_mon = RBF.Custom(mon -> (arr, x) -> mon(arr, x))
+        ℒrbf = identity_rbf(basis)  # Get the actual operator function
+        ℒmon = identity_mon(mon)    # Get the actual operator function
 
-    # Test standard path - use plain data array
-    weights_std = RBF._build_stencil!(
-        A_std, b_std, ℒrbf, ℒmon, data, eval_point, basis, mon, k
-    )
+        # Test standard path - use plain data array
+        weights_std = RBF._build_stencil!(
+            A_std, b_std, ℒrbf, ℒmon, data, eval_point, basis, mon, k
+        )
 
-    @test size(weights_std) == (k, 1)
-    @test all(isfinite.(weights_std))
-    println("    ✓ Standard stencil completed")
+        @test size(weights_std) == (k, 1)
+        @test all(isfinite.(weights_std))
+    end
 
-    # Test 2: Hermite stencil with Neumann boundary condition
-    println("  Test 2: Hermite stencil with Neumann boundary condition")
+    @testset "Hermite stencil with Neumann boundary condition" begin
+        k = 3
+        nmon = 2
+        n = k + nmon
 
-    # Set up boundary info: point 3 (index 3) is Neumann boundary
-    is_boundary = [false, false, true]
-    boundary_conditions = [
-        RBF.Internal(),     # Interior point 1 (sentinel value, not used)
-        RBF.Internal(),     # Interior point 2 (sentinel value, not used)
-        RBF.Neumann(),      # Neumann condition for boundary point 3
-    ]
-    normals = [
-        [0.0],   # Interior point 1 (not used)
-        [0.0],   # Interior point 2 (not used)
-        [1.0],    # Outward normal for boundary point 3 (rightward)
-    ]
+        # Set up boundary info: point 3 (index 3) is Neumann boundary
+        is_boundary = [false, false, true]
+        boundary_conditions = [
+            RBF.Internal(),     # Interior point 1 (sentinel value, not used)
+            RBF.Internal(),     # Interior point 2 (sentinel value, not used)
+            RBF.Neumann(),      # Neumann condition for boundary point 3
+        ]
+        normals = [
+            [0.0],   # Interior point 1 (not used)
+            [0.0],   # Interior point 2 (not used)
+            [1.0],    # Outward normal for boundary point 3 (rightward)
+        ]
 
-    # Create HermiteStencilData
-    hermite_data = RBF.HermiteStencilData(data, is_boundary, boundary_conditions, normals)
+        # Create HermiteStencilData
+        hermite_data = RBF.HermiteStencilData(data, is_boundary, boundary_conditions, normals)
 
-    # Create fresh matrices for Hermite test
-    A_herm = Symmetric(zeros(Float64, n, n), :U)
-    b_herm = zeros(Float64, n, 1)
-
-    # Test Hermite path - this should dispatch to Hermite functions
-    try
-        # For now, let's test that we can at least call the hermite functions
-        # and that the basic setup works
-
-        # Test 1: Can we create the collocation matrix?
+        # Test collocation matrix
         A_test = Symmetric(zeros(Float64, n, n), :U)
-        try
-            RBF._build_collocation_matrix!(A_test, hermite_data, basis, mon, k)
-            println("    ✓ Hermite collocation matrix building works")
-        catch e
-            println("    ✗ Hermite collocation matrix failed: $e")
-            @test false
-        end
+        RBF._build_collocation_matrix!(A_test, hermite_data, basis, mon, k)
 
-        # Test 2: Can we create the RHS vector? (This might be where the issue is)
-        # Note: There's currently an issue with gradient computations in Hermite RHS
-        # For now, we'll test the structure and skip the actual RHS computation
-        println("    ⚠ Hermite RHS computation skipped due to gradient computation issue")
+        # Note: RHS computation skipped due to gradient computation issue
 
-        println("    ✓ Basic Hermite functions work correctly")
-
-        # For now, just verify that the data structure is working
+        # Verify data structure
         @test isa(hermite_data, RBF.HermiteStencilData)
         @test length(hermite_data.data) == k
         @test hermite_data.is_boundary[3] == true  # Last point is boundary
         @test RBF.is_neumann(hermite_data.boundary_conditions[3])  # Neumann condition
-
-    catch e
-        println("    ✗ Hermite test failed with error: $e")
-        @test false
     end
 
-    # Test 3: Basic functionality test
-    println("  Test 3: Basic functionality test")
+    @testset "Basic functionality test" begin
 
-    # Test that we can create boundary conditions
-    bc_dirichlet = RBF.Dirichlet()
-    bc_neumann = RBF.Neumann()
-    bc_robin = RBF.Robin(1.0, 2.0)
+        # Reuse hermite_data from previous testset
+        is_boundary = [false, false, true]
+        boundary_conditions = [
+            RBF.Internal(),
+            RBF.Internal(),
+            RBF.Neumann(),
+        ]
+        normals = [[0.0], [0.0], [1.0]]
+        hermite_data = RBF.HermiteStencilData(data, is_boundary, boundary_conditions, normals)
 
-    @test RBF.is_dirichlet(bc_dirichlet)
-    @test RBF.is_neumann(bc_neumann)
-    @test RBF.is_robin(bc_robin)
+        # Test that we can create boundary conditions
+        bc_dirichlet = RBF.Dirichlet()
+        bc_neumann = RBF.Neumann()
+        bc_robin = RBF.Robin(1.0, 2.0)
 
-    # Test that we can create HermiteStencilData
-    @test isa(hermite_data, RBF.HermiteStencilData)
-    @test length(hermite_data.data) == 3
-    @test length(hermite_data.is_boundary) == 3
-    @test length(hermite_data.boundary_conditions) == 3
-    @test length(hermite_data.normals) == 3
+        @test RBF.is_dirichlet(bc_dirichlet)
+        @test RBF.is_neumann(bc_neumann)
+        @test RBF.is_robin(bc_robin)
 
-    println("    ✓ Basic functionality works correctly")
-
-    println("✓ All clean Hermite implementation tests passed!")
+        # Test that we can create HermiteStencilData
+        @test isa(hermite_data, RBF.HermiteStencilData)
+        @test length(hermite_data.data) == 3
+        @test length(hermite_data.is_boundary) == 3
+        @test length(hermite_data.boundary_conditions) == 3
+        @test length(hermite_data.normals) == 3
+    end
 end

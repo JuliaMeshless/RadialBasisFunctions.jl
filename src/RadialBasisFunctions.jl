@@ -22,23 +22,22 @@ export degree, dim
 include("utils.jl")
 export find_neighbors, reorder_points!
 
-# Boundary types needed by solve.jl and solve_utils.jl
-include("boundary_types.jl")
+# New three-layer solve system
+include("solve/types.jl")
+export BoundaryCondition, Dirichlet, Neumann, Robin, Internal
+export α, β, is_dirichlet, is_neumann, is_robin, is_internal
+export HermiteStencilData, update_hermite_stencil_data!, update_stencil_data!  # update_stencil_data! is backward compat alias
+export InteriorStencil, DirichletStencil, HermiteStencil
+export InternalStencil  # Backward compat alias for InteriorStencil
+export classify_stencil, stencil_type  # stencil_type is backward compat alias
+
+include("solve/stencil_math.jl")
+include("solve/kernel_exec.jl")
+include("solve/api.jl")
 
 include("operators/operators.jl")
 export RadialBasisOperator, ScalarValuedOperator, VectorValuedOperator
 export update_weights!, is_cache_valid
-
-include("solve_utils.jl")
-
-include("solve.jl")
-
-# New clean Hermite implementation
-include("solve_hermite.jl")
-export BoundaryCondition, Dirichlet, Neumann, Robin, Internal
-export α, β, is_dirichlet, is_neumann, is_robin, is_internal
-export HermiteBoundaryInfo, StencilType, InternalStencil, HermiteStencil
-export stencil_type, has_boundary_points
 
 include("operators/custom.jl")
 export Custom, custom

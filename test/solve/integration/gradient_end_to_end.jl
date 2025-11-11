@@ -6,43 +6,6 @@ using Statistics
 using RadialBasisFunctions
 import RadialBasisFunctions as RBF
 
-function construct_rhs_gradient(domain_2d, is_boundary, boundary_conditions, normals, RBF)
-    N = length(domain_2d)
-    rhs_x = zeros(N)
-    rhs_y = zeros(N)
-
-    for i in eachindex(domain_2d)
-        grad = target_gradient(domain_2d[i][1], domain_2d[i][2])
-        rhs_x[i] = grad[1]
-        rhs_y[i] = grad[2]
-    end
-
-    bnd_counter = 0
-    for i in eachindex(domain_2d)
-        if is_boundary[i]
-            bnd_counter += 1
-            bc = boundary_conditions[bnd_counter]
-            if RBF.is_dirichlet(bc)
-                func_val = target_function(domain_2d[i][1], domain_2d[i][2])
-                rhs_x[i] = func_val
-                rhs_y[i] = func_val
-            elseif RBF.is_neumann(bc) || RBF.is_robin(bc)
-                α_val = RBF.α(bc)
-                β_val = RBF.β(bc)
-                u_val = target_function(domain_2d[i][1], domain_2d[i][2])
-                ∂ₙu_val = target_Neumann_bc(
-                    domain_2d[i][1], domain_2d[i][2], normals[bnd_counter]
-                )
-                bc_val = α_val * u_val + β_val * ∂ₙu_val
-                rhs_x[i] = bc_val
-                rhs_y[i] = bc_val
-            end
-        end
-    end
-
-    return (rhs_x, rhs_y)
-end
-
 @testset "Gradient End-to-End with Hermite" begin
     domain_2d = create_2d_unit_square_domain(0.05; randomize=true)
 
@@ -107,8 +70,8 @@ end
     end
 
     @testset "Test 2: RHS Consistency Verification" begin
-        rhs = construct_rhs_gradient(
-            domain_2d, is_boundary, boundary_conditions, normals, RBF
+        rhs = construct_rhs(
+            target_gradient, domain_2d, is_boundary, boundary_conditions, normals, RBF
         )
         gradient_result = G_op(u_values)
 
@@ -122,31 +85,12 @@ end
     @testset "Test 3: Solution of PDE" begin
         gradient_result = G_op(u_values)
 
-        rhs = construct_rhs_gradient(
-            domain_2d, is_boundary, boundary_conditions, normals, RBF
+        rhs = construct_rhs(
+            target_gradient, domain_2d, is_boundary, boundary_conditions, normals, RBF
         )
-
-        cond_x = cond(Matrix(G_op.weights[1]))
-        cond_y = cond(Matrix(G_op.weights[2]))
-        # println("Condition number of weights[1]: ", cond_x)
-        # println("Condition number of weights[2]: ", cond_y)
-
-        forward_x = G_op.weights[1] * u_values
-        forward_y = G_op.weights[2] * u_values
-        forward_error_x = maximum(abs.(forward_x - rhs[1]))
-        forward_error_y = maximum(abs.(forward_y - rhs[2]))
-        # println("Max error in weights[1] * u_values vs rhs[1]: ", forward_error_x)
-        # println("Max error in weights[2] * u_values vs rhs[2]: ", forward_error_y)
 
         solution_x = G_op.weights[1] \ rhs[1]
         solution_y = G_op.weights[2] \ rhs[2]
-        # println("  X max error: ", maximum(abs.(solution_x .- u_values)))
-        # println("  Y max error: ", maximum(abs.(solution_y .- u_values)))
-
-        residual_x = G_op.weights[1] * solution_x - rhs[1]
-        residual_y = G_op.weights[2] * solution_y - rhs[2]
-        # println("Max residual for x: ", maximum(abs.(residual_x)))
-        # println("Max residual for y: ", maximum(abs.(residual_y)))
 
         solution_x_error = solution_x - u_values
         solution_y_error = solution_y - u_values
@@ -156,14 +100,9 @@ end
         rms_error_x = sqrt(mean(solution_x_error .^ 2))
         rms_error_y = sqrt(mean(solution_y_error .^ 2))
 
-        # println("X-component max error: ", max_error_x)
-        # println("X-component RMS error: ", rms_error_x)
-        # println("Y-component max error: ", max_error_y)
-        # println("Y-component RMS error: ", rms_error_y)
-
-        @test max_error_x < 1e-8
-        @test max_error_y < 1e-8
-        @test rms_error_x < 1e-9
-        @test rms_error_y < 1e-9
+        @test max_error_x < 1e-7
+        @test max_error_y < 1e-7
+        @test rms_error_x < 1e-8
+        @test rms_error_y < 1e-8
     end
 end

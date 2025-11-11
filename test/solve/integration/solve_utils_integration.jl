@@ -40,16 +40,19 @@ import RadialBasisFunctions as RBF
 
     @testset "Utility Function Testing" begin
         @testset "Non-zero Counting for Sparse Allocation" begin
-            # Test _count_nonzeros function with various boundary configurations
+            # Test count_nonzeros function with various boundary configurations
 
             # Simple case: no boundaries (all interior)
             adjl_simple = [[1, 2, 3], [2, 3, 4], [3, 4, 5]]
             is_boundary_none = [false, false, false, false, false]
             bcs_none = [RBF.Dirichlet() for _ in 1:0]  # No boundary conditions needed
 
-            total_nnz, nnz_per_row, row_offsets = RBF._count_nonzeros(
+            total_nnz, row_offsets = RBF.count_nonzeros(
                 adjl_simple, is_boundary_none, bcs_none
             )
+            nnz_per_row = [
+                row_offsets[i + 1] - row_offsets[i] for i in 1:length(adjl_simple)
+            ]
 
             @test length(nnz_per_row) == length(adjl_simple)
             @test length(row_offsets) == length(adjl_simple) + 1
@@ -60,9 +63,13 @@ import RadialBasisFunctions as RBF
             is_boundary_mixed = [true, false, true, false, false]
             bcs_mixed = [RBF.Dirichlet(), RBF.Neumann()]  # Only boundary conditions for boundary points
 
-            total_nnz_mixed, nnz_per_row_mixed, row_offsets_mixed = RBF._count_nonzeros(
+            total_nnz_mixed, row_offsets_mixed = RBF.count_nonzeros(
                 adjl_simple, is_boundary_mixed, bcs_mixed
             )
+            nnz_per_row_mixed = [
+                row_offsets_mixed[i + 1] - row_offsets_mixed[i] for
+                i in 1:length(adjl_simple)
+            ]
 
             @test length(nnz_per_row_mixed) == length(adjl_simple)
             @test total_nnz_mixed == sum(nnz_per_row_mixed)
@@ -70,11 +77,11 @@ import RadialBasisFunctions as RBF
         end
 
         @testset "Global to Boundary Index Mapping" begin
-            # Test _construct_global_to_boundary function
+            # Test construct_global_to_boundary function
 
             # Case with some boundary points
             is_boundary = [false, true, false, true, false, true]
-            global_to_boundary = RBF._construct_global_to_boundary(is_boundary)
+            global_to_boundary = RBF.construct_global_to_boundary(is_boundary)
 
             @test length(global_to_boundary) == length(is_boundary)
             @test global_to_boundary[2] == 1  # First boundary point
@@ -86,12 +93,12 @@ import RadialBasisFunctions as RBF
 
             # Case with no boundary points
             is_boundary_none = [false, false, false]
-            global_to_boundary_none = RBF._construct_global_to_boundary(is_boundary_none)
+            global_to_boundary_none = RBF.construct_global_to_boundary(is_boundary_none)
             @test all(global_to_boundary_none .== 0)
 
             # Case with all boundary points
             is_boundary_all = [true, true, true]
-            global_to_boundary_all = RBF._construct_global_to_boundary(is_boundary_all)
+            global_to_boundary_all = RBF.construct_global_to_boundary(is_boundary_all)
             @test global_to_boundary_all == [1, 2, 3]
         end
     end

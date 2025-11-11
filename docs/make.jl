@@ -22,6 +22,7 @@ makedocs(;
         "Home" => "index.md",
         "Getting Started" => "getting_started.md",
         "Theory" => "theory.md",
+        "Internals" => "internals.md",
         "API" => "api.md",
     ],
     clean=false,

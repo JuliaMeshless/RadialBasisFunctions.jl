@@ -4,8 +4,7 @@ using Statistics
 using HaltonSequences
 using LinearAlgebra
 
-rsme(test, correct) = sqrt(sum((test - correct) .^ 2) / sum(correct .^ 2))
-mean_percent_error(test, correct) = mean(abs.((test .- correct) ./ correct)) * 100
+include("../test_utils.jl")
 
 f(x) = 1 + sin(4 * x[1]) + cos(3 * x[1]) + sin(2 * x[2])
 df_dx(x) = 4 * cos(4 * x[1]) - 3 * sin(3 * x[1])
