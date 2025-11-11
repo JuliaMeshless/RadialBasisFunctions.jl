@@ -1,4 +1,4 @@
-# Pseudocode: RBF Weight Building System
+# Internals: RBF Weight Building System
 
 This document explains the code flow in the solve system, which builds sparse weight matrices for RBF operators.
 
@@ -6,7 +6,7 @@ This document explains the code flow in the solve system, which builds sparse we
 
 The solve system is organized into **three distinct layers**:
 
-```
+```text
 src/solve/
 ├── types.jl          # Layer 0: Shared data structures & traits
 ├── stencil_math.jl   # Layer 1: Pure mathematical operations
@@ -17,11 +17,13 @@ src/solve/
 ### Layer Responsibilities
 
 **Layer 0: `types.jl`** - Shared Data Structures
+
 - Boundary condition types (`BoundaryCondition`, `HermiteStencilData`)
 - Stencil classification types (`InteriorStencil`, `DirichletStencil`, `HermiteStencil`)
 - Operator arity traits (`SingleOperator`, `MultiOperator{N}`)
 
 **Layer 1: `stencil_math.jl`** - Pure Mathematics
+
 - Collocation matrix building (`_build_collocation_matrix!`)
 - RHS vector building (`_build_rhs!`)
 - Stencil assembly (`_build_stencil!`)
@@ -29,12 +31,14 @@ src/solve/
 - **No I/O, no parallelism, fully testable**
 
 **Layer 2: `kernel_exec.jl`** - Parallel Execution
+
 - Memory allocation (`allocate_sparse_arrays`)
 - Kernel launching (`launch_kernel!`)
 - Batch processing and synchronization
 - Sparse matrix construction
 
 **Layer 3: `api.jl`** - Entry Points
+
 - Public `_build_weights` functions
 - Routing (standard vs Hermite paths)
 - Operator application to basis functions
@@ -44,11 +48,12 @@ src/solve/
 ## System Flow
 
 The system builds sparse weight matrices using exact allocation:
+
 - Interior points get k entries (full stencil)
 - Dirichlet boundary points get 1 entry (identity row)
 - Other boundary points get k entries (Hermite stencil)
 
-```
+```text
 User Code
     ↓
 api.jl: Route based on boundary conditions
@@ -234,6 +239,7 @@ end
 ```
 
 Stencil classification via dispatch:
+
 - **DirichletStencil**: Identity row (only diagonal)
 - **InteriorStencil**: Standard stencil (all neighbors are interior)
 - **HermiteStencil**: Mixed interior/boundary stencil
@@ -253,12 +259,14 @@ end
 ```
 
 **Key insight**: Multiple dispatch on `data` type automatically selects:
+
 - `data::AbstractVector` → Standard interior stencil
 - `data::HermiteStencilData` → Hermite boundary stencil
 
 ### Collocation Matrix Building
 
 **Standard (Interior)**:
+
 ```julia
 function _build_collocation_matrix!(A, data::AbstractVector, basis, mon, k)
     AA = parent(A)
@@ -280,6 +288,7 @@ end
 ```
 
 **Hermite (With Boundary Conditions)**:
+
 ```julia
 function _build_collocation_matrix!(A, data::HermiteStencilData, basis, mon, k)
     AA = parent(A)
@@ -335,6 +344,7 @@ hermite_rbf_dispatch(::NeumannRobinPoint, ::NeumannRobinPoint, ...) =
 ### RHS Vector Building
 
 Similar dispatch pattern:
+
 - `_build_rhs!(b::Vector, ℒrbf, ...)` → Single operator
 - `_build_rhs!(b::Matrix, ℒrbf::Tuple, ...)` → Multiple operators
 - `_build_rhs!(b, ..., data::AbstractVector, ...)` → Interior
@@ -393,7 +403,7 @@ end
 
 ## Call Graph
 
-```
+```text
 User Code (e.g., Laplacian construction)
     │
     └─→ api.jl: _build_weights(ℒ, op)
@@ -434,8 +444,8 @@ User Code (e.g., Laplacian construction)
                             │                                       │                       (9 point type combos)
                             │                                       │
                             │                                       ├─→ _build_rhs!
-                            │                                       │       ├─→ apply_boundary_to_rbf
-                            │                                       │       └─→ apply_boundary_to_mono!
+                            │                                       │       ├─→ hermite_rbf_rhs
+                            │                                       │       └─→ hermite_mono_rhs!
                             │                                       │
                             │                                       └─→ solve(A, b)
                             │
@@ -449,6 +459,7 @@ User Code (e.g., Laplacian construction)
 ### 1. Layer Separation
 
 **Why it matters**:
+
 - **stencil_math.jl** contains pure functions → easily testable
 - **kernel_exec.jl** handles parallelism → can benchmark separately
 - **api.jl** routes requests → single place to trace flow
@@ -457,7 +468,7 @@ User Code (e.g., Laplacian construction)
 
 A **stencil** is a local approximation of a differential operator at a point:
 
-```
+```text
 For a point x₀ with k neighbors {x₁, x₂, ..., xₖ}:
 
     ℒu(x₀) ≈ Σᵢ₌₁ᵏ wᵢ * u(xᵢ)
@@ -467,7 +478,7 @@ where wᵢ are the weights we compute by solving A \ b.
 
 ### 3. Collocation Matrix Structure
 
-```
+```text
 Standard (Interior):
 ┌─────────────────┬─────────┐
 │  Φ(xᵢ, xⱼ)      │ P(xᵢ)   │  k×k RBF + k×nmon polynomial
@@ -487,6 +498,7 @@ where Bᵢ = α*I + β*∂ₙᵢ is the boundary operator at point i
 ### 4. Multiple Dispatch Benefits
 
 The code uses Julia's multiple dispatch to automatically select:
+
 - Vector vs Matrix RHS (single vs tuple operators)
 - AbstractVector vs HermiteStencilData (interior vs boundary)
 - Point type combinations (9 Hermite dispatch variants)
@@ -498,6 +510,7 @@ This eliminates explicit conditionals and improves type stability.
 ## Performance Characteristics
 
 ### Memory Allocation
+
 - Exact allocation via `count_nonzeros` (counts entries before allocating)
 - Interior points: k entries per stencil
 - Dirichlet points: 1 entry per stencil (identity row)
@@ -505,12 +518,14 @@ This eliminates explicit conditionals and improves type stability.
 - No over-allocation for interior-only problems
 
 ### Parallelization
+
 - Batch processing prevents memory exhaustion
 - Work arrays reused within batch
 - KernelAbstractions.jl enables CPU/GPU execution
 - Type-stable buffers via operator arity traits
 
 ### Stencil Classification
+
 - Runtime dispatch via `classify_stencil`
 - Zero overhead for interior-only problems (all stencils classify as InteriorStencil)
 - Dirichlet points bypass expensive matrix assembly
@@ -530,6 +545,7 @@ The unified solve system achieves:
 7. **Backward compatible**: All exports maintained
 
 **File Mapping**:
+
 - Want to modify math? → `stencil_math.jl`
 - Need better parallelism? → `kernel_exec.jl`
 - Adding new operator entry point? → `api.jl`
