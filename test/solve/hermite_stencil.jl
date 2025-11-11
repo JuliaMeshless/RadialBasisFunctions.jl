@@ -19,7 +19,6 @@ import RadialBasisFunctions as RBF
     mon = RBF.MonomialBasis(1, 1)  # 1D linear monomial basis
 
     @testset "Standard stencil (no boundary points)" begin
-
         # Create system matrices
         k = 3
         nmon = 2  # 1D linear: [1, x]
@@ -27,11 +26,10 @@ import RadialBasisFunctions as RBF
         A_std = Symmetric(zeros(Float64, n, n), :U)
         b_std = zeros(Float64, n, 1)
 
-        # Create simple identity operators for testing
-        identity_rbf = RBF.Custom(basis -> (x1, x2) -> basis(x1, x2))
-        identity_mon = RBF.Custom(mon -> (arr, x) -> mon(arr, x))
-        ℒrbf = identity_rbf(basis)  # Get the actual operator function
-        ℒmon = identity_mon(mon)    # Get the actual operator function
+        # Create identity operator (interpolation)
+        identity_op = x -> x
+        ℒrbf(x1, x2) = basis(x1, x2)  # Identity on RBF
+        ℒmon(arr, x) = mon(arr, x)     # Identity on monomial
 
         # Test standard path - use plain data array
         weights_std = RBF._build_stencil!(

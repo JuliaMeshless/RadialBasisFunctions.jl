@@ -72,16 +72,20 @@ end
     include("boundary_types.jl")
 end
 
-@safetestset "Solve Unit Tests" begin
-    include("solve/unit/collocation_matrix.jl")
-    include("solve/unit/rhs_vector.jl")
+@safetestset "Hermite Interpolation" begin
+    include("hermite.jl")
+end
+
+@safetestset "Solve Tests" begin
+    include("solve/collocation_matrix.jl")
+    include("solve/rhs_vector.jl")
+    include("solve/hermite_stencil.jl")
 end
 
 @safetestset "Solve Integration Tests" begin
     include("test_utils.jl")
-    include("solve/integration/hermite_integration.jl")
     include("solve/integration/solve_utils_integration.jl")
-    include("solve/integration/end_to_end_utils.jl")
+    include("solve/integration/hermite_test_utils.jl")
     include("solve/integration/laplacian_end_to_end.jl")
     include("solve/integration/gradient_end_to_end.jl")
     include("solve/integration/partial_x_end_to_end.jl")

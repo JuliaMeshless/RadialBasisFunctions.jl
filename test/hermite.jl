@@ -183,6 +183,38 @@ using SparseArrays
             @test all(abs.(result[interior_indices] .- 3.0) .< 1e-10)
         end
 
+        @testset "Directional Derivative (Single Direction)" begin
+            data, is_boundary, bcs, normals = create_2d_domain()
+
+            # Direction vector in x-direction
+            v = SVector(1.0, 0.0)
+            op = directional(data, data, v, basis_phs, is_boundary, bcs, normals)
+
+            # u = 2x + 3y has gradient = (2, 3), directional derivative in x-direction = 2
+            u = [2.0 * x[1] + 3.0 * x[2] for x in data]
+            result = op(u)
+
+            # Interior points: exact directional derivative = 2.0
+            interior_indices = findall(.!is_boundary)
+            @test all(abs.(result[interior_indices] .- 2.0) .< 1e-10)
+        end
+
+        @testset "Directional Derivative (Per-Point Vectors)" begin
+            data, is_boundary, bcs, normals = create_2d_domain()
+
+            # Per-point direction vectors (x-direction for all points)
+            v = [SVector(1.0, 0.0) for _ in 1:length(data)]
+            op = directional(data, data, v, basis_phs, is_boundary, bcs, normals)
+
+            # u = 2x + 3y has gradient = (2, 3), directional derivative in x-direction = 2
+            u = [2.0 * x[1] + 3.0 * x[2] for x in data]
+            result = op(u)
+
+            # Interior points: exact directional derivative = 2.0
+            interior_indices = findall(.!is_boundary)
+            @test all(abs.(result[interior_indices] .- 2.0) .< 1e-10)
+        end
+
         @testset "Zero Function Gives Zero" begin
             data, is_boundary, bcs, normals = create_2d_domain()
 
