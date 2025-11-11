@@ -4,7 +4,7 @@ using LinearAlgebra
 using Statistics
 using HaltonSequences
 
-mean_percent_error(test, correct) = mean(abs.((test .- correct) ./ correct)) * 100
+include("../test_utils.jl")
 
 f(x) = 2 * x[1] + 3 * x[2]
 df_dx(x) = 2

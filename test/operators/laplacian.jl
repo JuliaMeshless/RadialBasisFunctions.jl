@@ -3,8 +3,7 @@ using StaticArraysCore
 using Statistics
 using HaltonSequences
 
-rsme(test, correct) = sqrt(sum((test - correct) .^ 2) / sum(correct .^ 2))
-mean_percent_error(test, correct) = mean(abs.((test .- correct) ./ correct)) * 100
+include("../test_utils.jl")
 
 f(x) = 1 + sin(4 * x[1]) + cos(3 * x[1]) + sin(2 * x[2])
 d2f_dxx(x) = -16 * sin(4 * x[1]) - 9 * cos(3 * x[1])

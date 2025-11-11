@@ -5,29 +5,6 @@ using Statistics
 using RadialBasisFunctions
 import RadialBasisFunctions as RBF
 
-function construct_rhs_laplacian(domain_2d, is_boundary, boundary_conditions, normals, RBF)
-    rhs = [target_laplacian(p[1], p[2]) for p in domain_2d]
-    bnd_counter = 0
-    for i in eachindex(domain_2d)
-        if is_boundary[i]
-            bnd_counter += 1
-            bc = boundary_conditions[bnd_counter]
-            if RBF.is_dirichlet(bc)
-                rhs[i] = target_function(domain_2d[i][1], domain_2d[i][2])
-            elseif RBF.is_neumann(bc) || RBF.is_robin(bc)
-                α_val = RBF.α(bc)
-                β_val = RBF.β(bc)
-                u_val = target_function(domain_2d[i][1], domain_2d[i][2])
-                ∂ₙu_val = target_Neumann_bc(
-                    domain_2d[i][1], domain_2d[i][2], normals[bnd_counter]
-                )
-                rhs[i] = α_val * u_val + β_val * ∂ₙu_val
-            end
-        end
-    end
-    return rhs
-end
-
 @testset "Laplacian End-to-End with Hermite" begin
     domain_2d = create_2d_unit_square_domain(0.05)
     @test length(domain_2d) == 441
@@ -82,14 +59,11 @@ end
 
         @test max_error < 1e-10
         @test rms_error < 1e-11
-
-        # println("  Laplacian max error: ", max_error)
-        # println("  Laplacian RMS error: ", rms_error)
     end
 
     @testset "Test 2: Manufactured Solution (Inverse Problem)" begin
-        rhs = construct_rhs_laplacian(
-            domain_2d, is_boundary, boundary_conditions, normals, RBF
+        rhs = construct_rhs(
+            target_laplacian, domain_2d, is_boundary, boundary_conditions, normals, RBF
         )
 
         laplacian_result = L_op(u_values)
@@ -104,8 +78,5 @@ end
 
         @test max_error < 1e-9  # Machine precision
         @test rms_error < 1e-10  # RMS should be even better
-
-        # println("  Solution max error: ", max_error)
-        # println("  Solution RMS error: ", rms_error)
     end
 end

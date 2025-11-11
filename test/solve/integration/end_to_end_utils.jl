@@ -115,6 +115,79 @@ function construct_u_values_hermite(
     return u_values
 end
 
+"""
+    construct_rhs(operator_func, domain_2d, is_boundary, boundary_conditions, normals, RBF)
+
+Generic RHS construction for integration tests with Hermite interpolation.
+
+# Arguments
+- `operator_func`: Function that takes (x, y) and returns the expected operator result at that point
+- `domain_2d`: Vector of 2D points
+- `is_boundary`: Boolean vector indicating boundary points
+- `boundary_conditions`: Vector of boundary condition types
+- `normals`: Vector of normal vectors at boundary points
+- `RBF`: RadialBasisFunctions module reference
+
+# Returns
+- For scalar operators: Vector of RHS values
+- For gradient operator: Tuple of (rhs_x, rhs_y) vectors
+"""
+function construct_rhs(
+    operator_func, domain_2d, is_boundary, boundary_conditions, normals, RBF
+)
+    N = length(domain_2d)
+
+    # Check if operator_func returns a tuple (gradient case)
+    test_result = operator_func(domain_2d[1][1], domain_2d[1][2])
+    is_gradient = isa(test_result, Tuple) || isa(test_result, SVector)
+
+    if is_gradient
+        rhs_x = zeros(N)
+        rhs_y = zeros(N)
+        for i in eachindex(domain_2d)
+            result = operator_func(domain_2d[i][1], domain_2d[i][2])
+            rhs_x[i] = result[1]
+            rhs_y[i] = result[2]
+        end
+    else
+        rhs = [operator_func(p[1], p[2]) for p in domain_2d]
+    end
+
+    # Apply boundary conditions
+    bnd_counter = 0
+    for i in eachindex(domain_2d)
+        if is_boundary[i]
+            bnd_counter += 1
+            bc = boundary_conditions[bnd_counter]
+            if RBF.is_dirichlet(bc)
+                func_val = target_function(domain_2d[i][1], domain_2d[i][2])
+                if is_gradient
+                    rhs_x[i] = func_val
+                    rhs_y[i] = func_val
+                else
+                    rhs[i] = func_val
+                end
+            elseif RBF.is_neumann(bc) || RBF.is_robin(bc)
+                α_val = RBF.α(bc)
+                β_val = RBF.β(bc)
+                u_val = target_function(domain_2d[i][1], domain_2d[i][2])
+                ∂ₙu_val = target_Neumann_bc(
+                    domain_2d[i][1], domain_2d[i][2], normals[bnd_counter]
+                )
+                bc_val = α_val * u_val + β_val * ∂ₙu_val
+                if is_gradient
+                    rhs_x[i] = bc_val
+                    rhs_y[i] = bc_val
+                else
+                    rhs[i] = bc_val
+                end
+            end
+        end
+    end
+
+    return is_gradient ? (rhs_x, rhs_y) : rhs
+end
+
 # Export functions
 export create_2d_unit_square_domain
 export identify_boundary_points
@@ -126,3 +199,4 @@ export target_laplacian
 export target_Neumann_bc
 export setup_test_boundary_conditions
 export construct_u_values_hermite
+export construct_rhs
