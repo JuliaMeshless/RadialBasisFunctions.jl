@@ -61,7 +61,9 @@ import RadialBasisFunctions as RBF
         ]
 
         # Create HermiteStencilData
-        hermite_data = RBF.HermiteStencilData(data, is_boundary, boundary_conditions, normals)
+        hermite_data = RBF.HermiteStencilData(
+            data, is_boundary, boundary_conditions, normals
+        )
 
         # Test collocation matrix
         A_test = Symmetric(zeros(Float64, n, n), :U)
@@ -80,13 +82,11 @@ import RadialBasisFunctions as RBF
 
         # Reuse hermite_data from previous testset
         is_boundary = [false, false, true]
-        boundary_conditions = [
-            RBF.Internal(),
-            RBF.Internal(),
-            RBF.Neumann(),
-        ]
+        boundary_conditions = [RBF.Internal(), RBF.Internal(), RBF.Neumann()]
         normals = [[0.0], [0.0], [1.0]]
-        hermite_data = RBF.HermiteStencilData(data, is_boundary, boundary_conditions, normals)
+        hermite_data = RBF.HermiteStencilData(
+            data, is_boundary, boundary_conditions, normals
+        )
 
         # Test that we can create boundary conditions
         bc_dirichlet = RBF.Dirichlet()
