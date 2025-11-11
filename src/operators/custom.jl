@@ -8,5 +8,7 @@ struct Custom{F<:Function} <: AbstractOperator
 end
 (op::Custom)(basis) = op.ℒ(basis)
 
+# Hermite-compatible method now uses the generic dispatcher in solve_hermite.jl
+
 # pretty printing
 print_op(op::Custom) = "Custom Operator"

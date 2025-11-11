@@ -19,6 +19,9 @@ julia --project=test test/runtests.jl
 # Run tests for specific components
 julia --project=test test/basis/polyharmonic_spline.jl
 julia --project=test test/operators/gradient.jl
+
+# Run tests in development mode (activating the main project)
+julia --project=. test/runtests.jl
 ```
 
 ### Documentation
@@ -51,11 +54,12 @@ julia --project=benchmark benchmark/benchmarks.jl
    - `operator_algebra.jl` - Composition and algebraic operations on operators
    - Virtual operators for performance optimization
 
-3. **Solve System** (`src/solve.jl`, `src/solve_utils.jl`): Core weight computation
-   - `_build_weights()` - Main function for computing RBF stencil weights
-   - Uses KernelAbstractions.jl for GPU/CPU parallelization
-   - Batch processing for memory efficiency
-   - `StencilData.jl` and `solve_with_Hermite.jl` - Hermite interpolation support
+3. **Solve System** (`src/solve/`): Core weight computation organized in 4 layers
+   - `api.jl` - Entry points and routing (`_build_weights()` functions)
+   - `kernel_exec.jl` - Parallel execution via KernelAbstractions.jl, memory allocation, batch processing
+   - `stencil_math.jl` - Pure mathematical operations (collocation matrix, RHS, stencil assembly)
+   - `types.jl` - Shared data structures (boundary conditions, stencil classification, operator traits)
+   - Hermite interpolation with boundary conditions via multiple dispatch
 
 4. **Interpolation** (`src/interpolation.jl`): 
    - `Interpolator` type for global interpolation (uses all data points)
@@ -94,6 +98,17 @@ The package requires `Vector{AbstractVector}` input format (not matrices). Each 
 ## Key Files for Understanding
 
 - `src/RadialBasisFunctions.jl` - Main module with exports and precompilation
-- `src/solve.jl:21-102` - Core weight computation with GPU kernels
+- `src/solve/stencil_math.jl` - Pure mathematical operations for weight computation
+- `src/solve/kernel_exec.jl` - GPU/CPU parallel execution kernels
+- `src/solve/api.jl` - Entry points for weight building
 - `src/operators/operators.jl:10-31` - Main operator type definition
 - `src/basis/basis.jl` - Abstract basis type hierarchy
+- `docs/src/internals.md` - Detailed solve system architecture and pseudocode
+
+## Important Development Notes
+
+- The package requires Julia 1.8+ (see Project.toml compatibility)
+- Uses KernelAbstractions.jl for GPU/CPU parallelization
+- Data must be in `Vector{AbstractVector}` format (not matrices) - each point needs inferrable dimension (e.g., `SVector{2,Float64}`)
+- Two neighbor search backends available: NearestNeighbors.jl (default) and PointNeighbors.jl (`use_pointneighbors=true`)
+- PointNeighbors.jl automatically handles GPU arrays with appropriate backends

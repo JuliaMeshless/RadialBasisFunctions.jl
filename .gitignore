@@ -1,8 +1,13 @@
 *.jl.*.cov
 *.jl.cov
 *.jl.mem
-/docs/build/
 Manifest.toml
+
+# docs
+/docs/build/
+/docs/node_modules/
+/docs/package.json/
+
 
 /dev/
 

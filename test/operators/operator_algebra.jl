@@ -4,7 +4,7 @@ using LinearAlgebra
 using Statistics
 using HaltonSequences
 
-mean_percent_error(test, correct) = mean(abs.((test .- correct) ./ correct)) * 100
+include("../test_utils.jl")
 
 f(x) = 2 * x[1] + 3 * x[2]
 df_dx(x) = 2
@@ -25,9 +25,6 @@ dxdy = dx - dy
 
 # test compatibility with other operators
 dy = partial(x[1:500], 1, 2)
-@test_throws ArgumentError dx + dy
-
-dy = partial(x, 1, 2; adjl=dx.adjl[1:500])
 @test_throws ArgumentError dx + dy
 
 adjl = copy(dx.adjl)

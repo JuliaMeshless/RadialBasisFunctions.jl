@@ -1,5 +1,12 @@
-```@meta
-CurrentModule = RadialBasisFunctions
+```@raw html
+---
+# https://vitepress.dev/reference/default-theme-home-page
+layout: home
+
+hero:
+  name: RadialBasisFunctions.jl Docs
+  tagline: All things radial!
+---
 ```
 
 # RadialBasisFunctions.jl
