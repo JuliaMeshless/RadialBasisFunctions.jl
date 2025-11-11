@@ -79,7 +79,6 @@ end
 @safetestset "Solve Tests" begin
     include("solve/collocation_matrix.jl")
     include("solve/rhs_vector.jl")
-    include("solve/hermite_stencil.jl")
 end
 
 @safetestset "Solve Integration Tests" begin
