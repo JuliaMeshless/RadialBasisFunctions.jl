@@ -1,6 +1,6 @@
 # Radial Basis Functions Theory
 
-Radial Basis Functions (RBF) use only a distance (typically Euclidean) when constructing the basis. For example, if we wish to build an interpolator we get the following linear combination of RBFs
+Radial Basis Functions (RBF) use only a distance (typically Euclidean) when constructing the basis. For example, if an interpolator for $u(\mathbf{x})$ is given by the linear combination of RBFs
 
 $$u(\mathbf{x})=\sum_{i=1}^{N} \alpha_{i} \phi(\lvert \mathbf{x}-\mathbf{x}_{i} \rvert)$$
 
@@ -17,19 +17,23 @@ There are several types of RBFs to choose from, some with a tunable shape parame
 
 ## Augmenting with Monomials
 
-The interpolant may be augmented with a polynomial as
+The interpolant may be augmented with a polynomial:
 
 ```math
 u(\mathbf{x})=\sum_{i=1}^{N} \alpha_{i} \phi(\lvert \mathbf{x}-\mathbf{x}_{i} \rvert) + \sum_{i=1}^{N_{p}} \gamma_{i} p_{i}(\mathbf{x})
 ```
 
-where $N_{p}=\begin{pmatrix} m+d \\ m \end{pmatrix}$ is the number of monomials ($m$ is the monomial order and $d$ is the dimension of $\mathbf{x}$) and $p_{i}(\mathbf{x})$ is the monomial term, or:
+where $N_{p}=\begin{pmatrix} m+d \\ m \end{pmatrix}$ is the number of monomials ($m$ is the monomial order and $d$ is the dimension of $\mathbf{x}$) and $p_{i}(\mathbf{x})$ is the monomial term.
+<!-- , or:
 
 ```math
 p_{i}(\mathbf{x})=q_{i}(\lvert \mathbf{x}-\mathbf{x}_{i} \rvert)
 ```
 
-where $q_{i}$ is the $i$-th monomial in $\mathbf{q}=\left[\begin{array}{c} 1, x, y, x^2, xy, y^2 \end{array}\right]$ in 2D, for example. By collocation the expansion of the augmented interpolant at all the nodes $\mathbf{x}_{i}$ where $i=1\cdots N$, there results a linear system for the interpolant weights as:
+where $q_{i}$ is the $i$-th monomial in $\mathbf{q}=\left[\begin{array}{c} 1, x, y, x^2, xy, y^2 \end{array}\right]$ in 2D, for example.  -->
+<!-- 
+By collocation the expansion of the augmented interpolant at all the nodes $\mathbf{x}_{i}$ where $i=1\cdots N$, there results a linear system for the interpolant weights as: -->
+When we require the interpolation to be exact on a set of data points $\{\mathbf{x}_{i}, u(\mathbf{x}_{i})\}$ where $i=1,\cdots,N$, we obtain the following linear system for the interpolation coefficients:
 
 ```math
 \left[\begin{array}{cc}
@@ -77,20 +81,25 @@ u(\mathbf{x}_{N})
 
 and $\boldsymbol{\alpha}$ and $\boldsymbol{\gamma}$ are the interpolation coefficients. Note that the equations relating to $\mathbf{P}^\mathrm{T}$ are included to ensure optimal interpolation and unique solvability given that conditionally positive radial functions are used and the nodes in the subdomain form a unisolvent set. See (Fasshauer, et al. - Meshfree Approximation Methods with Matlab) and (Wendland, et al. - Scattered Data Approximation).
 
-This augmentation of the system is highly encouraged for a couple main reasons:
+Polynomial augmentation of the system is mainly motivated by two reasons:
 
-1. Increased accuracy especially for flat fields and near boundaries
-2. To ensure the linear system has a unique solution
+1. Increased accuracy, especially for polynomial fields and near boundaries
+2. To ensure the linear system has a unique solution for certain types of RBFs (conditionally positive definite)
 
 See (Flyer, et al. - On the role of polynomials in RBF-FD approximations: I. Interpolation and accuracy) for more information on this.
 
 ## Local Collocation
 
-The original RBF method employing the Kansa approach which connects all the nodes in the domain and, as such, is a _global_ method. Due to ill-conditioning and computational cost, this approach scales poorly; therefore, a _local_ approach is used instead. In the _local_ approach, each node is influenced only by its $k$ nearest neighbors which helps solve the issues related to _global_ collocation.
+The original RBF method employs the Kansa approach which connects all the nodes in the domain and, as such, is a _global_ method. Due to ill-conditioning and computational cost, this approach scales poorly; therefore, a _local_ approach is used instead. In the _local_ approach, each node is influenced only by its $k$ nearest neighbors.
 
-## Hermite Approach for Boundary Stencils
+## Boundary Conditions
 
-When a stencil is **centered around an internal node but includes boundary nodes**, standard RBF-FD using Kansa's approach can lead to ill-conditioning and singularity issues. This occurs because applying boundary operators $\mathcal{B}$ (such as normal derivatives for Neumann conditions) to the interpolation conditions breaks the symmetry of the local matrix $\mathbf{A}$.
+Radial Basis Functions can also be used to solve PDEs with various types of boundary conditions (Dirichlet, Neumann, Robin, etc.), when this is done in a meshless context, special considerations must be made to ensure that all local systems, including those near boundaries, remain well-posed.
+This package allows the user to adopt different approaches for handling boundary conditions, among them, the Hermite approach is suggested when the PDE is to be solved only at interior nodes. Furthermore, it can also be used to interpolate data near the boundary while including boundary conditions where these are knowns.
+
+### Hermite Approach for Boundary Stencils
+
+When a stencil is **centered around an internal node but includes boundary nodes**, standard RBF collocation can lead to ill-conditioning and singularity issues. This occurs because applying boundary operators $\mathcal{B}$ (such as normal derivatives for Neumann conditions) to the interpolation conditions breaks the symmetry of the local matrix $\mathbf{A}$.
 
 **The RBF-HFD (Hermite Finite Difference) method resolves this issue by modifying the basis functions only for stencils near boundaries.** Instead of keeping the same basis regardless of boundary conditions and applying the operator to the interpolation conditions (which creates asymmetry), the Hermite approach modifies the basis itself.
 
@@ -125,54 +134,13 @@ The local system becomes:
 
 where subscripts $I$ and $B$ denote internal and boundary quantities, respectively. The matrix blocks $\mathbf{A}_{I,I}$, $\mathbf{A}_{I,B}$, $\mathbf{A}_{B,I}$, and $\mathbf{A}_{B,B}$ represent RBF evaluations between internal-internal, internal-boundary, boundary-internal, and boundary-boundary nodes. The vectors $\boldsymbol{\alpha}_I$ and $\boldsymbol{\alpha}_B$ are the RBF coefficients for internal and boundary nodes, $\boldsymbol{\beta}$ are the polynomial coefficients, $\mathbf{u}_I$ contains function values at internal nodes, and $\mathbf{g}$ contains boundary condition values. **This system is now symmetric and positive definite** (for appropriate RBF kernels), ensuring unique solvability regardless of the boundary condition type.
 
-### Key Advantages
-
-1. **Restores symmetry** of the local interpolation matrix for boundary stencils
-2. **Eliminates singularity issues** that arise with differential boundary operators
-3. **Minimal computational overhead** - no additional nodes or information required
-4. **Flexible** - works with any linear boundary operator $\mathcal{B}$
-
-The Hermite approach is **only applied to stencils that include boundary nodes**. For internal stencils far from boundaries, the standard RBF-FD formulation remains unchanged, maintaining computational efficiency where boundary effects are not present.
-
-## Alternative Approach: Boundary Nodes as Unknowns
-
-In some applications, particularly multi-region or coupled problems, it may be advantageous to solve the governing equation at boundary nodes as well, treating **all nodes (interior and boundary) as unknowns** in the global system. When this strategy is adopted, an alternative implementation to the Hermite approach becomes available.
-
-Rather than modifying the basis functions for boundary nodes, this approach **maintains the standard RBF basis** $\{\phi(\lvert \cdot - \mathbf{x}_j \rvert)\}$ for all nodes regardless of their position. The key distinction is in how local systems are constructed:
-
-- **When the stencil includes boundary nodes but the evaluation point is interior**: Apply the standard RBF-FD method unchanged. Boundary neighbors contribute as regular unknowns with no special treatment.
-
-- **When the evaluation point itself is on the boundary**: Instead of modifying basis functions, modify the **right-hand side** of the local system. For a boundary point $\mathbf{x}_c$ (the stencil center) with operator $\mathcal{B}$, construct the RHS as $\mathcal{B}\boldsymbol{\phi}(\mathbf{x}_c)$ and $\mathcal{B}\mathbf{p}(\mathbf{x}_c)$ rather than using the standard differential operator.
-
-This means the collocation matrix $\mathbf{A}$ always uses the standard kernel evaluation:
-
-```math
-[\mathbf{A}]_{ij} = \phi(\lvert \mathbf{x}_i - \mathbf{x}_j \rvert)
-```
-
-maintaining symmetry trivially. The local system for a boundary evaluation point becomes:
-
-```math
-\left[\begin{array}{cc}
-\mathbf{A} & \mathbf{P} \\
-\mathbf{P}^\mathrm{T} & 0
-\end{array}\right]
-\left[\begin{array}{cc}
-\mathbf{w} \\
-\boldsymbol{\lambda}
-\end{array}\right]
-=
-\left[\begin{array}{cc}
-\mathcal{B}\boldsymbol{\phi}(\mathbf{x}_c) \\
-\mathcal{B}\mathbf{p}(\mathbf{x}_c)
-\end{array}\right]
-```
-
-This approach is **significantly simpler than the Hermite method** because stencil classification depends only on the evaluation point type, the same RBF basis is used everywhere, and interior stencils with boundary neighbors require no special treatment. It is particularly suitable when boundary values are genuinely unknown and must be determined simultaneously with the interior solution, such as in fluid-structure interaction, multi-physics coupling, or domain decomposition methods.
+We remark that Hermite approach is **only applied to stencils that include boundary nodes**. For internal stencils far from boundaries, the standard RBF formulation remains unchanged, maintaining computational efficiency where boundary effects are not present.
 
 ## Constructing an Operator
 
-In the Radial Basis Function - Finite Difference method (RBF-FD), a stencil is built to approximate derivatives using the same neighborhoods/subdomains of $N$ points. This is used in the [[MeshlessMultiphysics.jl]] package. For example, if $\mathcal{L}$ represents a linear differential operator, one can express the differentiation of the field variable $u$ at the center of the subdomain $\mathbf{x}_{c}$ in terms of some weights $\mathbf{w}$ and the field variable values on all the nodes within the subdomain as
+In the Radial Basis Function - Finite Difference method (RBF-FD), a stencil is built to approximate derivatives using the same neighborhoods/subdomains of $N$ points.
+ <!-- This is used in the [[MeshlessMultiphysics.jl]] package. -->
+For example, if $\mathcal{L}$ represents a linear differential operator, one can express the differentiation of the field variable $u$ at the center of the subdomain $\mathbf{x}_{c}$ in terms of some weights $\mathbf{w}$ and the field variable values on all the nodes within the subdomain as
 
 ```math
 \mathcal{L}u(\mathbf{x}_{c}) = \sum_{i=1}^{N}w_{i}u(\mathbf{x}_{i})
@@ -262,6 +230,43 @@ where $\mathcal{L}_1$ denotes the differential operator applied to the first arg
 ```
 
 where $g(\mathbf{x}_j)$ represents the boundary condition values at boundary nodes.
+
+### Constructing an Operator Treating Boundary Nodes as Unknowns
+
+In some applications, particularly multi-region or coupled problems, it may be advantageous to solve the governing equation at boundary nodes as well, treating **all nodes (interior and boundary) as unknowns** in the global system. When this strategy is adopted, an alternative implementation to the Hermite approach becomes available and the usual interpolation scheme can be preserved.
+
+Rather than modifying the basis functions for boundary nodes, this approach **maintains the standard RBF basis** $\{\phi(\lvert \mathbf{x} - \mathbf{x}_j \rvert)\}$ for all nodes regardless of their position.
+When treating boundary nodes as unknowns in the global system, the operator construction simplifies significantly. The key distinctions are:
+
+- **When the stencil includes boundary nodes but the evaluation point is interior**: Apply the standard RBF-FD method unchanged. Boundary neighbors contribute as regular unknowns with no special treatment.
+
+- **When the evaluation point itself is on the boundary**: Instead of modifying basis functions, modify the **right-hand side** of the local system. For a boundary point $\mathbf{x}_c$ (the stencil center) with operator $\mathcal{B}$, construct the RHS as $\mathcal{B}\boldsymbol{\phi}(\mathbf{x}_c)$ and $\mathcal{B}\mathbf{p}(\mathbf{x}_c)$ rather than using the standard differential operator.
+
+This means the collocation matrix $\mathbf{A}$ always uses the standard kernel evaluation:
+
+```math
+[\mathbf{A}]_{ij} = \phi(\lvert \mathbf{x}_i - \mathbf{x}_j \rvert)
+```
+
+maintaining symmetry trivially. The local system for a boundary evaluation point becomes:
+
+```math
+\left[\begin{array}{cc}
+\mathbf{A} & \mathbf{P} \\
+\mathbf{P}^\mathrm{T} & 0
+\end{array}\right]
+\left[\begin{array}{cc}
+\mathbf{w} \\
+\boldsymbol{\lambda}
+\end{array}\right]
+=
+\left[\begin{array}{cc}
+\mathcal{B}\boldsymbol{\phi}(\mathbf{x}_c) \\
+\mathcal{B}\mathbf{p}(\mathbf{x}_c)
+\end{array}\right]
+```
+
+This approach is **significantly simpler than the Hermite method** and stencil classification depends only on the evaluation point type, the same RBF basis is used everywhere, and interior stencils with boundary neighbors require no special treatment.
 
 ## References
 
