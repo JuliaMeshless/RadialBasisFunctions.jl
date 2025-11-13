@@ -105,7 +105,7 @@ where $\mathbf{x}_c$ is the stencil center (evaluation point), $\alpha_j$ are RB
 The local system becomes:
 
 $$
-\left[\begin{array}{cc}
+\left[\begin{array}{ccc}
 \mathbf{A}_{I,I} & \mathcal{B}_2\mathbf{A}_{I,B} & \mathbf{P}_I \\
 \mathcal{B}_1\mathbf{A}_{B,I} & \mathcal{B}_1\mathcal{B}_2\mathbf{A}_{B,B} & \mathcal{B}\mathbf{P}_B \\
 \mathbf{P}_I^\mathrm{T} & (\mathcal{B}\mathbf{P}_B)^\mathrm{T} & 0
@@ -162,7 +162,7 @@ $$
 \boldsymbol{\lambda}
 \end{array}\right]
 =
-\left[\begin{array}{cc}
+\left[\begin{array}{c}
 \mathcal{B}\boldsymbol{\phi}(\mathbf{x}_c) \\
 \mathcal{B}\mathbf{p}(\mathbf{x}_c)
 \end{array}\right]
@@ -237,7 +237,7 @@ where $\mathcal{L}\boldsymbol{\phi}$ is the vector of the operator applied to ea
 When constructing operators for stencils near boundaries using the Hermite approach, the system is modified to:
 
 $$
-\left[\begin{array}{cc}
+\left[\begin{array}{ccc}
 \mathbf{A}_{I,I} & \mathcal{B}_2\mathbf{A}_{I,B} & \mathbf{P}_I \\
 \mathcal{B}_1\mathbf{A}_{B,I} & \mathcal{B}_1\mathcal{B}_2\mathbf{A}_{B,B} & \mathcal{B}\mathbf{P}_B \\
 \mathbf{P}_I^\mathrm{T} & (\mathcal{B}\mathbf{P}_B)^\mathrm{T} & 0
