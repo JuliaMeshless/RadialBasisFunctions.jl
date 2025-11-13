@@ -33,16 +33,16 @@ where $q_{i}$ is the $i$-th monomial in $\mathbf{q}=\left[\begin{array}{c} 1, x,
 
 $$
 \begin{pmatrix}
-\mathbf{A} & \mathbf{P} \\
+\mathbf{A} & \mathbf{P} \\\
 \mathbf{P}^T & 0
 \end{pmatrix}
 \begin{pmatrix}
-\boldsymbol{\alpha} \\
+\boldsymbol{\alpha} \\\
 \boldsymbol{\gamma}
 \end{pmatrix}
 =
 \begin{pmatrix}
-\mathbf{u} \\
+\mathbf{u} \\\
 0
 \end{pmatrix}
 $$
