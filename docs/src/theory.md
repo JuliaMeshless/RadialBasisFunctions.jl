@@ -52,15 +52,15 @@ where
 $$
 \mathbf{A}=
 \begin{pmatrix}
-\phi(|\mathbf{x}_{1}-\mathbf{x}_{1}|) & \cdots & \phi(|\mathbf{x}_{1}-\mathbf{x}_{N}|) \\
-\vdots & \ddots & \vdots \\
+\phi(|\mathbf{x}_{1}-\mathbf{x}_{1}|) & \cdots & \phi(|\mathbf{x}_{1}-\mathbf{x}_{N}|) \\\
+\vdots & \ddots & \vdots \\\
 \phi(|\mathbf{x}_{N}-\mathbf{x}_{1}|) & \cdots & \phi(|\mathbf{x}_{N}-\mathbf{x}_{N}|)
 \end{pmatrix}
 \quad
 \mathbf{P}=
 \begin{pmatrix}
 p_{1}(\mathbf{x}_{1}) & \cdots & p_{N_p}(\mathbf{x}_{1}) \\
-\vdots & \ddots & \vdots \\
+\vdots & \ddots & \vdots \\\
 p_{1}(\mathbf{x}_{N}) & \cdots & p_{N_p}(\mathbf{x}_{N})
 \end{pmatrix}
 $$
