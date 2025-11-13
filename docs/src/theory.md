@@ -264,3 +264,15 @@ where ``\mathcal{L}_1`` denotes the differential operator applied to the first a
 ```
 
 where ``g(\mathbf{x}_j)`` represents the boundary condition values at boundary nodes.
+
+## References
+
+- Fasshauer, G. E., & McCourt, M. (2015). *Kernel-based Approximation Methods using MATLAB*. World Scientific. https://doi.org/10.1142/9335
+
+- Flyer, N., Fornberg, B., Bayona, V., & Barnett, G. A. (2016). On the role of polynomials in RBF-FD approximations: I. Interpolation and accuracy. *Journal of Computational Physics*, 321, 21-38. https://doi.org/10.1016/j.jcp.2016.05.026
+
+- Shankar, V., Wright, G. B., Kirby, R. M., & Fogelson, A. L. (2015). A radial basis function (RBF)-finite difference (FD) method for diffusion and reaction-diffusion equations on surfaces. *Journal of Scientific Computing*, 63(3), 745-768. https://doi.org/10.1007/s10915-014-9914-1
+
+- Wendland, H. (2004). *Scattered Data Approximation*. Cambridge University Press. https://doi.org/10.1017/CBO9780511617539
+
+- Wright, G. B., & Fornberg, B. (2006). Scattered node compact finite difference-type formulas generated from radial basis functions. *Journal of Computational Physics*, 212(1), 99-123. https://doi.org/10.1016/j.jcp.2005.05.030
