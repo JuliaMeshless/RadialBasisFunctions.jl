@@ -32,48 +32,48 @@ $$
 where $q_{i}$ is the $i$-th monomial in $\mathbf{q}=\left[\begin{array}{c} 1, x, y, x^2, xy, y^2 \end{array}\right]$ in 2D, for example. By collocation the expansion of the augmented interpolant at all the nodes $\mathbf{x}_{i}$ where $i=1\cdots N$, there results a linear system for the interpolant weights as:
 
 $$
-\begin{bmatrix}
+\begin{pmatrix}
 \mathbf{A} & \mathbf{P} \\
 \mathbf{P}^T & 0
-\end{bmatrix}
-\begin{bmatrix}
+\end{pmatrix}
+\begin{pmatrix}
 \boldsymbol{\alpha} \\
 \boldsymbol{\gamma}
-\end{bmatrix}
+\end{pmatrix}
 =
-\begin{bmatrix}
+\begin{pmatrix}
 \mathbf{u} \\
 0
-\end{bmatrix}
+\end{pmatrix}
 $$
 
 where
 
 $$
 \mathbf{A}=
-\begin{bmatrix}
+\begin{pmatrix}
 \phi(|\mathbf{x}_{1}-\mathbf{x}_{1}|) & \cdots & \phi(|\mathbf{x}_{1}-\mathbf{x}_{N}|) \\
 \vdots & \ddots & \vdots \\
 \phi(|\mathbf{x}_{N}-\mathbf{x}_{1}|) & \cdots & \phi(|\mathbf{x}_{N}-\mathbf{x}_{N}|)
-\end{bmatrix}
+\end{pmatrix}
 \quad
 \mathbf{P}=
-\begin{bmatrix}
+\begin{pmatrix}
 p_{1}(\mathbf{x}_{1}) & \cdots & p_{N_p}(\mathbf{x}_{1}) \\
 \vdots & \ddots & \vdots \\
 p_{1}(\mathbf{x}_{N}) & \cdots & p_{N_p}(\mathbf{x}_{N})
-\end{bmatrix}
+\end{pmatrix}
 $$
 
 and $\mathbf{u}$ is the vector of dependent data points
 
 $$
 \mathbf{u}=
-\begin{bmatrix}
+\begin{pmatrix}
 u(\mathbf{x}_{1}) \\
 \vdots \\
 u(\mathbf{x}_{N})
-\end{bmatrix}
+\end{pmatrix}
 $$
 
 and $\boldsymbol{\alpha}$ and $\boldsymbol{\gamma}$ are the interpolation coefficients. Note that the equations relating to $\mathbf{P}^T$ are included to ensure optimal interpolation and unique solvability given that conditionally positive radial functions are used and the nodes in the subdomain form a unisolvent set. See (Fasshauer, et al. - Meshfree Approximation Methods with Matlab) and (Wendland, et al. - Scattered Data Approximation).
@@ -106,22 +106,22 @@ where $\mathbf{x}_c$ is the stencil center (evaluation point), $\alpha_j$ are RB
 The local system becomes:
 
 $$
-\begin{bmatrix}
+\begin{pmatrix}
 \mathbf{A}_{I,I} & \mathcal{B}_2\mathbf{A}_{I,B} & \mathbf{P}_I \\
 \mathcal{B}_1\mathbf{A}_{B,I} & \mathcal{B}_1\mathcal{B}_2\mathbf{A}_{B,B} & \mathcal{B}\mathbf{P}_B \\
 \mathbf{P}_I^T & (\mathcal{B}\mathbf{P}_B)^T & 0
-\end{bmatrix}
-\begin{bmatrix}
+\end{pmatrix}
+\begin{pmatrix}
 \boldsymbol{\alpha}_I \\
 \boldsymbol{\alpha}_B \\
 \boldsymbol{\beta}
-\end{bmatrix}
+\end{pmatrix}
 =
-\begin{bmatrix}
+\begin{pmatrix}
 \mathbf{u}_I \\
 \mathbf{g} \\
 0
-\end{bmatrix}
+\end{pmatrix}
 $$
 
 where subscripts $I$ and $B$ denote internal and boundary quantities, respectively. The matrix blocks $\mathbf{A}_{I,I}$, $\mathbf{A}_{I,B}$, $\mathbf{A}_{B,I}$, and $\mathbf{A}_{B,B}$ represent RBF evaluations between internal-internal, internal-boundary, boundary-internal, and boundary-boundary nodes. The vectors $\boldsymbol{\alpha}_I$ and $\boldsymbol{\alpha}_B$ are the RBF coefficients for internal and boundary nodes, $\boldsymbol{\beta}$ are the polynomial coefficients, $\mathbf{u}_I$ contains function values at internal nodes, and $\mathbf{g}$ contains boundary condition values. **This system is now symmetric and positive definite** (for appropriate RBF kernels), ensuring unique solvability regardless of the boundary condition type.
@@ -154,19 +154,19 @@ $$
 maintaining symmetry trivially. The local system for a boundary evaluation point becomes:
 
 $$
-\begin{bmatrix}
+\begin{pmatrix}
 \mathbf{A} & \mathbf{P} \\
 \mathbf{P}^T & 0
-\end{bmatrix}
-\begin{bmatrix}
+\end{pmatrix}
+\begin{pmatrix}
 \mathbf{w} \\
 \boldsymbol{\lambda}
-\end{bmatrix}
+\end{pmatrix}
 =
-\begin{bmatrix}
+\begin{pmatrix}
 \mathcal{B}\boldsymbol{\phi}(\mathbf{x}_c) \\
 \mathcal{B}\mathbf{p}(\mathbf{x}_c)
-\end{bmatrix}
+\end{pmatrix}
 $$
 
 This approach is **significantly simpler than the Hermite method** because stencil classification depends only on the evaluation point type, the same RBF basis is used everywhere, and interior stencils with boundary neighbors require no special treatment. It is particularly suitable when boundary values are genuinely unknown and must be determined simultaneously with the interior solution, such as in fluid-structure interaction, multi-physics coupling, or domain decomposition methods.
@@ -200,37 +200,37 @@ $$
 which is practically solved as a linear system for the weights $\mathbf{w}$ as
 
 $$
-\begin{bmatrix}
+\begin{pmatrix}
 \mathbf{A} & \mathbf{P} \\
 \mathbf{P}^T & 0
-\end{bmatrix}
-\begin{bmatrix}
+\end{pmatrix}
+\begin{pmatrix}
 \mathbf{w} \\
 \boldsymbol{\lambda}
-\end{bmatrix}
+\end{pmatrix}
 =
-\begin{bmatrix}
+\begin{pmatrix}
 \mathcal{L}\boldsymbol{\phi} \\
 \mathcal{L}\mathbf{p}
-\end{bmatrix}
+\end{pmatrix}
 $$
 
 where $\boldsymbol{\lambda}$ are treated as Lagrange multipliers and are discarded after solving the linear system. The vectors are defined as
 
 $$
 \mathcal{L}\boldsymbol{\phi}=
-\begin{bmatrix}
+\begin{pmatrix}
 \mathcal{L}\boldsymbol{\phi}(|\mathbf{x}_{1}-\mathbf{x}_{c}|) \\
 \vdots \\
 \mathcal{L}\boldsymbol{\phi}(|\mathbf{x}_{N}-\mathbf{x}_{c}|)
-\end{bmatrix}
+\end{pmatrix}
 \hspace{2em}
 \mathcal{L}\mathbf{p}=
-\begin{bmatrix}
+\begin{pmatrix}
 \mathcal{L}p_{1}(\mathbf{x}_{c}) \\
 \vdots \\
 \mathcal{L}p_{N_{p}}(\mathbf{x}_{c})
-\end{bmatrix}
+\end{pmatrix}
 $$
 
 where $\mathcal{L}\boldsymbol{\phi}$ is the vector of the operator applied to each RBF basis function evaluated at the stencil nodes, and $\mathcal{L}\mathbf{p}$ is the vector of the operator applied to each polynomial basis function.
@@ -240,22 +240,22 @@ where $\mathcal{L}\boldsymbol{\phi}$ is the vector of the operator applied to ea
 When constructing operators for stencils near boundaries using the Hermite approach, the system is modified to:
 
 $$
-\begin{bmatrix}
+\begin{pmatrix}
 \mathbf{A}_{I,I} & \mathcal{B}_2\mathbf{A}_{I,B} & \mathbf{P}_I \\
 \mathcal{B}_1\mathbf{A}_{B,I} & \mathcal{B}_1\mathcal{B}_2\mathbf{A}_{B,B} & \mathcal{B}\mathbf{P}_B \\
 \mathbf{P}_I^T & (\mathcal{B}\mathbf{P}_B)^T & 0
-\end{bmatrix}
-\begin{bmatrix}
+\end{pmatrix}
+\begin{pmatrix}
 \mathbf{w}_I \\
 \mathbf{w}_B \\
 \boldsymbol{\lambda}
-\end{bmatrix}
+\end{pmatrix}
 =
-\begin{bmatrix}
+\begin{pmatrix}
 \mathcal{L}_1\boldsymbol{\phi}(\mathbf{x}_c, \mathcal{X}_I) \\
 \mathcal{L}_1\mathcal{B}_2\boldsymbol{\phi}(\mathbf{x}_c, \mathcal{X}_B) \\
 \mathcal{L}\mathbf{p}(\mathbf{x}_c)
-\end{bmatrix}
+\end{pmatrix}
 $$
 
 where $\mathcal{L}_1$ denotes the differential operator applied to the first argument of the kernel, $\mathcal{X}_I$ is the set of internal nodes in the stencil, and $\mathcal{X}_B$ is the set of boundary nodes in the stencil. This yields weight vectors $\mathbf{w}_I$ and $\mathbf{w}_B$ that properly account for boundary conditions while maintaining symmetry. The global system assembly then proceeds as:
