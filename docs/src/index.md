@@ -4,12 +4,10 @@
 layout: home
 
 hero:
-  name: RadialBasisFunctions.jl Docs
+  name: RadialBasisFunctions.jl
   tagline: All things radial!
 ---
 ```
-
-# RadialBasisFunctions.jl
 
 Documentation for [RadialBasisFunctions](https://github.com/JuliaMeshless/RadialBasisFunctions.jl).
 
