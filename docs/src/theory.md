@@ -23,7 +23,12 @@ The interpolant may be augmented with a polynomial:
 u(\mathbf{x})=\sum_{i=1}^{N} \alpha_{i} \phi(\lvert \mathbf{x}-\mathbf{x}_{i} \rvert) + \sum_{i=1}^{N_{p}} \gamma_{i} p_{i}(\mathbf{x})
 ```
 
-where $N_{p}=\begin{pmatrix} m+d \\ m \end{pmatrix}$ is the number of monomials ($m$ is the monomial order and $d$ is the dimension of $\mathbf{x}$) and $p_{i}(\mathbf{x})$ is the monomial term.
+where $N_{p}=\begin{pmatrix} m+d \\ m \end{pmatrix}$ is the number of monomials ($m$ is the monomial order and $d$ is the dimension of $\mathbf{x}$) and $p_{i}(\mathbf{x})$ is the monomial term. 
+
+For instance, in 2D with $m=2$, we have $N_{p}=6$ and
+```math
+p_{i}(\mathbf{x}) \in \left\{ 1, x, y, x^2, xy, y^2 \right\}
+```
 <!-- , or:
 
 ```math
