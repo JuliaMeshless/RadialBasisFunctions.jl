@@ -12,7 +12,12 @@ Find k-nearest neighbors for each point in `data` using the specified distance m
 - `adjl`: Adjacency list where adjl[i] contains indices of k nearest neighbors of point i
 """
 function find_neighbors(data::AbstractVector, k::Int; metric::M=Euclidean()) where {M<:Metric}
-    tree = KDTree(data, metric)
+    # KDTree only supports Minkowski metrics, use BallTree for custom metrics
+    tree = if metric isa Distances.UnionMinkowskiMetric
+        KDTree(data, metric)
+    else
+        BallTree(data, metric)
+    end
     adjl, _ = knn(tree, data, k, true)
     return adjl
 end
@@ -32,7 +37,12 @@ Find k-nearest neighbors in `data` for each point in `eval_points` using the spe
 - `adjl`: Adjacency list where adjl[i] contains indices of k nearest neighbors for eval_points[i]
 """
 function find_neighbors(data::AbstractVector, eval_points::AbstractVector, k::Int; metric::M=Euclidean()) where {M<:Metric}
-    tree = KDTree(data, metric)
+    # KDTree only supports Minkowski metrics, use BallTree for custom metrics
+    tree = if metric isa Distances.UnionMinkowskiMetric
+        KDTree(data, metric)
+    else
+        BallTree(data, metric)
+    end
     adjl, _ = knn(tree, eval_points, k, true)
     return adjl
 end

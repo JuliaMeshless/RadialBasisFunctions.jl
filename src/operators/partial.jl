@@ -21,7 +21,7 @@ function partial(
     dim::T,
     basis::B=PHS(3; poly_deg=2);
     k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, k),
+    adjl=find_neighbors(data, k; metric=basis.metric),
 ) where {T<:Int,B<:AbstractRadialBasis}
     ℒ = Partial(order, dim)
     return RadialBasisOperator(ℒ, data, basis; k=k, adjl=adjl)
@@ -39,7 +39,7 @@ function partial(
     dim::T,
     basis::B=PHS(3; poly_deg=2);
     k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, eval_points, k),
+    adjl=find_neighbors(data, eval_points, k; metric=basis.metric),
 ) where {T<:Int,B<:AbstractRadialBasis}
     ℒ = Partial(order, dim)
     return RadialBasisOperator(ℒ, data, eval_points, basis; k=k, adjl=adjl)
@@ -61,7 +61,7 @@ function partial(
     boundary_conditions::Vector{<:BoundaryCondition},
     normals::Vector{<:AbstractVector};
     k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, eval_points, k),
+    adjl=find_neighbors(data, eval_points, k; metric=basis.metric),
 ) where {T<:Int,B<:AbstractRadialBasis}
     ℒ = Partial(order, dim)
     # Store boundary information for Hermite dispatch

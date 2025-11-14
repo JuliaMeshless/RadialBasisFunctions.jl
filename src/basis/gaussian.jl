@@ -90,14 +90,6 @@ function ∇²(rbf::Gaussian{T,D,M}) where {T,D,M<:Metric}
     return ∇²ℒ
 end
 
-# Helper function for AD (defined in polyharmonic_spline.jl but needed here too)
-# Note: This should be moved to basis.jl to avoid duplication
-function _unit_vector(x::AbstractVector, dim::Int)
-    e = zero(x)
-    e = setindex(e, one(eltype(x)), dim)
-    return e
-end
-
 function Base.show(io::IO, rbf::Gaussian)
     print(io, "Gaussian, exp(-(ε*r)²)")
     print(io, "\n├─Shape factor: ε = $(rbf.ε)")

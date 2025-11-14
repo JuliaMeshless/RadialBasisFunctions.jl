@@ -18,7 +18,7 @@ function directional(
     v::AbstractVector,
     basis::B=PHS(3; poly_deg=2);
     k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, k),
+    adjl=find_neighbors(data, k; metric=basis.metric),
 ) where {B<:AbstractRadialBasis,T<:Int}
     Dim = length(first(data))
     ℒ = Directional{Dim}(v)
@@ -36,7 +36,7 @@ function directional(
     v::AbstractVector,
     basis::B=PHS(3; poly_deg=2);
     k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, eval_points, k),
+    adjl=find_neighbors(data, eval_points, k; metric=basis.metric),
 ) where {B<:AbstractRadialBasis,T<:Int}
     Dim = length(first(data))
     ℒ = Directional{Dim}(v)
@@ -58,7 +58,7 @@ function directional(
     boundary_conditions::Vector{<:BoundaryCondition},
     normals::Vector{<:AbstractVector};
     k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, eval_points, k),
+    adjl=find_neighbors(data, eval_points, k; metric=basis.metric),
 ) where {B<:AbstractRadialBasis,T<:Int}
     Dim = length(first(data))
     ℒ = Directional{Dim}(v)

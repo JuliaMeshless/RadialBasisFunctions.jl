@@ -66,6 +66,16 @@ function RadialBasisOperator(
     k::T=autoselect_k(data, basis),
     adjl=find_neighbors(data, eval_points, k),
 ) where {TD,TE,T<:Int,B<:AbstractRadialBasis}
+    # Validate that Hermite interpolation only uses Euclidean metric
+    M = typeof(basis.metric)
+    if !(M <: Euclidean)
+        throw(ArgumentError(
+            "Hermite interpolation with boundary conditions requires Euclidean metric. " *
+            "Normal derivatives used in Neumann/Robin boundary conditions are not well-defined " *
+            "for non-Euclidean metrics. Current metric: $(M)"
+        ))
+    end
+
     weights = _build_weights(
         ℒ, data, eval_points, adjl, basis, is_boundary, boundary_conditions, normals
     )

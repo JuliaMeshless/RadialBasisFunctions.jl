@@ -100,14 +100,6 @@ function ∇²(rbf::IMQ{T,D,M}) where {T,D,M<:Metric}
     return ∇²ℒ
 end
 
-# Helper function for AD (defined in polyharmonic_spline.jl but needed here too)
-# Note: This should be moved to basis.jl to avoid duplication
-function _unit_vector(x::AbstractVector, dim::Int)
-    e = zero(x)
-    e = setindex(e, one(eltype(x)), dim)
-    return e
-end
-
 function Base.show(io::IO, rbf::IMQ)
     print(io, "Inverse Multiquadrics, 1/sqrt((r*ε)²+1)")
     print(io, "\n├─Shape factor: ε = $(rbf.ε)")

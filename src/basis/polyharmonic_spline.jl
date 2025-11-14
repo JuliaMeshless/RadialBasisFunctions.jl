@@ -1,12 +1,5 @@
 # Polyharmonic Spline
 
-# Helper function for AD-based derivatives
-function _unit_vector(x::AbstractVector, dim::Int)
-    e = zero(x)
-    e = setindex(e, one(eltype(x)), dim)
-    return e
-end
-
 """
    abstract type AbstractPHS{M<:Metric} <: AbstractRadialBasis{M}
 
@@ -55,6 +48,10 @@ struct PHS1{T<:Int, M<:Metric} <: AbstractPHS{M}
         return new{T, M}(poly_deg, metric)
     end
 end
+
+# Keyword-only constructor for backward compatibility
+PHS1(; poly_deg::T, metric::M=Euclidean()) where {T<:Int, M<:Metric} = PHS1(poly_deg; metric=metric)
+
 (phs::PHS1)(x, xᵢ) = phs.metric(x, xᵢ)
 
 # Analytical derivative for Euclidean metric (fast path)
@@ -198,6 +195,10 @@ struct PHS3{T<:Int, M<:Metric} <: AbstractPHS{M}
         return new{T, M}(poly_deg, metric)
     end
 end
+
+# Keyword-only constructor for backward compatibility
+PHS3(; poly_deg::T, metric::M=Euclidean()) where {T<:Int, M<:Metric} = PHS3(poly_deg; metric=metric)
+
 (phs::PHS3)(x, xᵢ) = phs.metric(x, xᵢ)^3
 
 # Analytical derivative for Euclidean metric (fast path)
@@ -334,6 +335,10 @@ struct PHS5{T<:Int, M<:Metric} <: AbstractPHS{M}
         return new{T, M}(poly_deg, metric)
     end
 end
+
+# Keyword-only constructor for backward compatibility
+PHS5(; poly_deg::T, metric::M=Euclidean()) where {T<:Int, M<:Metric} = PHS5(poly_deg; metric=metric)
+
 (phs::PHS5)(x, xᵢ) = phs.metric(x, xᵢ)^5
 
 # Analytical derivative for Euclidean metric (fast path)
@@ -469,6 +474,9 @@ struct PHS7{T<:Int, M<:Metric} <: AbstractPHS{M}
         return new{T, M}(poly_deg, metric)
     end
 end
+
+# Keyword-only constructor for backward compatibility
+PHS7(; poly_deg::T, metric::M=Euclidean()) where {T<:Int, M<:Metric} = PHS7(poly_deg; metric=metric)
 
 (phs::PHS7)(x, xᵢ) = phs.metric(x, xᵢ)^7
 

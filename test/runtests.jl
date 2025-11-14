@@ -20,6 +20,10 @@ end
     include("basis/monomial.jl")
 end
 
+@safetestset "Custom Distance Metrics" begin
+    include("custom_metrics_test.jl")
+end
+
 @safetestset "Operators" begin
     include("operators/operators.jl")
 end

@@ -13,6 +13,14 @@ Radial basis functions depend only on the distance between points, as measured b
 """
 abstract type AbstractRadialBasis{M<:Metric} <: AbstractBasis{M} end
 
+# Helper function for automatic differentiation (AD) of basis functions
+# Creates a unit vector in the specified dimension, used for computing directional derivatives
+function _unit_vector(x::AbstractVector, dim::Int)
+    e = zero(x)
+    e = Base.setindex(e, one(eltype(x)), dim)
+    return e
+end
+
 include("polyharmonic_spline.jl")
 include("inverse_multiquadric.jl")
 include("gaussian.jl")
