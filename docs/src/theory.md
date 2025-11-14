@@ -106,10 +106,10 @@ When a stencil is **centered around an internal node but includes boundary nodes
 For a stencil with $m_I$ internal nodes and $m_B$ boundary nodes ($m = m_I + m_B$), the approximate solution $u^h$ (the RBF interpolant) takes the form:
 
 ```math
-u^h(\mathbf{x}_c) = \sum_{j=1}^{m_I} \alpha_j \phi(\lvert \mathbf{x}_c - \mathbf{x}_j \rvert) + \sum_{j=m_I+1}^{m} \alpha_j \mathcal{B}_2 \phi(\lvert \mathbf{x}_c - \mathbf{x}_j \rvert) + \sum_{k=1}^{N_p} \beta_k p_k(\mathbf{x}_c)
+u^h(\mathbf{x}_c) = \sum_{j=1}^{m_I} \alpha_j \phi(\lvert \mathbf{x}_c - \mathbf{x}_j \rvert) + \sum_{j=m_I+1}^{m} \alpha_j \mathcal{B}_2 \phi(\lvert \mathbf{x}_c - \mathbf{x}_j \rvert) + \sum_{k=1}^{N_p} \gamma_k p_k(\mathbf{x}_c)
 ```
 
-where $\mathbf{x}_c$ is the stencil center (evaluation point), $\alpha_j$ are RBF coefficients, $\beta_k$ are polynomial coefficients, and $\mathcal{B}_2$ denotes the boundary operator applied to the second argument of the kernel (i.e., to $\mathbf{x}_j$), while $\mathcal{B}_1$ would denote application to the first argument (i.e., to $\mathbf{x}_c$). The key insight is that **the basis function is changed** from $\phi(\cdot, \mathbf{x}_j)$ to $\mathcal{B}_2 \phi(\cdot, \mathbf{x}_j)$ for boundary nodes.
+where $\mathbf{x}_c$ is the stencil center (evaluation point), $\alpha_j$ are RBF coefficients, $\gamma_k$ are polynomial coefficients, and $\mathcal{B}_2$ denotes the boundary operator applied to the second argument of the kernel (i.e., to $\mathbf{x}_j$), while $\mathcal{B}_1$ would denote application to the first argument (i.e., to $\mathbf{x}_c$). The key insight is that **the basis function is changed** from $\phi(\cdot, \mathbf{x}_j)$ to $\mathcal{B}_2 \phi(\cdot, \mathbf{x}_j)$ for boundary nodes.
 
 The local system becomes:
 
@@ -122,7 +122,7 @@ The local system becomes:
 \left[\begin{array}{cc}
 \boldsymbol{\alpha}_I \\
 \boldsymbol{\alpha}_B \\
-\boldsymbol{\beta}
+\boldsymbol{\gamma}
 \end{array}\right]
 =
 \left[\begin{array}{cc}
@@ -132,7 +132,7 @@ The local system becomes:
 \end{array}\right]
 ```
 
-where subscripts $I$ and $B$ denote internal and boundary quantities, respectively. The matrix blocks $\mathbf{A}_{I,I}$, $\mathbf{A}_{I,B}$, $\mathbf{A}_{B,I}$, and $\mathbf{A}_{B,B}$ represent RBF evaluations between internal-internal, internal-boundary, boundary-internal, and boundary-boundary nodes. The vectors $\boldsymbol{\alpha}_I$ and $\boldsymbol{\alpha}_B$ are the RBF coefficients for internal and boundary nodes, $\boldsymbol{\beta}$ are the polynomial coefficients, $\mathbf{u}_I$ contains function values at internal nodes, and $\mathbf{g}$ contains boundary condition values. **This system is now symmetric and positive definite** (for appropriate RBF kernels), ensuring unique solvability regardless of the boundary condition type.
+where subscripts $I$ and $B$ denote internal and boundary quantities, respectively. The matrix blocks $\mathbf{A}_{I,I}$, $\mathbf{A}_{I,B}$, $\mathbf{A}_{B,I}$, and $\mathbf{A}_{B,B}$ represent RBF evaluations between internal-internal, internal-boundary, boundary-internal, and boundary-boundary nodes. The vectors $\boldsymbol{\alpha}_I$ and $\boldsymbol{\alpha}_B$ are the RBF coefficients for internal and boundary nodes, $\boldsymbol{\gamma}$ are the polynomial coefficients, $\mathbf{u}_I$ contains function values at internal nodes, and $\mathbf{g}$ contains boundary condition values. **This system is now symmetric and positive definite** (for appropriate RBF kernels), ensuring unique solvability regardless of the boundary condition type.
 
 We remark that Hermite approach is **only applied to stencils that include boundary nodes**. For internal stencils far from boundaries, the standard RBF formulation remains unchanged, maintaining computational efficiency where boundary effects are not present.
 
