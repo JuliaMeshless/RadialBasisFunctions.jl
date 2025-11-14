@@ -334,8 +334,17 @@ Compute single RBF matrix entry with Hermite boundary modifications.
 Dispatches based on point types (Interior/Dirichlet/NeumannRobin).
 """
 function compute_hermite_rbf_entry(
-    i::Int, j::Int, data::HermiteStencilData, basis::AbstractRadialBasis
-)
+    i::Int, j::Int, data::HermiteStencilData, basis::AbstractRadialBasis{M}
+) where M
+    # Validate that Hermite interpolation only uses Euclidean metric
+    if !(M <: Euclidean)
+        throw(ArgumentError(
+            "Hermite interpolation with boundary conditions requires Euclidean metric. " *
+            "Normal derivatives used in Neumann/Robin boundary conditions are not well-defined " *
+            "for non-Euclidean metrics. Current metric: $(M)"
+        ))
+    end
+
     xi, xj = data.data[i], data.data[j]
     type_i = point_type(data.is_boundary[i], data.boundary_conditions[i])
     type_j = point_type(data.is_boundary[j], data.boundary_conditions[j])

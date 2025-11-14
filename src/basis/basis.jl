@@ -1,12 +1,17 @@
 """
-    abstract type AbstractBasis end
+    abstract type AbstractBasis{M<:Metric} end
+
+Abstract supertype for all basis functions with distance metric type parameter `M`.
 """
-abstract type AbstractBasis end
+abstract type AbstractBasis{M<:Metric} end
 
 """
-    abstract type AbstractRadialBasis <: AbstractBasis end
+    abstract type AbstractRadialBasis{M<:Metric} <: AbstractBasis{M} end
+
+Abstract supertype for radial basis functions with distance metric type parameter `M`.
+Radial basis functions depend only on the distance between points, as measured by metric `M`.
 """
-abstract type AbstractRadialBasis <: AbstractBasis end
+abstract type AbstractRadialBasis{M<:Metric} <: AbstractBasis{M} end
 
 include("polyharmonic_spline.jl")
 include("inverse_multiquadric.jl")

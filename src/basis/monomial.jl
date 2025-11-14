@@ -1,16 +1,21 @@
 """
-    struct MonomialBasis{Dim,Deg} <: AbstractBasis
+    struct MonomialBasis{Dim,Deg,F<:Function,M<:Metric} <: AbstractBasis{M}
 
 `Dim` dimensional monomial basis of order `Deg`.
+
+# Note
+The metric parameter `M` is included for type consistency with the `AbstractBasis` hierarchy,
+but is not used in polynomial basis computations (monomials are not distance-based).
 """
-struct MonomialBasis{Dim,Deg,F<:Function} <: AbstractBasis
+struct MonomialBasis{Dim,Deg,F<:Function,M<:Metric} <: AbstractBasis{M}
     f::F
-    function MonomialBasis(dim::T, deg::T) where {T<:Int}
+    metric::M  # Not used in computation, but required for type hierarchy consistency
+    function MonomialBasis(dim::T, deg::T; metric::M=Euclidean()) where {T<:Int,M<:Metric}
         if deg < 0
             throw(ArgumentError("Monomial basis must have non-negative degree"))
         end
         f = _get_monomial_basis(Val(dim), Val(deg))
-        return new{dim,deg,typeof(f)}(f)
+        return new{dim,deg,typeof(f),M}(f, metric)
     end
 end
 

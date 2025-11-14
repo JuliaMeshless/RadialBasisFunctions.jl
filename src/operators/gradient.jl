@@ -19,7 +19,7 @@ function gradient(
     data::AbstractVector,
     basis::B=PHS(3; poly_deg=2);
     k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, k),
+    adjl=find_neighbors(data, k; metric=basis.metric),
 ) where {B<:AbstractRadialBasis,T<:Int}
     Dim = length(first(data))
     ℒ = Gradient{Dim}()
@@ -36,7 +36,7 @@ function gradient(
     eval_points::AbstractVector,
     basis::B=PHS(3; poly_deg=2);
     k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, eval_points, k),
+    adjl=find_neighbors(data, eval_points, k; metric=basis.metric),
 ) where {B<:AbstractRadialBasis,T<:Int}
     Dim = length(first(data))
     ℒ = Gradient{Dim}()
@@ -57,7 +57,7 @@ function gradient(
     boundary_conditions::Vector{<:BoundaryCondition},
     normals::Vector{<:AbstractVector};
     k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, eval_points, k),
+    adjl=find_neighbors(data, eval_points, k; metric=basis.metric),
 ) where {B<:AbstractRadialBasis,T<:Int}
     Dim = length(first(data))
     ℒ = Gradient{Dim}()

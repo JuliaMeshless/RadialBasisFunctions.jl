@@ -1,11 +1,38 @@
-function find_neighbors(data::AbstractVector, k::Int)
-    tree = KDTree(data)
+"""
+    find_neighbors(data::AbstractVector, k::Int; metric::Metric=Euclidean())
+
+Find k-nearest neighbors for each point in `data` using the specified distance metric.
+
+# Arguments
+- `data::AbstractVector`: Vector of points (each point should be an AbstractVector)
+- `k::Int`: Number of nearest neighbors to find
+- `metric::Metric`: Distance metric to use (default: Euclidean())
+
+# Returns
+- `adjl`: Adjacency list where adjl[i] contains indices of k nearest neighbors of point i
+"""
+function find_neighbors(data::AbstractVector, k::Int; metric::M=Euclidean()) where {M<:Metric}
+    tree = KDTree(data, metric)
     adjl, _ = knn(tree, data, k, true)
     return adjl
 end
 
-function find_neighbors(data::AbstractVector, eval_points::AbstractVector, k::Int)
-    tree = KDTree(data)
+"""
+    find_neighbors(data::AbstractVector, eval_points::AbstractVector, k::Int; metric::Metric=Euclidean())
+
+Find k-nearest neighbors in `data` for each point in `eval_points` using the specified distance metric.
+
+# Arguments
+- `data::AbstractVector`: Vector of data points
+- `eval_points::AbstractVector`: Vector of evaluation points
+- `k::Int`: Number of nearest neighbors to find
+- `metric::Metric`: Distance metric to use (default: Euclidean())
+
+# Returns
+- `adjl`: Adjacency list where adjl[i] contains indices of k nearest neighbors for eval_points[i]
+"""
+function find_neighbors(data::AbstractVector, eval_points::AbstractVector, k::Int; metric::M=Euclidean()) where {M<:Metric}
+    tree = KDTree(data, metric)
     adjl, _ = knn(tree, eval_points, k, true)
     return adjl
 end
