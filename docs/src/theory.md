@@ -29,15 +29,7 @@ For instance, in 2D with $m=2$, we have $N_{p}=6$ and
 ```math
 p_{i}(\mathbf{x}) \in \left\{ 1, x, y, x^2, xy, y^2 \right\}
 ```
-<!-- , or:
 
-```math
-p_{i}(\mathbf{x})=q_{i}(\lvert \mathbf{x}-\mathbf{x}_{i} \rvert)
-```
-
-where $q_{i}$ is the $i$-th monomial in $\mathbf{q}=\left[\begin{array}{c} 1, x, y, x^2, xy, y^2 \end{array}\right]$ in 2D, for example.  -->
-<!-- 
-By collocation the expansion of the augmented interpolant at all the nodes $\mathbf{x}_{i}$ where $i=1\cdots N$, there results a linear system for the interpolant weights as: -->
 When we require the interpolation to be exact on a set of data points $\{\mathbf{x}_{i}, u(\mathbf{x}_{i})\}$ where $i=1,\cdots,N$, we obtain the following linear system for the interpolation coefficients:
 
 ```math
