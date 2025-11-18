@@ -1,7 +1,7 @@
 name = "RadialBasisFunctions"
 uuid = "79ee0514-adf7-4479-8807-6f72ea8967e8"
 authors = ["Kyle Beggs"]
-version = "0.2.5"
+version = "0.2.6"
 
 [deps]
 ChunkSplitters = "ae650224-84b6-46f8-82ea-d812ca08434e"
