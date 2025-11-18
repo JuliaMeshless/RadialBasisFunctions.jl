@@ -3,35 +3,43 @@ name: Documentation
 on:
     push:
         branches:
-            - main # update to match your development branch (master, main, dev, trunk, ...)
+            - main
         tags: "*"
     pull_request:
+    workflow_dispatch:
+
+permissions:
+    contents: write
+    pages: write
+    id-token: write
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-    build:
-        # These permissions are needed to:
-        # - Deploy the documentation: https://documenter.juliadocs.org/stable/man/hosting/#Permissions
-        # - Delete old caches: https://github.com/julia-actions/cache#usage
-        permissions:
-            actions: write
-            contents: write
-            pull-requests: read
-            statuses: write
+    docs:
+        name: Documentation
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
             - uses: julia-actions/setup-julia@v2
               with:
                   version: "1.12"
-            - uses: julia-actions/cache@v2
-            - name: Install dependencies
-              shell: julia --color=yes --project=docs {0}
+            - name: Configure doc environment
+              shell: julia --project=docs --color=yes {0}
               run: |
                   using Pkg
                   Pkg.develop(PackageSpec(path=pwd()))
                   Pkg.instantiate()
-            - name: Build and deploy
-              run: julia --color=yes --project=docs docs/make.jl
+            - uses: julia-actions/julia-buildpkg@v1
+            - uses: julia-actions/julia-docdeploy@v1
               env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
-                  DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }} # If authenticating with SSH deploy key
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            - name: Run doctests
+              shell: julia --project=docs --color=yes {0}
+              run: |
+                  using Documenter: DocMeta, doctest
+                  using RadialBasisFunctions
+                  DocMeta.setdocmeta!(RadialBasisFunctions, :DocTestSetup, :(using RadialBasisFunctions); recursive=true)
+                  doctest(RadialBasisFunctions)
