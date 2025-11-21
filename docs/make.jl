@@ -15,8 +15,6 @@ makedocs(;
         repo="https://github.com/JuliaMeshless/RadialBasisFunctions.jl",
         devbranch="main",
         devurl="dev",
-        md_output_path=".",
-        build_vitepress=false,
     ),
     pages=[
         "Home" => "index.md",
