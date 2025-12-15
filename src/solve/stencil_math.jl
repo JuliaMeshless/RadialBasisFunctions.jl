@@ -1,13 +1,5 @@
 using LinearAlgebra: Symmetric, dot
 
-# ============================================================================
-# Dispatch Helpers for Data Access
-# ============================================================================
-
-# Get point at index i - dispatch on data type
-_get_point(data::AbstractVector, i) = data[i]
-_get_point(data::HermiteStencilData, i) = data.data[i]
-
 # Compute RBF matrix entry - dispatch on data type
 _rbf_entry(i, j, data::AbstractVector, basis) = basis(data[i], data[j])
 function _rbf_entry(i, j, data::HermiteStencilData, basis)

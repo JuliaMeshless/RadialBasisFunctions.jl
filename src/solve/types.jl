@@ -138,7 +138,6 @@ function update_hermite_stencil_data!(
     return nothing
 end
 
-
 # ============================================================================
 # Boundary Data Wrapper
 # ============================================================================
@@ -163,7 +162,6 @@ abstract type StencilType end
 struct InteriorStencil <: StencilType end  # All neighbors are interior
 struct DirichletStencil <: StencilType end  # Eval point is Dirichlet BC
 struct HermiteStencil <: StencilType end    # Mixed interior/boundary
-
 
 """
     classify_stencil(is_boundary, boundary_conditions, eval_idx,
@@ -203,7 +201,6 @@ function classify_stencil(
         global_to_boundary,
     )
 end
-
 
 # ============================================================================
 # Point Type Classification (for Hermite dispatch)
