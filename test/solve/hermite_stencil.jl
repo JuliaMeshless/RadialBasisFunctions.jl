@@ -102,4 +102,67 @@ import RadialBasisFunctions as RBF
         @test length(hermite_data.boundary_conditions) == 3
         @test length(hermite_data.normals) == 3
     end
+
+    @testset "Polynomial dispatch - point types" begin
+        # Setup
+        k = 3
+        dim = 1
+        nmon = 2  # 1D linear: [1, x]
+        mon = RBF.MonomialBasis(1, 1)
+
+        # Create HermiteStencilData with workspace
+        hermite_data = RBF.HermiteStencilData{Float64}(k, dim, nmon)
+
+        # Populate with test data
+        hermite_data.data[1] .= [0.0]
+        hermite_data.data[2] .= [0.5]
+        hermite_data.data[3] .= [1.0]
+
+        # Test 1: Interior point (standard evaluation)
+        hermite_data.is_boundary[1] = false
+        hermite_data.boundary_conditions[1] = RBF.Internal()
+        a_interior = zeros(nmon)
+        RBF.compute_hermite_poly_entry!(a_interior, 1, hermite_data, mon)
+        @test a_interior[1] ≈ 1.0  # Constant term
+        @test a_interior[2] ≈ 0.0  # x term at x=0
+
+        # Test 2: Dirichlet point (standard evaluation)
+        hermite_data.is_boundary[2] = true
+        hermite_data.boundary_conditions[2] = RBF.Dirichlet()
+        a_dirichlet = zeros(nmon)
+        RBF.compute_hermite_poly_entry!(a_dirichlet, 2, hermite_data, mon)
+        @test a_dirichlet[1] ≈ 1.0  # Constant term
+        @test a_dirichlet[2] ≈ 0.5  # x term at x=0.5
+
+        # Test 3: Neumann point (α*P + β*∂ₙP)
+        hermite_data.is_boundary[3] = true
+        hermite_data.boundary_conditions[3] = RBF.Neumann()  # α=0, β=1
+        hermite_data.normals[3] .= [1.0]  # Outward normal
+        a_neumann = zeros(nmon)
+        RBF.compute_hermite_poly_entry!(a_neumann, 3, hermite_data, mon)
+        # Neumann: β*∂ₙP = 1.0 * ∂/∂n[1, x] = [0, 1] (derivative of constant=0, derivative of x=1)
+        @test a_neumann[1] ≈ 0.0  # ∂(1)/∂n = 0
+        @test a_neumann[2] ≈ 1.0  # ∂(x)/∂n = n_x = 1.0
+
+        # Test 4: Robin point (α*P + β*∂ₙP)
+        hermite_data.boundary_conditions[3] = RBF.Robin(0.5, 0.5)  # α=0.5, β=0.5
+        a_robin = zeros(nmon)
+        RBF.compute_hermite_poly_entry!(a_robin, 3, hermite_data, mon)
+        # Robin: 0.5*P + 0.5*∂ₙP at x=1.0
+        # P = [1, 1], ∂ₙP = [0, 1]
+        # Result = 0.5*[1, 1] + 0.5*[0, 1] = [0.5, 1.0]
+        @test a_robin[1] ≈ 0.5  # 0.5*1 + 0.5*0 = 0.5
+        @test a_robin[2] ≈ 1.0  # 0.5*1 + 0.5*1 = 1.0
+    end
+
+    @testset "HermiteStencilData workspace allocation" begin
+        k = 5
+        dim = 2
+        nmon = 6  # 2D quadratic: binomial(2+2, 2) = 6
+
+        hermite_data = RBF.HermiteStencilData{Float64}(k, dim, nmon)
+
+        @test length(hermite_data.poly_workspace) == nmon
+        @test eltype(hermite_data.poly_workspace) == Float64
+    end
 end

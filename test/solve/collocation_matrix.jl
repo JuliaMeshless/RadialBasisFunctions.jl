@@ -47,8 +47,9 @@ import RadialBasisFunctions as RBF
         is_boundary = [false, true, false, true]
         bcs = [Internal(), Neumann(), Internal(), Robin(0.5, 1.0)]
         normals = [[0.0, 0.0], [1.0, 0.0], [0.0, 0.0], [0.0, 1.0]]
+        poly_workspace = zeros(Float64, nmon)
 
-        hermite_data = RBF.HermiteStencilData(data_2d, is_boundary, bcs, normals)
+        hermite_data = RBF.HermiteStencilData(data_2d, is_boundary, bcs, normals, poly_workspace)
 
         # Build Hermite matrix
         A_hermite = Symmetric(zeros(Float64, n, n), :U)

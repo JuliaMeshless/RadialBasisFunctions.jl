@@ -1,16 +1,3 @@
-"""
-Layer: Types & Data Structures
-
-This file contains shared type definitions used across the solve system:
-- Boundary condition types and utilities
-- Stencil classification types
-- Allocation strategy types
-- Operator arity traits for type-stable dispatch
-
-Called by: stencil_math.jl, kernel_exec.jl, api.jl
-Dependencies: StaticArraysCore
-"""
-
 using StaticArraysCore: StaticVector
 
 # ============================================================================
@@ -68,6 +55,7 @@ Fields:
 - `is_boundary`: Boolean flags for each point
 - `boundary_conditions`: BC for each point (use Internal() for interior)
 - `normals`: Normal vectors (zero for interior points)
+- `poly_workspace`: Pre-allocated buffer for polynomial operations (avoids allocations in hot path)
 
 Note: For interior points (is_boundary[i] == false), boundary_conditions[i]
 and normals[i] contain sentinel values and should not be accessed.
@@ -77,12 +65,14 @@ struct HermiteStencilData{T<:Real}
     is_boundary::Vector{Bool}
     boundary_conditions::Vector{BoundaryCondition{T}}
     normals::Vector{Vector{T}}
+    poly_workspace::Vector{T}  # Pre-allocated buffer for polynomial operations
 
     function HermiteStencilData(
         data::AbstractVector{<:AbstractVector{T}},
         is_boundary::Vector{Bool},
         boundary_conditions::Vector{BoundaryCondition{T}},
         normals::AbstractVector{<:AbstractVector{T}},
+        poly_workspace::Vector{T}=Vector{T}(undef, 0),
     ) where {T<:Real}
         @assert length(data) ==
             length(is_boundary) ==
@@ -93,17 +83,22 @@ struct HermiteStencilData{T<:Real}
         data_vectors = [Vector{T}(point) for point in data]
         normals_vectors = [Vector{T}(normal) for normal in normals]
 
-        return new{T}(data_vectors, is_boundary, boundary_conditions, normals_vectors)
+        return new{T}(
+            data_vectors, is_boundary, boundary_conditions, normals_vectors, poly_workspace
+        )
     end
 end
 
 """Pre-allocation constructor for HermiteStencilData"""
-function HermiteStencilData{T}(k::Int, dim::Int) where {T<:Real}
+function HermiteStencilData{T}(k::Int, dim::Int, nmon::Int=0) where {T<:Real}
     data = [Vector{T}(undef, dim) for _ in 1:k]
     is_boundary = Vector{Bool}(falses(k))
     boundary_conditions = [Internal(T) for _ in 1:k]
     normals = [Vector{T}(undef, dim) for _ in 1:k]
-    return HermiteStencilData(data, is_boundary, boundary_conditions, normals)
+    poly_workspace = Vector{T}(undef, nmon)
+    return HermiteStencilData(
+        data, is_boundary, boundary_conditions, normals, poly_workspace
+    )
 end
 
 """
@@ -143,8 +138,6 @@ function update_hermite_stencil_data!(
     return nothing
 end
 
-# Backward compatibility alias
-const update_stencil_data! = update_hermite_stencil_data!
 
 # ============================================================================
 # Boundary Data Wrapper
@@ -171,8 +164,6 @@ struct InteriorStencil <: StencilType end  # All neighbors are interior
 struct DirichletStencil <: StencilType end  # Eval point is Dirichlet BC
 struct HermiteStencil <: StencilType end    # Mixed interior/boundary
 
-# Backward compatibility alias
-const InternalStencil = InteriorStencil
 
 """
     classify_stencil(is_boundary, boundary_conditions, eval_idx,
@@ -213,8 +204,6 @@ function classify_stencil(
     )
 end
 
-# Backward compatibility alias
-const stencil_type = classify_stencil
 
 # ============================================================================
 # Point Type Classification (for Hermite dispatch)

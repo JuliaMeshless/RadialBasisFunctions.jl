@@ -33,7 +33,7 @@ end
 @testset "Right-hand side" begin
     b = zeros(n)
     eval_point = SVector(0.0, 0.0)
-    RBF._build_rhs!(b, Lrb, Lmb, x, eval_point, rb, k)
+    RBF._build_rhs!(b, Lrb, Lmb, x, eval_point, rb, mb, k)
     @testset "RBFs" begin
         @test b[1] ≈ Lrb(eval_point, x[1])
         @test b[2] ≈ Lrb(eval_point, x[2])

@@ -1,17 +1,3 @@
-"""
-Layer: Parallel Kernel Execution
-
-This file handles memory allocation, kernel launching, and parallel coordination:
-- Sparse matrix array allocation (strategies: Simple vs Optimized)
-- Batch processing and parallelization
-- Kernel execution on CPU/GPU
-- Sparse matrix construction
-
-Called by: api.jl
-Calls: stencil_math.jl (within kernels)
-Dependencies: KernelAbstractions, SparseArrays, types.jl, stencil_math.jl
-"""
-
 using KernelAbstractions
 using KernelAbstractions: @kernel, @index, CPU
 using SparseArrays: sparse
@@ -208,8 +194,8 @@ function launch_kernel!(
     TD = eltype(first(data))
     dim = length(first(data))
 
-    # Pre-allocate Hermite workspace for each batch
-    batch_hermite_datas = [HermiteStencilData{TD}(k, dim) for _ in 1:n_batches]
+    # Pre-allocate Hermite workspace for each batch (includes polynomial workspace)
+    batch_hermite_datas = [HermiteStencilData{TD}(k, dim, nmon) for _ in 1:n_batches]
     global_to_boundary = construct_global_to_boundary(boundary_data.is_boundary)
 
     @kernel function weight_kernel(
