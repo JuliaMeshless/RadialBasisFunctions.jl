@@ -30,7 +30,7 @@ import RadialBasisFunctions as RBF
         ℒmon = identity_op_mon(mon)
 
         b = zeros(Float64, n)
-        RBF._build_rhs!(b, ℒrbf, ℒmon, data_2d, eval_point_2d, basis, k)
+        RBF._build_rhs!(b, ℒrbf, ℒmon, data_2d, eval_point_2d, basis, mon, k)
 
         # Basic validation
         @test size(b) == (n,)
@@ -58,7 +58,7 @@ import RadialBasisFunctions as RBF
         ℒmon = partial_op_mon(mon)
 
         b = zeros(Float64, n)
-        RBF._build_rhs!(b, ℒrbf, ℒmon, data_2d, eval_point_2d, basis, k)
+        RBF._build_rhs!(b, ℒrbf, ℒmon, data_2d, eval_point_2d, basis, mon, k)
 
         # Basic validation
         @test size(b) == (n,)
@@ -83,7 +83,7 @@ import RadialBasisFunctions as RBF
         ℒmon = (RBF.∂(mon, 1), RBF.∂(mon, 2))
 
         b = zeros(Float64, n, 2)
-        RBF._build_rhs!(b, ℒrbf, ℒmon, data_2d, eval_point_2d, basis, k)
+        RBF._build_rhs!(b, ℒrbf, ℒmon, data_2d, eval_point_2d, basis, mon, k)
 
         # Basic validation
         @test size(b) == (n, 2)
@@ -128,7 +128,7 @@ import RadialBasisFunctions as RBF
 
         # With Dirichlet boundaries, should match standard RHS
         b_standard = zeros(Float64, n)
-        RBF._build_rhs!(b_standard, ℒrbf, ℒmon, data_2d, eval_pt, basis, k)
+        RBF._build_rhs!(b_standard, ℒrbf, ℒmon, data_2d, eval_pt, basis, mon, k)
         @test b ≈ b_standard
     end
 
