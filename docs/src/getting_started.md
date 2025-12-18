@@ -101,3 +101,9 @@ all(df_x.(x) .≈ grad(y)[1])
 ```@example overview
 all(df_y.(x) .≈ grad(y)[2])
 ```
+
+## Current Limitations
+
+1. **Data format**: The package requires `Vector{AbstractVector}` input (not matrices). Each point must have inferrable dimension, e.g., `SVector{2,Float64}` from StaticArrays.jl. Matrix input support is planned.
+
+2. **Global interpolation**: `Interpolator` currently uses all points globally. Local collocation support (like the operators use) is planned for future releases.

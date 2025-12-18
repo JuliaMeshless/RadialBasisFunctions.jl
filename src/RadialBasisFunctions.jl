@@ -12,7 +12,6 @@ using SymRCM
 
 include("basis/basis.jl")
 export AbstractRadialBasis
-export RadialBasisFunction
 export AbstractPHS, PHS, PHS1, PHS3, PHS5, PHS7
 export IMQ
 export Gaussian
@@ -29,8 +28,8 @@ export HermiteStencilData, update_hermite_stencil_data!
 export InteriorStencil, DirichletStencil, HermiteStencil
 export classify_stencil
 
-include("solve/stencil_math.jl")
-include("solve/kernel_exec.jl")
+include("solve/assembly.jl")
+include("solve/execution.jl")
 include("solve/api.jl")
 
 include("operators/operators.jl")

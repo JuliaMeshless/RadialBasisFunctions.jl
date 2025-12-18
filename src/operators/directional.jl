@@ -75,29 +75,36 @@ function directional(
     )
 end
 
-function _build_weights(ℒ::Directional{Dim}, data, eval_points, adjl, basis) where {Dim}
-    v = ℒ.v
-    if !(length(v) == Dim || length(v) == length(data))
+# Helper: validate direction vector dimensions
+function _validate_directional_vector(v, Dim::Int, data_length::Int)
+    if !(length(v) == Dim || length(v) == data_length)
         throw(
             DomainError(
-                "The geometrical vector for Directional() should match either the dimension of the input or the number of input points. The geometrical vector length is $(length(v)) while there are $(length(data)) points with a dimension of $Dim",
+                "The geometrical vector for Directional() should match either the dimension of the input or the number of input points. The geometrical vector length is $(length(v)) while there are $(data_length) points with a dimension of $Dim",
             ),
         )
     end
-    weights = _build_weights(Gradient{Dim}(), data, eval_points, adjl, basis)
+end
 
+# Helper: combine gradient weights with direction vector
+function _combine_directional_weights(weights, v, Dim::Int)
     if length(v) == Dim
-        return mapreduce(+, zip(weights, v)) do zipped
-            w, vᵢ = zipped
+        return mapreduce(+, zip(weights, v)) do (w, vᵢ)
             w * vᵢ
         end
     else
         vv = ntuple(i -> getindex.(v, i), Dim)
-        return mapreduce(+, zip(weights, vv)) do zipped
-            w, vᵢ = zipped
+        return mapreduce(+, zip(weights, vv)) do (w, vᵢ)
             Diagonal(vᵢ) * w
         end
     end
+end
+
+function _build_weights(ℒ::Directional{Dim}, data, eval_points, adjl, basis) where {Dim}
+    v = ℒ.v
+    _validate_directional_vector(v, Dim, length(data))
+    weights = _build_weights(Gradient{Dim}(), data, eval_points, adjl, basis)
+    return _combine_directional_weights(weights, v, Dim)
 end
 
 """
@@ -116,13 +123,7 @@ function _build_weights(
     normals::Vector{<:AbstractVector},
 ) where {Dim}
     v = ℒ.v
-    if !(length(v) == Dim || length(v) == length(data))
-        throw(
-            DomainError(
-                "The geometrical vector for Directional() should match either the dimension of the input or the number of input points. The geometrical vector length is $(length(v)) while there are $(length(data)) points with a dimension of $Dim",
-            ),
-        )
-    end
+    _validate_directional_vector(v, Dim, length(data))
 
     # Build gradient weights using Hermite method
     dim = length(first(data))
@@ -144,18 +145,7 @@ function _build_weights(
         normals,
     )
 
-    if length(v) == Dim
-        return mapreduce(+, zip(weights, v)) do zipped
-            w, vᵢ = zipped
-            w * vᵢ
-        end
-    else
-        vv = ntuple(i -> getindex.(v, i), Dim)
-        return mapreduce(+, zip(weights, vv)) do zipped
-            w, vᵢ = zipped
-            Diagonal(vᵢ) * w
-        end
-    end
+    return _combine_directional_weights(weights, v, Dim)
 end
 
 # pretty printing
