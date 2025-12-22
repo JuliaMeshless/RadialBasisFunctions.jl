@@ -32,6 +32,10 @@ end
     include("operators/gradient.jl")
 end
 
+@safetestset "Jacobian" begin
+    include("operators/jacobian.jl")
+end
+
 @safetestset "Directional Derivative" begin
     include("operators/directional.jl")
 end

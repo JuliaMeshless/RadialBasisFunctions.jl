@@ -18,16 +18,37 @@ y = f.(x)
 @testset "First Derivative gradients" begin
     ∇ = gradient(x, PHS(3; poly_deg=2))
     ∇y = ∇(y)
-    @test mean_percent_error(∇y[1], df_dx.(x)) < 10
-    @test mean_percent_error(∇y[2], df_dy.(x)) < 10
+    @test ∇y isa Matrix
+    @test size(∇y) == (N, 2)
+    @test mean_percent_error(∇y[:, 1], df_dx.(x)) < 10
+    @test mean_percent_error(∇y[:, 2], df_dy.(x)) < 10
 end
 
 @testset "Different Evaluation Points" begin
     x2 = map(x -> SVector{2}(rand(2)), 1:100)
     ∇ = gradient(x, x2, PHS(3; poly_deg=2))
     ∇y = ∇(y)
-    @test mean_percent_error(∇y[1], df_dx.(x2)) < 10
-    @test mean_percent_error(∇y[2], df_dy.(x2)) < 10
+    @test ∇y isa Matrix
+    @test size(∇y) == (100, 2)
+    @test mean_percent_error(∇y[:, 1], df_dx.(x2)) < 10
+    @test mean_percent_error(∇y[:, 2], df_dy.(x2)) < 10
+end
+
+@testset "In-place gradient evaluation" begin
+    ∇ = gradient(x, PHS(3; poly_deg=2))
+    out = Matrix{Float64}(undef, N, 2)
+    gradient!(out, ∇, y)
+    @test mean_percent_error(out[:, 1], df_dx.(x)) < 10
+    @test mean_percent_error(out[:, 2], df_dy.(x)) < 10
+end
+
+@testset "Gradient via jacobian function" begin
+    ∇ = gradient(x, PHS(3; poly_deg=2))
+    ∇y = jacobian(∇, y)
+    @test ∇y isa Matrix
+    @test size(∇y) == (N, 2)
+    @test mean_percent_error(∇y[:, 1], df_dx.(x)) < 10
+    @test mean_percent_error(∇y[:, 2], df_dy.(x)) < 10
 end
 
 @testset "Printing" begin

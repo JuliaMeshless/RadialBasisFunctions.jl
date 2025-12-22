@@ -78,3 +78,53 @@ end
 
 # pretty printing
 print_op(op::Gradient) = "Gradient (∇f)"
+
+# Evaluation methods - delegate to jacobian for unified implementation
+
+"""
+    gradient(op::RadialBasisOperator{<:Gradient}, x::AbstractVector)
+
+Evaluate the gradient of scalar field `x`. Returns `Matrix{T}` of size (N_eval × D).
+
+This is equivalent to `jacobian(op, x)` but validates that the input is a scalar field.
+
+!!! note "Breaking change"
+    In previous versions, `gradient` returned a tuple of vectors `(∂f/∂x₁, ∂f/∂x₂, ...)`.
+    It now returns a Matrix for better autodiff compatibility and consistency with Jacobian semantics.
+    Migrate code from `result[1]` to `result[:, 1]`.
+
+# Examples
+```julia
+op = gradient(points, PHS(3; poly_deg=2))
+u = sin.(getindex.(points, 1))
+∇u = gradient(op, u)  # Matrix (N × D)
+∂u_∂x = ∇u[:, 1]
+∂u_∂y = ∇u[:, 2]
+```
+"""
+function gradient(op::RadialBasisOperator{<:Gradient}, x::AbstractVector)
+    return jacobian(op, x)
+end
+
+"""
+    gradient!(out::AbstractMatrix, op::RadialBasisOperator{<:Gradient}, x::AbstractVector)
+
+In-place gradient evaluation. Stores result in preallocated `out` matrix.
+
+# Arguments
+- `out`: Preallocated output matrix of size (N_eval × D)
+- `op`: Gradient operator
+- `x`: Scalar field values
+
+# Examples
+```julia
+op = gradient(points, PHS(3; poly_deg=2))
+out = Matrix{Float64}(undef, length(points), 2)
+gradient!(out, op, u)
+```
+"""
+function gradient!(
+    out::AbstractMatrix, op::RadialBasisOperator{<:Gradient}, x::AbstractVector
+)
+    return jacobian!(out, op, x)
+end
