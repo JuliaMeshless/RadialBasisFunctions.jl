@@ -83,23 +83,25 @@ lap(x) = 4
 all(abs.(lap.(x) .- lap_rbf(y)) .< 1e-8)
 ```
 
-### Gradient
+### Gradient / Jacobian
 
-We can also retrieve the gradient. This is really just a convenience wrapper around `Partial`.
+The `jacobian` function computes all partial derivatives. For scalar fields, this is the gradient.
+The `gradient` function is a convenience alias for `jacobian`.
 
 ```@example overview
-grad = gradient(x)
+op = jacobian(x)  # or equivalently: gradient(x)
+result = op(y)    # Matrix of size (N, dim)
 
 # define exacts
 df_x(x) = 4*x[1]
 df_y(x) = 3
 
-# error
-all(df_x.(x) .≈ grad(y)[1])
+# error - access columns for each partial derivative
+all(df_x.(x) .≈ result[:, 1])
 ```
 
 ```@example overview
-all(df_y.(x) .≈ grad(y)[2])
+all(df_y.(x) .≈ result[:, 2])
 ```
 
 ## Current Limitations

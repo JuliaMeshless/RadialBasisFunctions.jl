@@ -1,4 +1,5 @@
 using RadialBasisFunctions
+using SparseArrays: SparseVector
 using StaticArraysCore
 using Statistics
 using HaltonSequences
@@ -13,8 +14,8 @@ points = SVector{2}.(HaltonPoint(2)[1:N])
     # f(x,y) = sin(x) + cos(y)
     # ∂f/∂x = cos(x), ∂f/∂y = -sin(y)
     u = sin.(getindex.(points, 1)) .+ cos.(getindex.(points, 2))
-    op = gradient(points, PHS(3; poly_deg=2))
-    J = jacobian(op, u)
+    op = jacobian(points, PHS(3; poly_deg=2))
+    J = op(u)
 
     @test J isa Matrix
     @test size(J) == (N, 2)
@@ -33,8 +34,8 @@ end
     u2 = cos.(getindex.(points, 2))
     u = hcat(u1, u2)
 
-    op = gradient(points, PHS(3; poly_deg=2))
-    J = jacobian(op, u)
+    op = jacobian(points, PHS(3; poly_deg=2))
+    J = op(u)
 
     @test J isa Array{<:Any,3}
     @test size(J) == (N, 2, 2)
@@ -56,8 +57,8 @@ end
     u2 = getindex.(points, 1) .^ 2 .+ getindex.(points, 2) .^ 2
     u = hcat(u1, u2)
 
-    op = gradient(points, PHS(3; poly_deg=2))
-    J = jacobian(op, u)
+    op = jacobian(points, PHS(3; poly_deg=2))
+    J = op(u)
 
     @test size(J) == (N, 2, 2)
 
@@ -73,9 +74,9 @@ end
 
 @testset "Jacobian in-place - Scalar" begin
     u = sin.(getindex.(points, 1)) .+ cos.(getindex.(points, 2))
-    op = gradient(points, PHS(3; poly_deg=2))
+    op = jacobian(points, PHS(3; poly_deg=2))
     out = Matrix{Float64}(undef, N, 2)
-    jacobian!(out, op, u)
+    op(out, u)
 
     @test mean_percent_error(out[:, 1], cos.(getindex.(points, 1))) < 10
     @test mean_percent_error(out[:, 2], -sin.(getindex.(points, 2))) < 10
@@ -86,9 +87,9 @@ end
     u2 = cos.(getindex.(points, 2))
     u = hcat(u1, u2)
 
-    op = gradient(points, PHS(3; poly_deg=2))
+    op = jacobian(points, PHS(3; poly_deg=2))
     out = Array{Float64,3}(undef, N, 2, 2)
-    jacobian!(out, op, u)
+    op(out, u)
 
     @test mean_percent_error(out[:, 1, 1], cos.(getindex.(points, 1))) < 10
     @test maximum(abs.(out[:, 1, 2])) < 0.1
@@ -111,8 +112,8 @@ end
     eval_points = SVector{2}.(HaltonPoint(2)[(N + 1):(N + 100)])
     u = sin.(getindex.(points, 1)) .+ cos.(getindex.(points, 2))
 
-    op = gradient(points, eval_points, PHS(3; poly_deg=2))
-    J = jacobian(op, u)
+    op = jacobian(points, eval_points, PHS(3; poly_deg=2))
+    J = op(u)
 
     @test size(J) == (100, 2)
     @test mean_percent_error(J[:, 1], cos.(getindex.(eval_points, 1))) < 10
@@ -130,8 +131,8 @@ end
         getindex.(points_3d, 2) .* getindex.(points_3d, 3) .+
         getindex.(points_3d, 3) .* getindex.(points_3d, 1)
 
-    op = gradient(points_3d, PHS(3; poly_deg=2))
-    J = jacobian(op, u)
+    op = jacobian(points_3d, PHS(3; poly_deg=2))
+    J = op(u)
 
     @test J isa Matrix
     @test size(J) == (500, 3)
@@ -143,4 +144,50 @@ end
     @test mean_percent_error(J[:, 1], expected_dx) < 10
     @test mean_percent_error(J[:, 2], expected_dy) < 10
     @test mean_percent_error(J[:, 3], expected_dz) < 10
+end
+
+@testset "Single eval point - Scalar field returns Vector" begin
+    # Single evaluation point
+    eval_pt = [SVector{2}(0.5, 0.5)]
+    u = sin.(getindex.(points, 1)) .+ cos.(getindex.(points, 2))
+
+    op = jacobian(points, eval_pt, PHS(3; poly_deg=2))
+
+    # Weights should be SparseVectors, not matrices
+    @test op.weights[1] isa SparseVector
+    @test op.weights[2] isa SparseVector
+
+    J = op(u)
+
+    # Result should be a Vector (size D), not a 1×D Matrix
+    @test J isa Vector
+    @test size(J) == (2,)
+    @test length(J) == 2
+
+    # Check accuracy
+    @test abs(J[1] - cos(0.5)) < 0.1
+    @test abs(J[2] - (-sin(0.5))) < 0.1
+end
+
+@testset "Single eval point - Vector field returns Matrix" begin
+    # Single evaluation point
+    eval_pt = [SVector{2}(0.5, 0.5)]
+    # u = [x*y, x² + y²]
+    u1 = getindex.(points, 1) .* getindex.(points, 2)
+    u2 = getindex.(points, 1) .^ 2 .+ getindex.(points, 2) .^ 2
+    u = hcat(u1, u2)
+
+    op = jacobian(points, eval_pt, PHS(3; poly_deg=2))
+    J = op(u)
+
+    # Result should be a D_in × D Matrix, not 1×D_in×D tensor
+    @test J isa Matrix
+    @test size(J) == (2, 2)
+
+    # Expected Jacobian at (0.5, 0.5):
+    # J = [[y, x], [2x, 2y]] = [[0.5, 0.5], [1.0, 1.0]]
+    @test abs(J[1, 1] - 0.5) < 0.1  # ∂u₁/∂x = y
+    @test abs(J[1, 2] - 0.5) < 0.1  # ∂u₁/∂y = x
+    @test abs(J[2, 1] - 1.0) < 0.1  # ∂u₂/∂x = 2x
+    @test abs(J[2, 2] - 1.0) < 0.1  # ∂u₂/∂y = 2y
 end

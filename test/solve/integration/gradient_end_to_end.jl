@@ -24,10 +24,10 @@ import RadialBasisFunctions as RBF
         domain_2d, is_boundary, boundary_conditions, normals, RBF
     )
 
-    gradient_op = RBF.Gradient{2}()
+    jacobian_op = RBF.Jacobian{2}()
 
     G_op = RBF.RadialBasisOperator(
-        gradient_op,
+        jacobian_op,
         domain_2d,
         domain_2d,
         basis_phs,

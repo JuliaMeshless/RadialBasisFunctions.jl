@@ -45,11 +45,11 @@ export Partial, partial
 include("operators/laplacian.jl")
 export Laplacian, laplacian
 
-include("operators/gradient.jl")
-export Gradient, gradient, gradient!
-
 include("operators/jacobian.jl")
-export jacobian, jacobian!
+export Jacobian, jacobian
+
+include("operators/gradient.jl")
+export gradient
 
 include("operators/directional.jl")
 export Directional, directional

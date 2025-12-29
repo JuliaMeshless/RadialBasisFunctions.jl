@@ -144,6 +144,46 @@ function _eval_op(
     return out
 end
 
+# VectorValuedOperator with SparseVector weights (single eval point)
+# W is 2nd type param in RadialBasisOperator{L,W,D,C,A,B}
+function _eval_op(
+    op::RadialBasisOperator{<:VectorValuedOperator{D},<:NTuple{D,<:SparseVector}},
+    x::AbstractVector,
+) where {D}
+    T = promote_type(eltype(x), eltype(first(op.weights)))
+    out = similar(x, T, D)
+    @inbounds for d in 1:D
+        out[d] = dot(op.weights[d], x)
+    end
+    return out
+end
+
+function _eval_op(
+    op::RadialBasisOperator{<:VectorValuedOperator{D},<:NTuple{D,<:SparseVector}},
+    x::AbstractMatrix,
+) where {D}
+    D_in = size(x, 2)
+    T = promote_type(eltype(x), eltype(first(op.weights)))
+    out = similar(x, T, D_in, D)
+    @inbounds for d in 1:D, d_in in 1:D_in
+        out[d_in, d] = dot(op.weights[d], view(x, :, d_in))
+    end
+    return out
+end
+
+function _eval_op(
+    op::RadialBasisOperator{<:VectorValuedOperator{D},<:NTuple{D,<:SparseVector}},
+    x::AbstractArray,
+) where {D}
+    trailing_dims = size(x)[2:end]
+    T = promote_type(eltype(x), eltype(first(op.weights)))
+    out = similar(x, T, trailing_dims..., D)
+    @inbounds for idx in CartesianIndices(trailing_dims), d in 1:D
+        out[idx, d] = dot(op.weights[d], view(x, :, idx))
+    end
+    return out
+end
+
 # In-place: Scalar field → Matrix
 function _eval_op(
     op::RadialBasisOperator{<:VectorValuedOperator{D}}, y::AbstractMatrix, x::AbstractVector

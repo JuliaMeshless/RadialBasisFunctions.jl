@@ -37,21 +37,12 @@ end
 @testset "In-place gradient evaluation" begin
     ∇ = gradient(x, PHS(3; poly_deg=2))
     out = Matrix{Float64}(undef, N, 2)
-    gradient!(out, ∇, y)
+    ∇(out, y)
     @test mean_percent_error(out[:, 1], df_dx.(x)) < 10
     @test mean_percent_error(out[:, 2], df_dy.(x)) < 10
 end
 
-@testset "Gradient via jacobian function" begin
-    ∇ = gradient(x, PHS(3; poly_deg=2))
-    ∇y = jacobian(∇, y)
-    @test ∇y isa Matrix
-    @test size(∇y) == (N, 2)
-    @test mean_percent_error(∇y[:, 1], df_dx.(x)) < 10
-    @test mean_percent_error(∇y[:, 2], df_dy.(x)) < 10
-end
-
 @testset "Printing" begin
-    ∇ = Gradient{2}()
-    @test RadialBasisFunctions.print_op(∇) == "Gradient (∇f)"
+    J = Jacobian{2}()
+    @test RadialBasisFunctions.print_op(J) == "Jacobian (J)"
 end
