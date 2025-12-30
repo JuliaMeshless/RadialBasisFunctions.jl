@@ -37,7 +37,7 @@ struct PHS1{T<:Int} <: AbstractPHS
 end
 (phs::PHS1)(x, xᵢ) = euclidean(x, xᵢ)
 
-function ∂(::PHS1, dim::Int, ::Nothing=nothing)
+function ∂(::PHS1, dim::Int, normal::Union{Nothing,AbstractVector,Tuple}=nothing)
     function ∂ℒ(x, xᵢ, normal=nothing)
         r = euclidean(x, xᵢ)
         if normal === nothing
@@ -51,15 +51,14 @@ function ∂(::PHS1, dim::Int, ::Nothing=nothing)
     return ∂ℒ
 end
 
-function ∇(::PHS1, ::Nothing=nothing)
+function ∇(::PHS1, normal::Union{Nothing,AbstractVector,Tuple}=nothing)
     function ∇ℒ(x, xᵢ, normal=nothing)
         r = euclidean(x, xᵢ)
         if normal === nothing
             return (x .- xᵢ) / (r + AVOID_INF)
         else
             dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-            return -normal / (r + AVOID_INF) +
-                   dot_normal * (x .- xᵢ) / (r^3 + AVOID_INF)
+            return -normal / (r + AVOID_INF) + dot_normal * (x .- xᵢ) / (r^3 + AVOID_INF)
         end
     end
     return ∇ℒ
@@ -76,7 +75,7 @@ function directional∂²(::PHS1, v1::AbstractVector, v2::AbstractVector)
     return directional₂ℒ
 end
 
-function ∂²(::PHS1, dim::Int, ::Nothing=nothing)
+function ∂²(::PHS1, dim::Int, normal::Union{Nothing,AbstractVector,Tuple}=nothing)
     function ∂²ℒ(x, xᵢ, normal=nothing)
         r = euclidean(x, xᵢ)
         if normal === nothing
@@ -93,7 +92,7 @@ function ∂²(::PHS1, dim::Int, ::Nothing=nothing)
     return ∂²ℒ
 end
 
-function ∇²(::PHS1, ::Nothing=nothing)
+function ∇²(::PHS1, normal::Union{Nothing,AbstractVector,Tuple}=nothing)
     function ∇²ℒ(x, xᵢ, normal=nothing)
         r = euclidean(x, xᵢ)
         if normal === nothing
@@ -120,7 +119,7 @@ struct PHS3{T<:Int} <: AbstractPHS
 end
 (phs::PHS3)(x, xᵢ) = euclidean(x, xᵢ)^3
 
-function ∂(::PHS3, dim::Int, ::Nothing=nothing)
+function ∂(::PHS3, dim::Int, normal::Union{Nothing,AbstractVector,Tuple}=nothing)
     function ∂ℒ(x, xᵢ, normal=nothing)
         r = euclidean(x, xᵢ)
         if normal === nothing
@@ -135,7 +134,7 @@ function ∂(::PHS3, dim::Int, ::Nothing=nothing)
     return ∂ℒ
 end
 
-function ∇(::PHS3, ::Nothing=nothing)
+function ∇(::PHS3, normal::Union{Nothing,AbstractVector,Tuple}=nothing)
     function ∇ℒ(x, xᵢ, normal=nothing)
         r = euclidean(x, xᵢ)
         if normal === nothing
@@ -159,7 +158,7 @@ function directional∂²(::PHS3, v1::AbstractVector, v2::AbstractVector)
     return directional₂ℒ
 end
 
-function ∂²(::PHS3, dim::Int, ::Nothing=nothing)
+function ∂²(::PHS3, dim::Int, normal::Union{Nothing,AbstractVector,Tuple}=nothing)
     function ∂²ℒ(x, xᵢ, normal=nothing)
         r = euclidean(x, xᵢ)
         if normal === nothing
@@ -177,7 +176,7 @@ function ∂²(::PHS3, dim::Int, ::Nothing=nothing)
     return ∂²ℒ
 end
 
-function ∇²(::PHS3, ::Nothing=nothing)
+function ∇²(::PHS3, normal::Union{Nothing,AbstractVector,Tuple}=nothing)
     function ∇²ℒ(x, xᵢ, normal=nothing)
         r = euclidean(x, xᵢ)
         if normal === nothing
@@ -204,7 +203,7 @@ struct PHS5{T<:Int} <: AbstractPHS
 end
 (phs::PHS5)(x, xᵢ) = euclidean(x, xᵢ)^5
 
-function ∂(::PHS5, dim::Int, ::Nothing=nothing)
+function ∂(::PHS5, dim::Int, normal::Union{Nothing,AbstractVector,Tuple}=nothing)
     function ∂ℒ(x, xᵢ, normal=nothing)
         r = euclidean(x, xᵢ)
         if normal === nothing
@@ -219,7 +218,7 @@ function ∂(::PHS5, dim::Int, ::Nothing=nothing)
     return ∂ℒ
 end
 
-function ∇(::PHS5, ::Nothing=nothing)
+function ∇(::PHS5, normal::Union{Nothing,AbstractVector,Tuple}=nothing)
     function ∇ℒ(x, xᵢ, normal=nothing)
         r = euclidean(x, xᵢ)
         if normal === nothing
@@ -243,7 +242,7 @@ function directional∂²(::PHS5, v1::AbstractVector, v2::AbstractVector)
     return directional₂ℒ
 end
 
-function ∂²(::PHS5, dim::Int, ::Nothing=nothing)
+function ∂²(::PHS5, dim::Int, normal::Union{Nothing,AbstractVector,Tuple}=nothing)
     function ∂²ℒ(x, xᵢ, normal=nothing)
         r = euclidean(x, xᵢ)
         if normal === nothing
@@ -259,7 +258,7 @@ function ∂²(::PHS5, dim::Int, ::Nothing=nothing)
     return ∂²ℒ
 end
 
-function ∇²(::PHS5, ::Nothing=nothing)
+function ∇²(::PHS5, normal::Union{Nothing,AbstractVector,Tuple}=nothing)
     function ∇²ℒ(x, xᵢ, normal=nothing)
         r = euclidean(x, xᵢ)
         if normal === nothing
@@ -287,12 +286,13 @@ end
 
 (phs::PHS7)(x, xᵢ) = euclidean(x, xᵢ)^7
 
-function ∂(::PHS7, dim::Int, ::Nothing=nothing)
+function ∂(::PHS7, dim::Int, normal::Union{Nothing,AbstractVector,Tuple}=nothing)
     function ∂ℒ(x, xᵢ, normal=nothing)
         r = euclidean(x, xᵢ)
         if normal === nothing
             return 7 * (x[dim] - xᵢ[dim]) * r^5
         else
+            r = euclidean(x, xᵢ)
             n_d = normal[dim]
             Δ_d = x[dim] - xᵢ[dim]
             dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
@@ -302,7 +302,7 @@ function ∂(::PHS7, dim::Int, ::Nothing=nothing)
     return ∂ℒ
 end
 
-function ∇(::PHS7, ::Nothing=nothing)
+function ∇(::PHS7, normal::Union{Nothing,AbstractVector,Tuple}=nothing)
     function ∇ℒ(x, xᵢ, normal=nothing)
         r = euclidean(x, xᵢ)
         if normal === nothing
@@ -326,7 +326,7 @@ function directional∂²(::PHS7, v1::AbstractVector, v2::AbstractVector)
     return directional₂ℒ
 end
 
-function ∂²(::PHS7, dim::Int, ::Nothing=nothing)
+function ∂²(::PHS7, dim::Int, normal::Union{Nothing,AbstractVector,Tuple}=nothing)
     function ∂²ℒ(x, xᵢ, normal=nothing)
         r = euclidean(x, xᵢ)
         if normal === nothing
@@ -342,7 +342,7 @@ function ∂²(::PHS7, dim::Int, ::Nothing=nothing)
     return ∂²ℒ
 end
 
-function ∇²(::PHS7, ::Nothing=nothing)
+function ∇²(::PHS7, normal::Union{Nothing,AbstractVector,Tuple}=nothing)
     function ∇²ℒ(x, xᵢ, normal=nothing)
         r = euclidean(x, xᵢ)
         if normal === nothing
