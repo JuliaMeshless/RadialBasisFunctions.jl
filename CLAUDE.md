@@ -50,7 +50,7 @@ julia --project=benchmark benchmark/benchmarks.jl
 
 2. **Operators** (`src/operators/`): Differential operators built on RBFs
    - `RadialBasisOperator` - Main operator type with lazy weight computation
-   - Specific operators: `Partial`, `Gradient`, `Laplacian`, `Directional`, `Custom`
+   - Specific operators: `Partial`, `Jacobian`, `Laplacian`, `Directional`, `Custom`
    - `operator_algebra.jl` - Composition and algebraic operations on operators
    - Virtual operators for performance optimization
 

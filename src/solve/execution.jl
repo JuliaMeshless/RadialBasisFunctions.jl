@@ -149,12 +149,18 @@ function build_weights_kernel(
         device,
     )
 
-    # Construct sparse matrix
+    # Construct sparse matrix/vector based on dimensions
     nrows, ncols = N_eval, length(data)
     if num_ops == 1
+        # ScalarValuedOperator: always return sparse matrix
         return sparse(I, J, V[:, 1], nrows, ncols)
     else
-        return ntuple(i -> sparse(I, J, V[:, i], nrows, ncols), num_ops)
+        # VectorValuedOperator: use sparse vectors for single eval point
+        if nrows == 1
+            return ntuple(i -> sparsevec(J, V[:, i], ncols), num_ops)
+        else
+            return ntuple(i -> sparse(I, J, V[:, i], nrows, ncols), num_ops)
+        end
     end
 end
 

@@ -103,7 +103,7 @@ end
 function _build_weights(ℒ::Directional{Dim}, data, eval_points, adjl, basis) where {Dim}
     v = ℒ.v
     _validate_directional_vector(v, Dim, length(data))
-    weights = _build_weights(Gradient{Dim}(), data, eval_points, adjl, basis)
+    weights = _build_weights(Jacobian{Dim}(), data, eval_points, adjl, basis)
     return _combine_directional_weights(weights, v, Dim)
 end
 
@@ -125,12 +125,12 @@ function _build_weights(
     v = ℒ.v
     _validate_directional_vector(v, Dim, length(data))
 
-    # Build gradient weights using Hermite method
+    # Build jacobian weights using Hermite method
     dim = length(first(data))
     mon = MonomialBasis(dim, basis.poly_deg)
-    gradient_op = Gradient{Dim}()
-    ℒmon = gradient_op(mon)
-    ℒrbf = gradient_op(basis)
+    jacobian_op = Jacobian{Dim}()
+    ℒmon = jacobian_op(mon)
+    ℒrbf = jacobian_op(basis)
 
     weights = _build_weights(
         data,

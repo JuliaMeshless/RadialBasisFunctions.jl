@@ -24,10 +24,10 @@ import RadialBasisFunctions as RBF
         domain_2d, is_boundary, boundary_conditions, normals, RBF
     )
 
-    gradient_op = RBF.Gradient{2}()
+    jacobian_op = RBF.Jacobian{2}()
 
     G_op = RBF.RadialBasisOperator(
-        gradient_op,
+        jacobian_op,
         domain_2d,
         domain_2d,
         basis_phs,
@@ -41,8 +41,8 @@ import RadialBasisFunctions as RBF
     @testset "Test 1: Weights Calculation (Forward Problem)" begin
         gradient_result = G_op(u_values)
 
-        gradient_x_interior = gradient_result[1][.!is_boundary]
-        gradient_y_interior = gradient_result[2][.!is_boundary]
+        gradient_x_interior = gradient_result[.!is_boundary, 1]
+        gradient_y_interior = gradient_result[.!is_boundary, 2]
 
         expected_gradient_x = Float64[]
         expected_gradient_y = Float64[]
@@ -75,8 +75,8 @@ import RadialBasisFunctions as RBF
         )
         gradient_result = G_op(u_values)
 
-        rhs_error_x = abs.(rhs[1] - gradient_result[1])
-        rhs_error_y = abs.(rhs[2] - gradient_result[2])
+        rhs_error_x = abs.(rhs[1] - gradient_result[:, 1])
+        rhs_error_y = abs.(rhs[2] - gradient_result[:, 2])
         max_rhs_error = max(maximum(rhs_error_x), maximum(rhs_error_y))
 
         @test max_rhs_error < 1e-10

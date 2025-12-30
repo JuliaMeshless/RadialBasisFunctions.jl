@@ -103,21 +103,117 @@ end
 _eval_op(op::RadialBasisOperator, x) = op.weights * x
 _eval_op(op::RadialBasisOperator, y, x) = mul!(y, op.weights, x)
 
-function _eval_op(op::RadialBasisOperator{<:VectorValuedOperator}, x)
-    return ntuple(i -> op.weights[i] * x, dim(op))
-end
-function _eval_op(op::RadialBasisOperator{<:VectorValuedOperator}, y, x)
-    for i in eachindex(op.weights)
-        mul!(y[i], op.weights[i], x)
+# VectorValuedOperator: Scalar field input → Matrix output (N×D)
+function _eval_op(
+    op::RadialBasisOperator{<:VectorValuedOperator{D}}, x::AbstractVector
+) where {D}
+    N_eval = length(op.eval_points)
+    T = promote_type(eltype(x), eltype(first(op.weights)))
+    out = Matrix{T}(undef, N_eval, D)
+    for d in 1:D
+        out[:, d] = op.weights[d] * x
     end
+    return out
 end
 
-# LinearAlgebra methods
+# VectorValuedOperator: Vector field input (N×D_in) → 3-tensor output (N×D_in×D)
+function _eval_op(
+    op::RadialBasisOperator{<:VectorValuedOperator{D}}, x::AbstractMatrix
+) where {D}
+    N_eval = length(op.eval_points)
+    D_in = size(x, 2)
+    T = promote_type(eltype(x), eltype(first(op.weights)))
+    out = Array{T,3}(undef, N_eval, D_in, D)
+    for d_out in 1:D, d_in in 1:D_in
+        out[:, d_in, d_out] = op.weights[d_out] * view(x, :, d_in)
+    end
+    return out
+end
+
+# VectorValuedOperator: General tensor input → tensor output with extra dimension
+function _eval_op(
+    op::RadialBasisOperator{<:VectorValuedOperator{D}}, x::AbstractArray
+) where {D}
+    N_eval = length(op.eval_points)
+    trailing_dims = size(x)[2:end]
+    T = promote_type(eltype(x), eltype(first(op.weights)))
+    out = Array{T}(undef, N_eval, trailing_dims..., D)
+    for idx in CartesianIndices(trailing_dims), d in 1:D
+        out[:, idx, d] = op.weights[d] * view(x, :, idx)
+    end
+    return out
+end
+
+# VectorValuedOperator with SparseVector weights (single eval point)
+# W is 2nd type param in RadialBasisOperator{L,W,D,C,A,B}
+function _eval_op(
+    op::RadialBasisOperator{<:VectorValuedOperator{D},<:NTuple{D,<:SparseVector}},
+    x::AbstractVector,
+) where {D}
+    T = promote_type(eltype(x), eltype(first(op.weights)))
+    out = similar(x, T, D)
+    @inbounds for d in 1:D
+        out[d] = dot(op.weights[d], x)
+    end
+    return out
+end
+
+function _eval_op(
+    op::RadialBasisOperator{<:VectorValuedOperator{D},<:NTuple{D,<:SparseVector}},
+    x::AbstractMatrix,
+) where {D}
+    D_in = size(x, 2)
+    T = promote_type(eltype(x), eltype(first(op.weights)))
+    out = similar(x, T, D_in, D)
+    @inbounds for d in 1:D, d_in in 1:D_in
+        out[d_in, d] = dot(op.weights[d], view(x, :, d_in))
+    end
+    return out
+end
+
+function _eval_op(
+    op::RadialBasisOperator{<:VectorValuedOperator{D},<:NTuple{D,<:SparseVector}},
+    x::AbstractArray,
+) where {D}
+    trailing_dims = size(x)[2:end]
+    T = promote_type(eltype(x), eltype(first(op.weights)))
+    out = similar(x, T, trailing_dims..., D)
+    @inbounds for idx in CartesianIndices(trailing_dims), d in 1:D
+        out[idx, d] = dot(op.weights[d], view(x, :, idx))
+    end
+    return out
+end
+
+# In-place: Scalar field → Matrix
+function _eval_op(
+    op::RadialBasisOperator{<:VectorValuedOperator{D}}, y::AbstractMatrix, x::AbstractVector
+) where {D}
+    for d in 1:D
+        mul!(view(y, :, d), op.weights[d], x)
+    end
+    return y
+end
+
+# In-place: Vector field → 3-tensor
+function _eval_op(
+    op::RadialBasisOperator{<:VectorValuedOperator{D}},
+    y::AbstractArray{<:Any,3},
+    x::AbstractMatrix,
+) where {D}
+    D_in = size(x, 2)
+    for d_out in 1:D, d_in in 1:D_in
+        mul!(view(y, :, d_in, d_out), op.weights[d_out], view(x, :, d_in))
+    end
+    return y
+end
+
+# LinearAlgebra methods - divergence (dot with gradient operator)
 function LinearAlgebra.:⋅(
     op::RadialBasisOperator{<:VectorValuedOperator}, x::AbstractVector
 )
     !is_cache_valid(op) && update_weights!(op)
-    return sum(op(x))
+    result = op(x)  # Now Matrix (N×D)
+    return vec(sum(result; dims=2))  # Sum across derivative dimension → Vector (N,)
 end
 
 # update weights
