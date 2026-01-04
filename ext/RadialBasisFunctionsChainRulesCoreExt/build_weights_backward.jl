@@ -32,7 +32,7 @@ function backward_linear_solve!(
     ΔA::AbstractMatrix{T},
     Δb::AbstractVecOrMat{T},
     Δw::AbstractVecOrMat{T},
-    cache::StencilForwardCache{T}
+    cache::StencilForwardCache{T},
 ) where {T}
     k = cache.k
     nmon = cache.nmon
@@ -91,7 +91,7 @@ function backward_collocation!(
     data::AbstractVector,
     basis::AbstractRadialBasis,
     mon::MonomialBasis{Dim,Deg},
-    k::Int
+    k::Int,
 ) where {T,Dim,Deg}
     grad_φ = ∇(basis)
     n = k + binomial(Dim + Deg, Deg)
@@ -100,7 +100,7 @@ function backward_collocation!(
     # Only upper triangle stored, but gradients flow both ways
     @inbounds for j in 1:k
         xj = data[neighbors[j]]
-        for i in 1:(j-1)  # Skip diagonal (i == j) since φ(x,x) = 0 always, no gradient contribution
+        for i in 1:(j - 1)  # Skip diagonal (i == j) since φ(x,x) = 0 always, no gradient contribution
             xi = data[neighbors[i]]
 
             # Get gradient of basis function
@@ -169,7 +169,7 @@ function backward_rhs_partial!(
     data::AbstractVector,
     basis::AbstractRadialBasis,
     dim::Int,
-    k::Int
+    k::Int,
 ) where {T}
     num_ops = size(Δb, 2)
 
@@ -216,7 +216,7 @@ function backward_rhs_laplacian!(
     eval_point,
     data::AbstractVector,
     basis::AbstractRadialBasis,
-    k::Int
+    k::Int,
 ) where {T}
     num_ops = size(Δb, 2)
 
@@ -265,7 +265,7 @@ function backward_stencil_partial!(
     basis::AbstractRadialBasis,
     mon::MonomialBasis{Dim,Deg},
     k::Int,
-    dim::Int  # Partial derivative dimension
+    dim::Int,  # Partial derivative dimension
 ) where {T,Dim,Deg}
     n = k + cache.nmon
 
@@ -280,7 +280,9 @@ function backward_stencil_partial!(
     backward_collocation!(Δdata, ΔA, neighbors, data, basis, mon, k)
 
     # Step 3: Backprop through RHS
-    backward_rhs_partial!(Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, dim, k)
+    backward_rhs_partial!(
+        Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, dim, k
+    )
 
     return nothing
 end
@@ -295,7 +297,7 @@ function backward_stencil_laplacian!(
     data::AbstractVector,
     basis::AbstractRadialBasis,
     mon::MonomialBasis{Dim,Deg},
-    k::Int
+    k::Int,
 ) where {T,Dim,Deg}
     n = k + cache.nmon
 

@@ -53,10 +53,7 @@ end
 
 # Batch evaluation: interp([x1, x2, ...]) returns [f(x1), f(x2), ...]
 # The pullback needs to accumulate gradients for each input point.
-function ChainRulesCore.rrule(
-    interp::Interpolator,
-    xs::Vector{<:AbstractVector}
-)
+function ChainRulesCore.rrule(interp::Interpolator, xs::Vector{<:AbstractVector})
     ys = interp(xs)
 
     function interpolator_batch_pullback(Δys)

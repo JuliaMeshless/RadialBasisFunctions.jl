@@ -32,7 +32,7 @@ function _forward_with_cache(
     ℒrbf,
     ℒmon,
     mon::MonomialBasis{Dim,Deg},
-    ::Type{ℒType}
+    ::Type{ℒType},
 ) where {Dim,Deg,ℒType}
     TD = eltype(first(data))
     k = length(first(adjl))
@@ -90,7 +90,7 @@ function _forward_with_cache(
         A_full_symmetric = copy(A_full)
         # Fill lower triangle from upper
         for j in 1:n
-            for i in (j+1):n
+            for i in (j + 1):n
                 A_full_symmetric[i, j] = A_full[j, i]
             end
         end
@@ -132,11 +132,7 @@ end
 Extract the cotangent values for a single stencil from the sparse matrix cotangent.
 """
 function extract_stencil_cotangent(
-    ΔW::AbstractMatrix{T},
-    eval_idx::Int,
-    neighbors::Vector{Int},
-    k::Int,
-    num_ops::Int
+    ΔW::AbstractMatrix{T}, eval_idx::Int, neighbors::Vector{Int}, k::Int, num_ops::Int
 ) where {T}
     Δw = zeros(T, k, num_ops)
     for (local_idx, global_idx) in enumerate(neighbors)
@@ -155,7 +151,7 @@ function ChainRulesCore.rrule(
     data::AbstractVector,
     eval_points::AbstractVector,
     adjl::AbstractVector,
-    basis::AbstractRadialBasis
+    basis::AbstractRadialBasis,
 )
     # Build monomial basis and apply operator (same as forward pass)
     dim = length(first(data))
@@ -209,7 +205,7 @@ function ChainRulesCore.rrule(
                     basis,
                     mon,
                     k,
-                    ℒ.dim
+                    ℒ.dim,
                 )
 
                 # Accumulate to global gradients
@@ -244,7 +240,7 @@ function ChainRulesCore.rrule(
     data::AbstractVector,
     eval_points::AbstractVector,
     adjl::AbstractVector,
-    basis::AbstractRadialBasis
+    basis::AbstractRadialBasis,
 )
     # Build monomial basis and apply operator
     dim = length(first(data))
@@ -253,7 +249,9 @@ function ChainRulesCore.rrule(
     ℒrbf = ℒ(basis)
 
     # Forward pass with caching
-    W, cache = _forward_with_cache(data, eval_points, adjl, basis, ℒrbf, ℒmon, mon, Laplacian)
+    W, cache = _forward_with_cache(
+        data, eval_points, adjl, basis, ℒrbf, ℒmon, mon, Laplacian
+    )
 
     function _build_weights_laplacian_pullback(ΔW_raw)
         TD = eltype(first(data))
@@ -297,7 +295,7 @@ function ChainRulesCore.rrule(
                     local_data,
                     basis,
                     mon,
-                    k
+                    k,
                 )
 
                 # Accumulate to global gradients

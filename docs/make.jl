@@ -15,7 +15,7 @@ makedocs(;
         repo="https://github.com/JuliaMeshless/RadialBasisFunctions.jl",
         devbranch="main",
         devurl="dev",
-        build_vitepress=!haskey(ENV, "VITEPRESS_DEV"),
+        build_vitepress=(!haskey(ENV, "VITEPRESS_DEV")),
     ),
     pages=[
         "Home" => "index.md",
