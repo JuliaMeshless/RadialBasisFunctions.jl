@@ -4,23 +4,53 @@ This document explains the architecture of the solve system, which builds sparse
 
 ## Call Graph
 
-```mermaid
-flowchart TD
-    U[User: construct operator] --> A1[_build_weights ℒ, op]
-    A1 --> A2[Apply ℒ to basis/monomial]
-    A2 --> K1[build_weights_kernel]
+```text
+                      ┌─────────────────────────┐
+                      │ User: construct operator│
+                      └───────────┬─────────────┘
+                                  │
+                                  ▼
+                      ┌───────────────────────────┐
+                      │   _build_weights(L, op)   │
+                      └───────────┬───────────────┘
+                                  │
+                                  ▼
+                      ┌───────────────────────────┐
+                      │ Apply L to basis/monomial │
+                      └───────────┬───────────────┘
+                                  │
+                                  ▼
+                ┌─────────────────────────────────────┐
+                │        build_weights_kernel         │
+                └──────┬─────────────────────┬────────┘
+                       │                     │
+                       ▼                     ▼
+         ┌─────────────────────┐   ┌─────────────────┐
+         │allocate_sparse_arrays│   │  launch_kernel! │
+         └─────────────────────┘   └────────┬────────┘
+                                            │
+                                            ▼
+                                 ┌──────────────────────┐
+                                 │weight_kernel per batch│
+                                 └──────────┬───────────┘
+                                            │
+                                            ▼
+                                 ┌──────────────────────┐
+                                 │   _build_stencil!    │
+                                 └──┬───────┬───────┬───┘
+                                    │       │       │
+                     ┌──────────────┘       │       └──────────────┐
+                     ▼                      ▼                      ▼
+      ┌───────────────────────┐ ┌────────────────┐ ┌───────────────────┐
+      │_build_collocation_    │ │  _build_rhs!   │ │    Solve A\b      │
+      │      matrix!          │ │                │ │                   │
+      └───────────────────────┘ └────────────────┘ └───────────────────┘
 
-    K1 --> K2[allocate_sparse_arrays]
-    K1 --> K3[launch_kernel!]
-
-    K3 --> W1[weight_kernel per batch]
-    W1 --> I1[_build_stencil!]
-
-    I1 --> S1[_build_collocation_matrix!]
-    I1 --> S2[_build_rhs!]
-    I1 --> S3[Solve A\\b]
-
-    K1 --> SP[sparse I, J, V → return]
+                                            │
+                                            ▼
+                                 ┌──────────────────────┐
+                                 │sparse I,J,V -> return│
+                                 └──────────────────────┘
 ```
 
 ## Architecture Overview
@@ -48,13 +78,12 @@ src/solve/
 
 The system builds sparse weight matrices by computing stencil weights in parallel for each evaluation point:
 
-```mermaid
-flowchart LR
-    A[User Code] --> B[api.jl<br/>Route request]
-    B --> C[execution.jl<br/>Allocate & launch kernel]
-    C --> D[assembly.jl<br/>Build A, b, solve A\\b]
-    D --> E[execution.jl<br/>Construct sparse matrix]
-    E --> F[Return to user]
+```text
+┌───────────┐    ┌───────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌────────────────────┐    ┌──────────────┐
+│ User Code │───>│    api.jl     │───>│  execution.jl   │───>│   assembly.jl   │───>│   execution.jl     │───>│Return to user│
+│           │    │ Route request │    │Allocate & launch│    │Build A,b, solve │    │Construct sparse    │    │              │
+│           │    │               │    │     kernel      │    │      A\b        │    │      matrix        │    │              │
+└───────────┘    └───────────────┘    └─────────────────┘    └─────────────────┘    └────────────────────┘    └──────────────┘
 ```
 
 **Key steps:**
