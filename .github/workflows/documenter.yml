@@ -13,14 +13,13 @@ permissions:
     pages: write
     id-token: write
 
-concurrency:
-    group: ${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
-
 jobs:
     docs:
         name: Documentation
         runs-on: ubuntu-latest
+        concurrency:
+            group: docs-${{ github.workflow }}-${{ github.ref }}
+            cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
         steps:
             - uses: actions/checkout@v5
             - uses: julia-actions/setup-julia@v2

@@ -133,8 +133,8 @@ using SparseArrays
 
             # At interior points, gradient should be exactly (2, 3)
             interior_indices = findall(.!is_boundary)
-            @test all(abs.(result[1][interior_indices] .- 2.0) .< 1e-10)
-            @test all(abs.(result[2][interior_indices] .- 3.0) .< 1e-10)
+            @test all(abs.(result[interior_indices, 1] .- 2.0) .< 1e-10)
+            @test all(abs.(result[interior_indices, 2] .- 3.0) .< 1e-10)
         end
 
         @testset "Gradient of Linear Function (Neumann BCs)" begin
@@ -149,8 +149,8 @@ using SparseArrays
 
             # Interior points: gradient should be exactly (0, 3)
             interior_indices = findall(.!is_boundary)
-            @test all(abs.(result[1][interior_indices] .- 0.0) .< 1e-10)
-            @test all(abs.(result[2][interior_indices] .- 3.0) .< 1e-10)
+            @test all(abs.(result[interior_indices, 1] .- 0.0) .< 1e-10)
+            @test all(abs.(result[interior_indices, 2] .- 3.0) .< 1e-10)
         end
 
         @testset "Partial ∂/∂x of Linear Function" begin

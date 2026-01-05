@@ -23,10 +23,10 @@ end
     @test y ≈ ∂.weights * z
 
     ∇ = gradient(x, PHS(3; poly_deg=2))
-    y = (rand(N), rand(N))
-    ∇(y, z)
-    @test y[1] ≈ ∇.weights[1] * z
-    @test y[2] ≈ ∇.weights[2] * z
+    y_mat = Matrix{Float64}(undef, N, 2)
+    ∇(y_mat, z)
+    @test y_mat[:, 1] ≈ ∇.weights[1] * z
+    @test y_mat[:, 2] ≈ ∇.weights[2] * z
 
     @test ∇ ⋅ z ≈ (∇.weights[1] * z) .+ (∇.weights[2] * z)
 end

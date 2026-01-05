@@ -12,7 +12,6 @@ using SymRCM
 
 include("basis/basis.jl")
 export AbstractRadialBasis
-export RadialBasisFunction
 export AbstractPHS, PHS, PHS1, PHS3, PHS5, PHS7
 export IMQ
 export Gaussian
@@ -22,17 +21,15 @@ export degree, dim
 include("utils.jl")
 export find_neighbors, reorder_points!
 
-# New three-layer solve system
 include("solve/types.jl")
 export BoundaryCondition, Dirichlet, Neumann, Robin, Internal
 export α, β, is_dirichlet, is_neumann, is_robin, is_internal
-export HermiteStencilData, update_hermite_stencil_data!, update_stencil_data!  # update_stencil_data! is backward compat alias
+export HermiteStencilData, update_hermite_stencil_data!
 export InteriorStencil, DirichletStencil, HermiteStencil
-export InternalStencil  # Backward compat alias for InteriorStencil
-export classify_stencil, stencil_type  # stencil_type is backward compat alias
+export classify_stencil
 
-include("solve/stencil_math.jl")
-include("solve/kernel_exec.jl")
+include("solve/assembly.jl")
+include("solve/execution.jl")
 include("solve/api.jl")
 
 include("operators/operators.jl")
@@ -48,8 +45,11 @@ export Partial, partial
 include("operators/laplacian.jl")
 export Laplacian, laplacian
 
+include("operators/jacobian.jl")
+export Jacobian, jacobian
+
 include("operators/gradient.jl")
-export Gradient, gradient
+export gradient
 
 include("operators/directional.jl")
 export Directional, directional

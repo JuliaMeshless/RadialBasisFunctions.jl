@@ -83,21 +83,29 @@ lap(x) = 4
 all(abs.(lap.(x) .- lap_rbf(y)) .< 1e-8)
 ```
 
-### Gradient
+### Gradient / Jacobian
 
-We can also retrieve the gradient. This is really just a convenience wrapper around `Partial`.
+The `jacobian` function computes all partial derivatives. For scalar fields, this is the gradient.
+The `gradient` function is a convenience alias for `jacobian`.
 
 ```@example overview
-grad = gradient(x)
+op = jacobian(x)  # or equivalently: gradient(x)
+result = op(y)    # Matrix of size (N, dim)
 
 # define exacts
 df_x(x) = 4*x[1]
 df_y(x) = 3
 
-# error
-all(df_x.(x) .≈ grad(y)[1])
+# error - access columns for each partial derivative
+all(df_x.(x) .≈ result[:, 1])
 ```
 
 ```@example overview
-all(df_y.(x) .≈ grad(y)[2])
+all(df_y.(x) .≈ result[:, 2])
 ```
+
+## Current Limitations
+
+1. **Data format**: The package requires `Vector{AbstractVector}` input (not matrices). Each point must have inferrable dimension, e.g., `SVector{2,Float64}` from StaticArrays.jl. Matrix input support is planned.
+
+2. **Global interpolation**: `Interpolator` currently uses all points globally. Local collocation support (like the operators use) is planned for future releases.

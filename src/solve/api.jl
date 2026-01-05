@@ -1,17 +1,3 @@
-"""
-Layer: Public API & Entry Points
-
-This file contains all entry points for the weight building system:
-- Main _build_weights function and its overloads
-- Routing logic (standard vs Hermite paths)
-- Operator application to basis functions
-- Parameter validation and defaults
-
-Called by: operators.jl, interpolation.jl
-Calls: kernel_exec.jl
-Dependencies: types.jl, kernel_exec.jl
-"""
-
 using KernelAbstractions: CPU
 
 # ============================================================================
