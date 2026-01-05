@@ -1,98 +1,101 @@
 """
     Directional{Dim,T} <: ScalarValuedOperator
 
-Operator for the directional derivative, or the inner product of the gradient and a direction vector.
+Operator for the directional derivative (∇f⋅v), the inner product of the gradient and a direction vector.
 """
 struct Directional{Dim,T} <: ScalarValuedOperator
     v::T
 end
 Directional{Dim}(v) where {Dim} = Directional{Dim,typeof(v)}(v)
 
+# Primary interface using unified keyword constructor
 """
-    function directional(data, v, basis; k=autoselect_k(data, basis))
+    directional(data, v; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl, hermite)
 
-Builds a `RadialBasisOperator` where the operator is the directional derivative, `Directional`.
+Build a `RadialBasisOperator` for the directional derivative (∇f⋅v).
+
+# Arguments
+- `data`: Vector of data points
+- `v`: Direction vector. Can be:
+  - A single vector of length `Dim` (constant direction)
+  - A vector of vectors matching `length(data)` (spatially-varying direction)
+
+# Keyword Arguments
+- `basis`: RBF basis (default: `PHS(3; poly_deg=2)`)
+- `eval_points`: Evaluation points (default: `data`)
+- `k`: Stencil size (default: `autoselect_k(data, basis)`)
+- `adjl`: Adjacency list (default: computed via `find_neighbors`)
+- `hermite`: Optional NamedTuple for Hermite interpolation
+
+# Examples
+```julia
+# Constant direction
+∂_x = directional(data, [1.0, 0.0])
+
+# Spatially-varying direction (e.g., radial)
+normals = [normalize(p) for p in data]
+∂_n = directional(data, normals)
+```
 """
-function directional(
-    data::AbstractVector,
-    v::AbstractVector,
-    basis::B=PHS(3; poly_deg=2);
-    k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, k),
-) where {B<:AbstractRadialBasis,T<:Int}
+function directional(data::AbstractVector, v::AbstractVector; kw...)
     Dim = length(first(data))
-    ℒ = Directional{Dim}(v)
-    return RadialBasisOperator(ℒ, data, basis; k=k, adjl=adjl)
+    return RadialBasisOperator(Directional{Dim}(v), data; kw...)
 end
 
-"""
-    function directional(data, eval_points, v, basis; k=autoselect_k(data, basis))
+# Backward compatible positional signatures
+function directional(data::AbstractVector, v::AbstractVector, basis::AbstractRadialBasis; kw...)
+    Dim = length(first(data))
+    return RadialBasisOperator(Directional{Dim}(v), data; basis=basis, kw...)
+end
 
-Builds a `RadialBasisOperator` where the operator is the directional derivative, `Directional`.
-"""
+function directional(data::AbstractVector, eval_points::AbstractVector, v::AbstractVector,
+                     basis::AbstractRadialBasis=PHS(3; poly_deg=2); kw...)
+    Dim = length(first(data))
+    return RadialBasisOperator(Directional{Dim}(v), data;
+        eval_points=eval_points, basis=basis, kw...)
+end
+
+# Hermite backward compatibility (positional boundary arguments)
 function directional(
     data::AbstractVector,
     eval_points::AbstractVector,
     v::AbstractVector,
-    basis::B=PHS(3; poly_deg=2);
-    k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, eval_points, k),
-) where {B<:AbstractRadialBasis,T<:Int}
-    Dim = length(first(data))
-    ℒ = Directional{Dim}(v)
-    return RadialBasisOperator(ℒ, data, eval_points, basis; k=k, adjl=adjl)
-end
-
-"""
-    function directional(data, eval_points, v, basis, is_boundary, boundary_conditions, normals; k=autoselect_k(data, basis))
-
-Builds a Hermite-compatible `RadialBasisOperator` where the operator is the directional derivative, `Directional`.
-The additional boundary information enables Hermite interpolation with proper boundary condition handling.
-"""
-function directional(
-    data::AbstractVector,
-    eval_points::AbstractVector,
-    v::AbstractVector,
-    basis::B,
+    basis::AbstractRadialBasis,
     is_boundary::Vector{Bool},
     boundary_conditions::Vector{<:BoundaryCondition},
     normals::Vector{<:AbstractVector};
-    k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, eval_points, k),
-) where {B<:AbstractRadialBasis,T<:Int}
+    kw...,
+)
     Dim = length(first(data))
-    ℒ = Directional{Dim}(v)
-    return RadialBasisOperator(
-        ℒ,
-        data,
-        eval_points,
-        basis,
-        is_boundary,
-        boundary_conditions,
-        normals;
-        k=k,
-        adjl=adjl,
-    )
+    hermite = (is_boundary=is_boundary, bc=boundary_conditions, normals=normals)
+    return RadialBasisOperator(Directional{Dim}(v), data;
+        eval_points=eval_points, basis=basis, hermite=hermite, kw...)
 end
+
+# ============================================================================
+# Custom weight-building logic for Directional operator
+# The directional derivative is computed by combining Jacobian weights with
+# the direction vector: ∇f⋅v = Σᵢ (∂f/∂xᵢ) * vᵢ
+# ============================================================================
 
 # Helper: validate direction vector dimensions
 function _validate_directional_vector(v, Dim::Int, data_length::Int)
     if !(length(v) == Dim || length(v) == data_length)
-        throw(
-            DomainError(
-                "The geometrical vector for Directional() should match either the dimension of the input or the number of input points. The geometrical vector length is $(length(v)) while there are $(data_length) points with a dimension of $Dim",
-            ),
-        )
+        throw(DomainError(
+            "Direction vector length $(length(v)) must equal dimension $Dim or data length $data_length"
+        ))
     end
 end
 
 # Helper: combine gradient weights with direction vector
 function _combine_directional_weights(weights, v, Dim::Int)
     if length(v) == Dim
+        # Constant direction: simple weighted sum
         return mapreduce(+, zip(weights, v)) do (w, vᵢ)
             w * vᵢ
         end
     else
+        # Spatially-varying direction: diagonal scaling
         vv = ntuple(i -> getindex.(v, i), Dim)
         return mapreduce(+, zip(weights, vv)) do (w, vᵢ)
             Diagonal(vᵢ) * w
@@ -100,6 +103,7 @@ function _combine_directional_weights(weights, v, Dim::Int)
     end
 end
 
+# Custom _build_weights: standard (non-Hermite) path
 function _build_weights(ℒ::Directional{Dim}, data, eval_points, adjl, basis) where {Dim}
     v = ℒ.v
     _validate_directional_vector(v, Dim, length(data))
@@ -107,11 +111,7 @@ function _build_weights(ℒ::Directional{Dim}, data, eval_points, adjl, basis) w
     return _combine_directional_weights(weights, v, Dim)
 end
 
-"""
-    _build_weights(ℒ::Directional, data, eval_points, adjl, basis, is_boundary, boundary_conditions, normals)
-
-Hermite-compatible method for building directional derivative weights with boundary condition support.
-"""
+# Custom _build_weights: Hermite path (with boundary conditions)
 function _build_weights(
     ℒ::Directional{Dim},
     data::AbstractVector,
@@ -133,20 +133,12 @@ function _build_weights(
     ℒrbf = jacobian_op(basis)
 
     weights = _build_weights(
-        data,
-        eval_points,
-        adjl,
-        basis,
-        ℒrbf,
-        ℒmon,
-        mon,
-        is_boundary,
-        boundary_conditions,
-        normals,
+        data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
+        is_boundary, boundary_conditions, normals
     )
 
     return _combine_directional_weights(weights, v, Dim)
 end
 
 # pretty printing
-print_op(op::Directional) = "Directional Derivative (∇f⋅v)"
+print_op(::Directional) = "Directional Derivative (∇f⋅v)"

@@ -22,26 +22,30 @@ function (op::Jacobian{Dim})(basis) where {Dim}
     return ntuple(dim -> ∂(basis, dim), Dim)
 end
 
+# Primary interface using unified keyword constructor
 """
-    jacobian(data, basis; k, adjl)
+    jacobian(data; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl, hermite)
 
 Build a `RadialBasisOperator` for computing Jacobians (or gradients for scalar fields).
 
 The Jacobian is the fundamental differential operator. For a scalar field, it computes
-the gradient. For a vector field, it computes the full Jacobian matrix.
+the gradient. For a vector field, it computes the full Jacobian matrix. The spatial
+dimension is automatically inferred from the data.
 
 # Arguments
 - `data`: Vector of points (e.g., `Vector{SVector{2,Float64}}`)
-- `basis`: RBF basis function (default: `PHS(3; poly_deg=2)`)
 
 # Keyword Arguments
-- `k`: Stencil size (neighbors per point)
-- `adjl`: Precomputed adjacency list
+- `basis`: RBF basis function (default: `PHS(3; poly_deg=2)`)
+- `eval_points`: Evaluation points (default: `data`)
+- `k`: Stencil size (default: `autoselect_k(data, basis)`)
+- `adjl`: Adjacency list (default: computed via `find_neighbors`)
+- `hermite`: Optional NamedTuple for Hermite interpolation
 
 # Examples
 ```julia
 points = [SVector{2}(rand(2)) for _ in 1:1000]
-op = jacobian(points, PHS(3; poly_deg=2))
+op = jacobian(points)
 
 # Scalar field → gradient
 u = sin.(getindex.(points, 1))
@@ -54,102 +58,59 @@ J = op(v)  # Array (1000 × 2 × 2)
 
 See also: [`gradient`](@ref)
 """
-function jacobian(
-    data::AbstractVector{TD},
-    basis::B=PHS(3; poly_deg=2);
-    k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, k),
-) where {TD<:AbstractVector,B<:AbstractRadialBasis,T<:Int}
+function jacobian(data::AbstractVector{<:AbstractVector}; kw...)
     Dim = length(first(data))
-    ℒ = Jacobian{Dim}()
-    return RadialBasisOperator(ℒ, data, basis; k=k, adjl=adjl)
+    return RadialBasisOperator(Jacobian{Dim}(), data; kw...)
 end
 
-"""
-    jacobian(data, eval_points, basis; k, adjl)
-
-Build a `RadialBasisOperator` for computing Jacobians at specified evaluation points.
-
-# Arguments
-- `data`: Vector of data points
-- `eval_points`: Vector of points where the Jacobian will be evaluated
-- `basis`: RBF basis function (default: `PHS(3; poly_deg=2)`)
-
-# Keyword Arguments
-- `k`: Stencil size (neighbors per point)
-- `adjl`: Precomputed adjacency list
-"""
-function jacobian(
-    data::AbstractVector{TD},
-    eval_points::AbstractVector{TE},
-    basis::B=PHS(3; poly_deg=2);
-    k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, eval_points, k),
-) where {TD<:AbstractVector,TE<:AbstractVector,B<:AbstractRadialBasis,T<:Int}
+# Backward compatible positional signatures
+function jacobian(data::AbstractVector{<:AbstractVector}, basis::AbstractRadialBasis; kw...)
     Dim = length(first(data))
-    ℒ = Jacobian{Dim}()
-    return RadialBasisOperator(ℒ, data, eval_points, basis; k=k, adjl=adjl)
+    return RadialBasisOperator(Jacobian{Dim}(), data; basis=basis, kw...)
 end
 
-"""
-    jacobian(data, eval_points, basis, is_boundary, boundary_conditions, normals; k, adjl)
+# Note: Type constraint {<:AbstractVector} ensures this only matches vector-of-points,
+# not field values like Vector{Float64}
+function jacobian(data::AbstractVector{<:AbstractVector}, eval_points::AbstractVector{<:AbstractVector},
+                  basis::AbstractRadialBasis=PHS(3; poly_deg=2); kw...)
+    Dim = length(first(data))
+    return RadialBasisOperator(Jacobian{Dim}(), data;
+        eval_points=eval_points, basis=basis, kw...)
+end
 
-Build a Hermite-compatible `RadialBasisOperator` for computing Jacobians.
-The additional boundary information enables Hermite interpolation with proper boundary condition handling.
-
-# Arguments
-- `data`: Vector of data points
-- `eval_points`: Vector of points where the Jacobian will be evaluated
-- `basis`: RBF basis function
-- `is_boundary`: Boolean vector indicating boundary points
-- `boundary_conditions`: Vector of boundary conditions
-- `normals`: Vector of normal vectors at boundary points
-
-# Keyword Arguments
-- `k`: Stencil size (neighbors per point)
-- `adjl`: Precomputed adjacency list
-"""
+# Hermite backward compatibility (positional boundary arguments)
 function jacobian(
-    data::AbstractVector{TD},
-    eval_points::AbstractVector{TE},
-    basis::B,
+    data::AbstractVector{<:AbstractVector},
+    eval_points::AbstractVector{<:AbstractVector},
+    basis::AbstractRadialBasis,
     is_boundary::Vector{Bool},
     boundary_conditions::Vector{<:BoundaryCondition},
     normals::Vector{<:AbstractVector};
-    k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, eval_points, k),
-) where {TD<:AbstractVector,TE<:AbstractVector,B<:AbstractRadialBasis,T<:Int}
+    kw...,
+)
     Dim = length(first(data))
-    ℒ = Jacobian{Dim}()
-    return RadialBasisOperator(
-        ℒ,
-        data,
-        eval_points,
-        basis,
-        is_boundary,
-        boundary_conditions,
-        normals;
-        k=k,
-        adjl=adjl,
-    )
+    hermite = (is_boundary=is_boundary, bc=boundary_conditions, normals=normals)
+    return RadialBasisOperator(Jacobian{Dim}(), data;
+        eval_points=eval_points, basis=basis, hermite=hermite, kw...)
 end
 
+# One-shot convenience: create operator and apply immediately
 """
-    jacobian(data, x, basis; k, adjl)
+    jacobian(data, x; basis=PHS(3; poly_deg=2), k, adjl)
 
 One-shot convenience function that creates a Jacobian operator and applies it to field `x`.
 
 For repeated evaluations on the same points, prefer creating the operator once with
-[`jacobian(data, basis)`](@ref) and calling it via functor syntax `op(x)`.
+[`jacobian(data)`](@ref) and calling it via functor syntax `op(x)`.
 
 # Arguments
-- `data`: Vector of points (e.g., `Vector{SVector{2,Float64}}`)
+- `data`: Vector of points
 - `x`: Field values to differentiate
-- `basis`: RBF basis function (default: `PHS(3; poly_deg=2)`)
 
 # Keyword Arguments
-- `k`: Stencil size (neighbors per point)
-- `adjl`: Precomputed adjacency list
+- `basis`: RBF basis function (default: `PHS(3; poly_deg=2)`)
+- `k`: Stencil size (default: `autoselect_k(data, basis)`)
+- `adjl`: Adjacency list (default: computed via `find_neighbors`)
 
 # Examples
 ```julia
@@ -158,14 +119,8 @@ u = sin.(getindex.(points, 1))
 ∇u = jacobian(points, u)  # One-shot gradient computation
 ```
 """
-function jacobian(
-    data::AbstractVector,
-    x,
-    basis::B=PHS(3; poly_deg=2);
-    k::Int=autoselect_k(data, basis),
-    adjl=find_neighbors(data, k),
-) where {B<:AbstractRadialBasis}
-    op = jacobian(data, basis; k=k, adjl=adjl)
+function jacobian(data::AbstractVector{<:AbstractVector}, x; kw...)
+    op = jacobian(data; kw...)
     return op(x)
 end
 
