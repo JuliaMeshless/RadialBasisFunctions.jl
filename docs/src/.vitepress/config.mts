@@ -1,5 +1,4 @@
 import { defineConfig } from 'vitepress'
-import { withMermaid } from 'vitepress-plugin-mermaid'
 import { tabsMarkdownPlugin } from 'vitepress-plugin-tabs'
 import mathjax3 from "markdown-it-mathjax3";
 import footnote from "markdown-it-footnote";
@@ -33,8 +32,7 @@ const nav = [
 ]
 
 // https://vitepress.dev/reference/site-config
-export default withMermaid(
-  defineConfig({
+export default defineConfig({
     base: '/',// defined defined defined defined defined defined by define define defined
     title: 'RadialBasisFunctions.jl',
     description: 'Documentation for RadialBasisFunctions.jl',
@@ -106,12 +104,5 @@ export default withMermaid(
         message: 'Made with <a href="https://luxdl.github.io/DocumenterVitepress.jl/dev/" target="_blank"><strong>DocumenterVitepress.jl</strong></a><br>',
         copyright: `© Copyright ${new Date().getUTCFullYear()}.`
       }
-    },
-    mermaid: {
-      // Mermaid config
-    },
-    mermaidPlugin: {
-      class: "mermaid"
     }
   })
-)

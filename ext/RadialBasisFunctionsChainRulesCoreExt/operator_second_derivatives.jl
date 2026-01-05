@@ -376,13 +376,13 @@ end
 function _get_grad_Lrbf_wrt_x_impl(ℒrbf, basis::PHS1)
     # Try to detect if it's a partial or laplacian
     # This is a simplified approach - in practice you may need to store operator info
-    error(
+    return error(
         "Operator type detection not yet implemented for PHS1. Pass operator info explicitly.",
     )
 end
 
 function _get_grad_Lrbf_wrt_xi_impl(ℒrbf, basis::PHS1)
-    error(
+    return error(
         "Operator type detection not yet implemented for PHS1. Pass operator info explicitly.",
     )
 end
