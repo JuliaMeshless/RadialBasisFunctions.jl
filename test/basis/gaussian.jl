@@ -1,6 +1,8 @@
 using RadialBasisFunctions
 import RadialBasisFunctions as RBF
 using StaticArraysCore
+using LinearAlgebra
+import ForwardDiff as FD
 
 @testset "Constructors and Printing" begin
     g = Gaussian()
@@ -38,4 +40,19 @@ end
     @test ∂rbf(x₁, x₂) ≈ 8 / exp(20)
     @test all(∇rbf(x₁, x₂) .≈ (8 / exp(20), 16 / exp(20)))
     @test ∂²rbf(x₁, x₂) ≈ 56 / exp(20)
+end
+
+@testset "Directional First Derivatives" begin
+    v1 = SVector(1.0, 0.0)
+    v2 = SVector(0.0, 1.0)
+    normal = SVector(1.0, 1) ./ sqrt(2)
+
+    # Test D equals dot(v, ∇)
+    @test RBF.D(g, v1)(x₁, x₂) ≈ dot(v1, RBF.∇(g)(x₁, x₂))
+    @test RBF.D(g, v2)(x₁, x₂) ≈ dot(v2, RBF.∇(g)(x₁, x₂))
+    @test RBF.D(g, normal)(x₁, x₂) ≈ dot(normal, RBF.∇(g)(x₁, x₂))
+
+    # Test against ForwardDiff
+    expected = FD.gradient(x -> g(x, x₂), x₁) ⋅ normal
+    @test RBF.D(g, normal)(x₁, x₂) ≈ expected rtol = 1e-5
 end
