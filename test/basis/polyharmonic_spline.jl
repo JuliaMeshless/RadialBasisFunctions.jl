@@ -49,16 +49,14 @@ end
         normal = SVector(1.0, 1) ./ sqrt(2)  # Normalize for better numerical stability
         dim = 1
 
-        # First derivative
+        # First derivative - functor handles both 2-arg and 3-arg calls
         ∂rbf = RBF.∂(phs, dim)
-        ∂rbf_n = RBF.∂(phs, dim, normal)
-        @test ∂rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∂rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
 
         # Gradient
         ∇rbf = RBF.∇(phs)
-        ∇rbf_n = RBF.∇(phs, normal)
         @test all(
-            ∇rbf_n(x₁, x₂, normal) .≈ [
+            ∇rbf(x₁, x₂, normal) .≈ [
                 (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[1], x₂) ⋅ normal),
                 (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[2], x₂) ⋅ normal),
             ],
@@ -66,13 +64,26 @@ end
 
         # Second derivative
         ∂²rbf = RBF.∂²(phs, dim)
-        ∂²rbf_n = RBF.∂²(phs, dim, normal)
-        @test ∂²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∂²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
 
         # Laplacian
         ∇²rbf = RBF.∇²(phs)
-        ∇²rbf_n = RBF.∇²(phs, normal)
-        @test ∇²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∇²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
+    end
+
+    @testset "Directional First Derivatives" begin
+        v1 = SVector(1.0, 0.0)  # x direction
+        v2 = SVector(0.0, 1.0)  # y direction
+        normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
+
+        # Test D equals dot(v, ∇)
+        @test RBF.D(phs, v1)(x₁, x₂) ≈ dot(v1, RBF.∇(phs)(x₁, x₂))
+        @test RBF.D(phs, v2)(x₁, x₂) ≈ dot(v2, RBF.∇(phs)(x₁, x₂))
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ dot(normal, RBF.∇(phs)(x₁, x₂))
+
+        # Test against ForwardDiff
+        expected = FD.gradient(x -> phs(x, x₂), x₁) ⋅ normal
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ expected rtol = 1e-5
     end
 
     @testset "Directional Second Derivatives" begin
@@ -82,7 +93,7 @@ end
         normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
 
         # Same direction test (both normal)
-        dir_deriv = RBF.directional∂²(phs, normal, normal)
+        dir_deriv = RBF.D²(phs, normal, normal)
 
         # Calculate expected value manually with ForwardDiff
         first_normal_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ normal
@@ -91,7 +102,7 @@ end
         @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
 
         # Test with orthogonal directions
-        dir_deriv_xy = RBF.directional∂²(phs, v1, v2)
+        dir_deriv_xy = RBF.D²(phs, v1, v2)
 
         # Calculate mixed partial derivative with ForwardDiff
         first_x_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ v1
@@ -132,14 +143,12 @@ end
 
         # First derivative
         ∂rbf = RBF.∂(phs, dim)
-        ∂rbf_n = RBF.∂(phs, dim, normal)
-        @test ∂rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∂rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
 
         # Gradient
         ∇rbf = RBF.∇(phs)
-        ∇rbf_n = RBF.∇(phs, normal)
         @test all(
-            ∇rbf_n(x₁, x₂, normal) .≈ [
+            ∇rbf(x₁, x₂, normal) .≈ [
                 (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[1], x₂) ⋅ normal),
                 (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[2], x₂) ⋅ normal),
             ],
@@ -147,13 +156,26 @@ end
 
         # Second derivative
         ∂²rbf = RBF.∂²(phs, dim)
-        ∂²rbf_n = RBF.∂²(phs, dim, normal)
-        @test ∂²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∂²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
 
         # Laplacian
         ∇²rbf = RBF.∇²(phs)
-        ∇²rbf_n = RBF.∇²(phs, normal)
-        @test ∇²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∇²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
+    end
+
+    @testset "Directional First Derivatives" begin
+        v1 = SVector(1.0, 0.0)  # x direction
+        v2 = SVector(0.0, 1.0)  # y direction
+        normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
+
+        # Test D equals dot(v, ∇)
+        @test RBF.D(phs, v1)(x₁, x₂) ≈ dot(v1, RBF.∇(phs)(x₁, x₂))
+        @test RBF.D(phs, v2)(x₁, x₂) ≈ dot(v2, RBF.∇(phs)(x₁, x₂))
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ dot(normal, RBF.∇(phs)(x₁, x₂))
+
+        # Test against ForwardDiff
+        expected = FD.gradient(x -> phs(x, x₂), x₁) ⋅ normal
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ expected rtol = 1e-5
     end
 
     @testset "Directional Second Derivatives" begin
@@ -163,7 +185,7 @@ end
         normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
 
         # Same direction test (both normal)
-        dir_deriv = RBF.directional∂²(phs, normal, normal)
+        dir_deriv = RBF.D²(phs, normal, normal)
 
         # Calculate expected value manually with ForwardDiff
         first_normal_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ normal
@@ -172,7 +194,7 @@ end
         @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
 
         # Test with orthogonal directions
-        dir_deriv_xy = RBF.directional∂²(phs, v1, v2)
+        dir_deriv_xy = RBF.D²(phs, v1, v2)
 
         # Calculate mixed partial derivative with ForwardDiff
         first_x_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ v1
@@ -213,14 +235,12 @@ end
 
         # First derivative
         ∂rbf = RBF.∂(phs, dim)
-        ∂rbf_n = RBF.∂(phs, dim, normal)
-        @test ∂rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∂rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
 
         # Gradient
         ∇rbf = RBF.∇(phs)
-        ∇rbf_n = RBF.∇(phs, normal)
         @test all(
-            ∇rbf_n(x₁, x₂, normal) .≈ [
+            ∇rbf(x₁, x₂, normal) .≈ [
                 (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[1], x₂) ⋅ normal),
                 (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[2], x₂) ⋅ normal),
             ],
@@ -228,13 +248,26 @@ end
 
         # Second derivative
         ∂²rbf = RBF.∂²(phs, dim)
-        ∂²rbf_n = RBF.∂²(phs, dim, normal)
-        @test ∂²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∂²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
 
         # Laplacian
         ∇²rbf = RBF.∇²(phs)
-        ∇²rbf_n = RBF.∇²(phs, normal)
-        @test ∇²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∇²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
+    end
+
+    @testset "Directional First Derivatives" begin
+        v1 = SVector(1.0, 0.0)  # x direction
+        v2 = SVector(0.0, 1.0)  # y direction
+        normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
+
+        # Test D equals dot(v, ∇)
+        @test RBF.D(phs, v1)(x₁, x₂) ≈ dot(v1, RBF.∇(phs)(x₁, x₂))
+        @test RBF.D(phs, v2)(x₁, x₂) ≈ dot(v2, RBF.∇(phs)(x₁, x₂))
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ dot(normal, RBF.∇(phs)(x₁, x₂))
+
+        # Test against ForwardDiff
+        expected = FD.gradient(x -> phs(x, x₂), x₁) ⋅ normal
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ expected rtol = 1e-5
     end
 
     @testset "Directional Second Derivatives" begin
@@ -244,7 +277,7 @@ end
         normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
 
         # Same direction test (both normal)
-        dir_deriv = RBF.directional∂²(phs, normal, normal)
+        dir_deriv = RBF.D²(phs, normal, normal)
 
         # Calculate expected value manually with ForwardDiff
         first_normal_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ normal
@@ -253,7 +286,7 @@ end
         @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
 
         # Test with orthogonal directions
-        dir_deriv_xy = RBF.directional∂²(phs, v1, v2)
+        dir_deriv_xy = RBF.D²(phs, v1, v2)
 
         # Calculate mixed partial derivative with ForwardDiff
         first_x_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ v1
@@ -293,14 +326,12 @@ end
 
         # First derivative
         ∂rbf = RBF.∂(phs, dim)
-        ∂rbf_n = RBF.∂(phs, dim, normal)
-        @test ∂rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∂rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
 
         # Gradient
         ∇rbf = RBF.∇(phs)
-        ∇rbf_n = RBF.∇(phs, normal)
         @test all(
-            ∇rbf_n(x₁, x₂, normal) .≈ [
+            ∇rbf(x₁, x₂, normal) .≈ [
                 (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[1], x₂) ⋅ normal),
                 (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[2], x₂) ⋅ normal),
             ],
@@ -308,13 +339,26 @@ end
 
         # Second derivative
         ∂²rbf = RBF.∂²(phs, dim)
-        ∂²rbf_n = RBF.∂²(phs, dim, normal)
-        @test ∂²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∂²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
 
         # Laplacian
         ∇²rbf = RBF.∇²(phs)
-        ∇²rbf_n = RBF.∇²(phs, normal)
-        @test ∇²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∇²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
+    end
+
+    @testset "Directional First Derivatives" begin
+        v1 = SVector(1.0, 0.0)  # x direction
+        v2 = SVector(0.0, 1.0)  # y direction
+        normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
+
+        # Test D equals dot(v, ∇)
+        @test RBF.D(phs, v1)(x₁, x₂) ≈ dot(v1, RBF.∇(phs)(x₁, x₂))
+        @test RBF.D(phs, v2)(x₁, x₂) ≈ dot(v2, RBF.∇(phs)(x₁, x₂))
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ dot(normal, RBF.∇(phs)(x₁, x₂))
+
+        # Test against ForwardDiff
+        expected = FD.gradient(x -> phs(x, x₂), x₁) ⋅ normal
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ expected rtol = 1e-5
     end
 
     @testset "Directional Second Derivatives" begin
@@ -324,7 +368,7 @@ end
         normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
 
         # Same direction test (both normal)
-        dir_deriv = RBF.directional∂²(phs, normal, normal)
+        dir_deriv = RBF.D²(phs, normal, normal)
 
         # Calculate expected value manually with ForwardDiff
         first_normal_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ normal
@@ -333,7 +377,7 @@ end
         @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
 
         # Test with orthogonal directions
-        dir_deriv_xy = RBF.directional∂²(phs, v1, v2)
+        dir_deriv_xy = RBF.D²(phs, v1, v2)
 
         # Calculate mixed partial derivative with ForwardDiff
         first_x_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ v1

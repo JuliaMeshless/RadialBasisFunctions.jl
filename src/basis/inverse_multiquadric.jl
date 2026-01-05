@@ -13,42 +13,40 @@ end
 
 (rbf::IMQ)(x, xᵢ) = 1 / sqrt((euclidean(x, xᵢ) * rbf.ε)^2 + 1)
 
-function ∂(rbf::IMQ, dim::Int=1)
-    function ∂ℒ(x, xᵢ)
-        ε2 = rbf.ε .^ 2
-        return (xᵢ[dim] - x[dim]) .* (ε2 / sqrt((ε2 * sqeuclidean(x, xᵢ) + 1)^3))
-    end
-    return ∂ℒ
+# ∂ - first partial derivative
+function (op::∂{<:IMQ})(x, xᵢ)
+    ε2 = op.basis.ε^2
+    return (xᵢ[op.dim] - x[op.dim]) * (ε2 / sqrt((ε2 * sqeuclidean(x, xᵢ) + 1)^3))
 end
 
-function ∇(rbf::IMQ)
-    function ∇ℒ(x, xᵢ)
-        ε2 = rbf.ε .^ 2
-        return (xᵢ - x) .* (ε2 / sqrt((ε2 * sqeuclidean(x, xᵢ) + 1)^3))
-    end
-    return ∇ℒ
+# ∇ - gradient
+function (op::∇{<:IMQ})(x, xᵢ)
+    ε2 = op.basis.ε^2
+    return (xᵢ .- x) * (ε2 / sqrt((ε2 * sqeuclidean(x, xᵢ) + 1)^3))
 end
 
-function ∂²(rbf::IMQ, dim::Int=1)
-    function ∂²ℒ(x, xᵢ)
-        ε2 = rbf.ε .^ 2
-        ε4 = ε2^2
-        num1 = 3 * ε4 * (x[dim] - xᵢ[dim])^2
-        denom = (ε2 * sqeuclidean(x, xᵢ) + 1)
-        return num1 / sqrt(denom^5) - ε2 / sqrt(denom^3)
-    end
-    return ∂²ℒ
+# D - directional derivative
+function (op::D{<:IMQ})(x, xᵢ)
+    ε2 = op.basis.ε^2
+    return LinearAlgebra.dot(op.v, xᵢ .- x) * (ε2 / sqrt((ε2 * sqeuclidean(x, xᵢ) + 1)^3))
 end
 
-function ∇²(rbf::IMQ)
-    function ∇²ℒ(x, xᵢ)
-        ε2 = rbf.ε .^ 2
-        ε4 = ε2^2
-        num1 = 3 * ε4 * (x .- xᵢ) .^ 2
-        denom = (ε2 * sqeuclidean(x, xᵢ) + 1)
-        return sum(num1 / sqrt(denom^5) .- ε2 / sqrt(denom^3))
-    end
-    return ∇²ℒ
+# ∂² - second partial derivative
+function (op::∂²{<:IMQ})(x, xᵢ)
+    ε2 = op.basis.ε^2
+    ε4 = ε2^2
+    num1 = 3 * ε4 * (x[op.dim] - xᵢ[op.dim])^2
+    denom = (ε2 * sqeuclidean(x, xᵢ) + 1)
+    return num1 / sqrt(denom^5) - ε2 / sqrt(denom^3)
+end
+
+# ∇² - Laplacian
+function (op::∇²{<:IMQ})(x, xᵢ)
+    ε2 = op.basis.ε^2
+    ε4 = ε2^2
+    num1 = 3 * ε4 * (x .- xᵢ) .^ 2
+    denom = (ε2 * sqeuclidean(x, xᵢ) + 1)
+    return sum(num1 / sqrt(denom^5) .- ε2 / sqrt(denom^3))
 end
 
 function Base.show(io::IO, rbf::IMQ)

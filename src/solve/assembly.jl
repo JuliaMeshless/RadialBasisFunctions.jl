@@ -221,10 +221,9 @@ function hermite_rbf_dispatch(
     ::InteriorPoint, ::NeumannRobinPoint, i, j, xi, xj, data, basis
 )
     φ = basis(xi, xj)
-    ∇φ = ∇(basis)(xi, xj)
     bc_j = data.boundary_conditions[j]
     nj = data.normals[j]
-    return α(bc_j) * φ + β(bc_j) * dot(nj, -∇φ)
+    return α(bc_j) * φ - β(bc_j) * D(basis, nj)(xi, xj)
 end
 
 # Dirichlet-Interior: Standard RBF evaluation
@@ -242,10 +241,9 @@ function hermite_rbf_dispatch(
     ::DirichletPoint, ::NeumannRobinPoint, i, j, xi, xj, data, basis
 )
     φ = basis(xi, xj)
-    ∇φ = ∇(basis)(xi, xj)
     bc_j = data.boundary_conditions[j]
     nj = data.normals[j]
-    return α(bc_j) * φ + β(bc_j) * dot(nj, -∇φ)
+    return α(bc_j) * φ - β(bc_j) * D(basis, nj)(xi, xj)
 end
 
 # NeumannRobin-Interior: Apply boundary operator to first argument
@@ -253,10 +251,9 @@ function hermite_rbf_dispatch(
     ::NeumannRobinPoint, ::InteriorPoint, i, j, xi, xj, data, basis
 )
     φ = basis(xi, xj)
-    ∇φ = ∇(basis)(xi, xj)
     bc_i = data.boundary_conditions[i]
     ni = data.normals[i]
-    return α(bc_i) * φ + β(bc_i) * dot(ni, ∇φ)
+    return α(bc_i) * φ + β(bc_i) * D(basis, ni)(xi, xj)
 end
 
 # NeumannRobin-Dirichlet: Apply boundary operator to first argument
@@ -264,10 +261,9 @@ function hermite_rbf_dispatch(
     ::NeumannRobinPoint, ::DirichletPoint, i, j, xi, xj, data, basis
 )
     φ = basis(xi, xj)
-    ∇φ = ∇(basis)(xi, xj)
     bc_i = data.boundary_conditions[i]
     ni = data.normals[i]
-    return α(bc_i) * φ + β(bc_i) * dot(ni, ∇φ)
+    return α(bc_i) * φ + β(bc_i) * D(basis, ni)(xi, xj)
 end
 
 # NeumannRobin-NeumannRobin: Apply boundary operators to both arguments
@@ -275,18 +271,16 @@ function hermite_rbf_dispatch(
     ::NeumannRobinPoint, ::NeumannRobinPoint, i, j, xi, xj, data, basis
 )
     φ = basis(xi, xj)
-    ∇φ = ∇(basis)(xi, xj)
     bc_i = data.boundary_conditions[i]
     bc_j = data.boundary_conditions[j]
     ni = data.normals[i]
     nj = data.normals[j]
-    ∂i∂j_φ = directional∂²(basis, ni, nj)(xi, xj)
 
     return (
-        α(bc_i) * α(bc_j) * φ +
-        α(bc_i) * β(bc_j) * dot(nj, -∇φ) +
-        β(bc_i) * α(bc_j) * dot(ni, ∇φ) +
-        β(bc_i) * β(bc_j) * ∂i∂j_φ
+        α(bc_i) * α(bc_j) * φ -
+        α(bc_i) * β(bc_j) * D(basis, nj)(xi, xj) +
+        β(bc_i) * α(bc_j) * D(basis, ni)(xi, xj) +
+        β(bc_i) * β(bc_j) * D²(basis, ni, nj)(xi, xj)
     )
 end
 
