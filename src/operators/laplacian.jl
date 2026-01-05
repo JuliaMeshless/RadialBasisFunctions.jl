@@ -37,11 +37,18 @@ op = laplacian(data; eval_points=eval_pts)
 laplacian(data::AbstractVector; kw...) = RadialBasisOperator(Laplacian(), data; kw...)
 
 # Backward compatible positional signatures
-laplacian(data::AbstractVector, basis::AbstractRadialBasis; kw...) =
+function laplacian(data::AbstractVector, basis::AbstractRadialBasis; kw...)
     RadialBasisOperator(Laplacian(), data; basis=basis, kw...)
+end
 
-laplacian(data::AbstractVector, eval_points::AbstractVector, basis::AbstractRadialBasis=PHS(3; poly_deg=2); kw...) =
+function laplacian(
+    data::AbstractVector,
+    eval_points::AbstractVector,
+    basis::AbstractRadialBasis=PHS(3; poly_deg=2);
+    kw...,
+)
     RadialBasisOperator(Laplacian(), data; eval_points=eval_points, basis=basis, kw...)
+end
 
 # Hermite backward compatibility (positional boundary arguments)
 """
@@ -60,8 +67,9 @@ function laplacian(
     kw...,
 )
     hermite = (is_boundary=is_boundary, bc=boundary_conditions, normals=normals)
-    return RadialBasisOperator(Laplacian(), data;
-        eval_points=eval_points, basis=basis, hermite=hermite, kw...)
+    return RadialBasisOperator(
+        Laplacian(), data; eval_points=eval_points, basis=basis, hermite=hermite, kw...
+    )
 end
 
 # pretty printing

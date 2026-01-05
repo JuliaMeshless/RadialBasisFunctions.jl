@@ -35,16 +35,24 @@ op = custom(data, basis -> (x, xᵢ) -> basis(x, xᵢ))
 op = custom(data, basis -> ∇²(basis) ∘ ∇²(basis))
 ```
 """
-custom(data::AbstractVector, ℒ::Function; kw...) =
+function custom(data::AbstractVector, ℒ::Function; kw...)
     RadialBasisOperator(Custom(ℒ), data; kw...)
+end
 
 # Backward compatible positional signatures
-custom(data::AbstractVector, ℒ::Function, basis::AbstractRadialBasis; kw...) =
+function custom(data::AbstractVector, ℒ::Function, basis::AbstractRadialBasis; kw...)
     RadialBasisOperator(Custom(ℒ), data; basis=basis, kw...)
+end
 
-custom(data::AbstractVector, eval_points::AbstractVector, ℒ::Function,
-       basis::AbstractRadialBasis=PHS(3; poly_deg=2); kw...) =
+function custom(
+    data::AbstractVector,
+    eval_points::AbstractVector,
+    ℒ::Function,
+    basis::AbstractRadialBasis=PHS(3; poly_deg=2);
+    kw...,
+)
     RadialBasisOperator(Custom(ℒ), data; eval_points=eval_points, basis=basis, kw...)
+end
 
 # Hermite backward compatibility (positional boundary arguments)
 function custom(
@@ -58,8 +66,9 @@ function custom(
     kw...,
 )
     hermite = (is_boundary=is_boundary, bc=boundary_conditions, normals=normals)
-    return RadialBasisOperator(Custom(ℒ), data;
-        eval_points=eval_points, basis=basis, hermite=hermite, kw...)
+    return RadialBasisOperator(
+        Custom(ℒ), data; eval_points=eval_points, basis=basis, hermite=hermite, kw...
+    )
 end
 
 # pretty printing

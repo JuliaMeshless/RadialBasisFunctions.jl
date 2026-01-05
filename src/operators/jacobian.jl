@@ -71,11 +71,16 @@ end
 
 # Note: Type constraint {<:AbstractVector} ensures this only matches vector-of-points,
 # not field values like Vector{Float64}
-function jacobian(data::AbstractVector{<:AbstractVector}, eval_points::AbstractVector{<:AbstractVector},
-                  basis::AbstractRadialBasis=PHS(3; poly_deg=2); kw...)
+function jacobian(
+    data::AbstractVector{<:AbstractVector},
+    eval_points::AbstractVector{<:AbstractVector},
+    basis::AbstractRadialBasis=PHS(3; poly_deg=2);
+    kw...,
+)
     Dim = length(first(data))
-    return RadialBasisOperator(Jacobian{Dim}(), data;
-        eval_points=eval_points, basis=basis, kw...)
+    return RadialBasisOperator(
+        Jacobian{Dim}(), data; eval_points=eval_points, basis=basis, kw...
+    )
 end
 
 # Hermite backward compatibility (positional boundary arguments)
@@ -90,8 +95,9 @@ function jacobian(
 )
     Dim = length(first(data))
     hermite = (is_boundary=is_boundary, bc=boundary_conditions, normals=normals)
-    return RadialBasisOperator(Jacobian{Dim}(), data;
-        eval_points=eval_points, basis=basis, hermite=hermite, kw...)
+    return RadialBasisOperator(
+        Jacobian{Dim}(), data; eval_points=eval_points, basis=basis, hermite=hermite, kw...
+    )
 end
 
 # One-shot convenience: create operator and apply immediately

@@ -82,8 +82,14 @@ function RadialBasisOperator(
         _build_weights(ℒ, data, eval_points, adjl, basis)
     else
         _build_weights(
-            ℒ, data, eval_points, adjl, basis,
-            hermite.is_boundary, hermite.bc, hermite.normals
+            ℒ,
+            data,
+            eval_points,
+            adjl,
+            basis,
+            hermite.is_boundary,
+            hermite.bc,
+            hermite.normals,
         )
     end
     return RadialBasisOperator(ℒ, weights, data, eval_points, adjl, basis, true)
@@ -113,7 +119,9 @@ function RadialBasisOperator(
     k::Int=autoselect_k(data, basis),
     adjl=find_neighbors(data, eval_points, k),
 )
-    return RadialBasisOperator(ℒ, data; eval_points=eval_points, basis=basis, k=k, adjl=adjl)
+    return RadialBasisOperator(
+        ℒ, data; eval_points=eval_points, basis=basis, k=k, adjl=adjl
+    )
 end
 
 # Hermite-compatible constructor (positional boundary arguments)
@@ -129,8 +137,9 @@ function RadialBasisOperator(
     adjl=find_neighbors(data, eval_points, k),
 )
     hermite = (is_boundary=is_boundary, bc=boundary_conditions, normals=normals)
-    return RadialBasisOperator(ℒ, data;
-        eval_points=eval_points, basis=basis, k=k, adjl=adjl, hermite=hermite)
+    return RadialBasisOperator(
+        ℒ, data; eval_points=eval_points, basis=basis, k=k, adjl=adjl, hermite=hermite
+    )
 end
 
 dim(op::RadialBasisOperator) = length(first(op.data))

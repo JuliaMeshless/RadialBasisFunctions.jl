@@ -36,12 +36,16 @@ u_coarse = sin.(getindex.(coarse, 1))
 u_fine = op(u_coarse)
 ```
 """
-regrid(data::AbstractVector, eval_points::AbstractVector; kw...) =
+function regrid(data::AbstractVector, eval_points::AbstractVector; kw...)
     RadialBasisOperator(Regrid(), data; eval_points=eval_points, kw...)
+end
 
 # Backward compatible positional signature
-regrid(data::AbstractVector, eval_points::AbstractVector, basis::AbstractRadialBasis; kw...) =
+function regrid(
+    data::AbstractVector, eval_points::AbstractVector, basis::AbstractRadialBasis; kw...
+)
     RadialBasisOperator(Regrid(), data; eval_points=eval_points, basis=basis, kw...)
+end
 
 # pretty printing
 print_op(::Regrid) = "regrid"

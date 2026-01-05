@@ -36,12 +36,18 @@ See also: [`jacobian`](@ref)
 gradient(data::AbstractVector{<:AbstractVector}; kw...) = jacobian(data; kw...)
 
 # Backward compatible positional signatures (all delegate to jacobian)
-gradient(data::AbstractVector{<:AbstractVector}, basis::AbstractRadialBasis; kw...) =
+function gradient(data::AbstractVector{<:AbstractVector}, basis::AbstractRadialBasis; kw...)
     jacobian(data, basis; kw...)
+end
 
-gradient(data::AbstractVector{<:AbstractVector}, eval_points::AbstractVector{<:AbstractVector},
-         basis::AbstractRadialBasis=PHS(3; poly_deg=2); kw...) =
+function gradient(
+    data::AbstractVector{<:AbstractVector},
+    eval_points::AbstractVector{<:AbstractVector},
+    basis::AbstractRadialBasis=PHS(3; poly_deg=2);
+    kw...,
+)
     jacobian(data, eval_points, basis; kw...)
+end
 
 # Hermite backward compatibility
 function gradient(
@@ -53,7 +59,9 @@ function gradient(
     normals::Vector{<:AbstractVector};
     kw...,
 )
-    return jacobian(data, eval_points, basis, is_boundary, boundary_conditions, normals; kw...)
+    return jacobian(
+        data, eval_points, basis, is_boundary, boundary_conditions, normals; kw...
+    )
 end
 
 # One-shot convenience (delegate to jacobian's one-shot)

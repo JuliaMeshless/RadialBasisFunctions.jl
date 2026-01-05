@@ -277,8 +277,7 @@ function hermite_rbf_dispatch(
     nj = data.normals[j]
 
     return (
-        α(bc_i) * α(bc_j) * φ -
-        α(bc_i) * β(bc_j) * D(basis, nj)(xi, xj) +
+        α(bc_i) * α(bc_j) * φ - α(bc_i) * β(bc_j) * D(basis, nj)(xi, xj) +
         β(bc_i) * α(bc_j) * D(basis, ni)(xi, xj) +
         β(bc_i) * β(bc_j) * D²(basis, ni, nj)(xi, xj)
     )

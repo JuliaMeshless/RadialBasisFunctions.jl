@@ -43,16 +43,24 @@ function directional(data::AbstractVector, v::AbstractVector; kw...)
 end
 
 # Backward compatible positional signatures
-function directional(data::AbstractVector, v::AbstractVector, basis::AbstractRadialBasis; kw...)
+function directional(
+    data::AbstractVector, v::AbstractVector, basis::AbstractRadialBasis; kw...
+)
     Dim = length(first(data))
     return RadialBasisOperator(Directional{Dim}(v), data; basis=basis, kw...)
 end
 
-function directional(data::AbstractVector, eval_points::AbstractVector, v::AbstractVector,
-                     basis::AbstractRadialBasis=PHS(3; poly_deg=2); kw...)
+function directional(
+    data::AbstractVector,
+    eval_points::AbstractVector,
+    v::AbstractVector,
+    basis::AbstractRadialBasis=PHS(3; poly_deg=2);
+    kw...,
+)
     Dim = length(first(data))
-    return RadialBasisOperator(Directional{Dim}(v), data;
-        eval_points=eval_points, basis=basis, kw...)
+    return RadialBasisOperator(
+        Directional{Dim}(v), data; eval_points=eval_points, basis=basis, kw...
+    )
 end
 
 # Hermite backward compatibility (positional boundary arguments)
@@ -68,8 +76,14 @@ function directional(
 )
     Dim = length(first(data))
     hermite = (is_boundary=is_boundary, bc=boundary_conditions, normals=normals)
-    return RadialBasisOperator(Directional{Dim}(v), data;
-        eval_points=eval_points, basis=basis, hermite=hermite, kw...)
+    return RadialBasisOperator(
+        Directional{Dim}(v),
+        data;
+        eval_points=eval_points,
+        basis=basis,
+        hermite=hermite,
+        kw...,
+    )
 end
 
 # ============================================================================
@@ -81,9 +95,11 @@ end
 # Helper: validate direction vector dimensions
 function _validate_directional_vector(v, Dim::Int, data_length::Int)
     if !(length(v) == Dim || length(v) == data_length)
-        throw(DomainError(
-            "Direction vector length $(length(v)) must equal dimension $Dim or data length $data_length"
-        ))
+        throw(
+            DomainError(
+                "Direction vector length $(length(v)) must equal dimension $Dim or data length $data_length",
+            ),
+        )
     end
 end
 
@@ -133,8 +149,16 @@ function _build_weights(
     ℒrbf = jacobian_op(basis)
 
     weights = _build_weights(
-        data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
-        is_boundary, boundary_conditions, normals
+        data,
+        eval_points,
+        adjl,
+        basis,
+        ℒrbf,
+        ℒmon,
+        mon,
+        is_boundary,
+        boundary_conditions,
+        normals,
     )
 
     return _combine_directional_weights(weights, v, Dim)
