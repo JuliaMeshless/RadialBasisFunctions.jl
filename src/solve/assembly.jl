@@ -223,7 +223,8 @@ function hermite_rbf_dispatch(
     φ = basis(xi, xj)
     bc_j = data.boundary_conditions[j]
     nj = data.normals[j]
-    return α(bc_j) * φ - β(bc_j) * D(basis, nj)(xi, xj)
+    Dⱼφ = D(basis, nj)(xi, xj)
+    return α(bc_j) * φ - β(bc_j) * Dⱼφ
 end
 
 # Dirichlet-Interior: Standard RBF evaluation
@@ -243,7 +244,8 @@ function hermite_rbf_dispatch(
     φ = basis(xi, xj)
     bc_j = data.boundary_conditions[j]
     nj = data.normals[j]
-    return α(bc_j) * φ - β(bc_j) * D(basis, nj)(xi, xj)
+    Dⱼφ = D(basis, nj)(xi, xj)
+    return α(bc_j) * φ - β(bc_j) * Dⱼφ
 end
 
 # NeumannRobin-Interior: Apply boundary operator to first argument
@@ -253,7 +255,8 @@ function hermite_rbf_dispatch(
     φ = basis(xi, xj)
     bc_i = data.boundary_conditions[i]
     ni = data.normals[i]
-    return α(bc_i) * φ + β(bc_i) * D(basis, ni)(xi, xj)
+    Dᵢφ = D(basis, ni)(xi, xj)
+    return α(bc_i) * φ + β(bc_i) * Dᵢφ
 end
 
 # NeumannRobin-Dirichlet: Apply boundary operator to first argument
@@ -263,7 +266,8 @@ function hermite_rbf_dispatch(
     φ = basis(xi, xj)
     bc_i = data.boundary_conditions[i]
     ni = data.normals[i]
-    return α(bc_i) * φ + β(bc_i) * D(basis, ni)(xi, xj)
+    Dᵢφ = D(basis, ni)(xi, xj)
+    return α(bc_i) * φ + β(bc_i) * Dᵢφ
 end
 
 # NeumannRobin-NeumannRobin: Apply boundary operators to both arguments
@@ -275,12 +279,13 @@ function hermite_rbf_dispatch(
     bc_j = data.boundary_conditions[j]
     ni = data.normals[i]
     nj = data.normals[j]
+    Dᵢφ = D(basis, ni)(xi, xj)
+    Dⱼφ = D(basis, nj)(xi, xj)
+    D²φ = D²(basis, ni, nj)(xi, xj)
 
-    return (
-        α(bc_i) * α(bc_j) * φ - α(bc_i) * β(bc_j) * D(basis, nj)(xi, xj) +
-        β(bc_i) * α(bc_j) * D(basis, ni)(xi, xj) +
-        β(bc_i) * β(bc_j) * D²(basis, ni, nj)(xi, xj)
-    )
+    return α(bc_i) * α(bc_j) * φ - α(bc_i) * β(bc_j) * Dⱼφ +
+           β(bc_i) * α(bc_j) * Dᵢφ +
+           β(bc_i) * β(bc_j) * D²φ
 end
 
 """
