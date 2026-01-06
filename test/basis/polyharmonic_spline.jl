@@ -110,6 +110,30 @@ end
 
         @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
     end
+
+    @testset "Hessian" begin
+        v1 = SVector(1.0, 0.0)
+        v2 = SVector(0.0, 1.0)
+        normal = SVector(1.0, 1) ./ sqrt(2)
+
+        Hrbf = RBF.H(phs)
+        H_val = Hrbf(x₁, x₂)
+
+        # Test matrix size
+        @test size(H_val) == (2, 2)
+
+        # Test consistency with D²: dot(v1, H * v2) should equal D²(basis, v1, v2)
+        @test dot(v1, H_val * v2) ≈ RBF.D²(phs, v1, v2)(x₁, x₂) rtol = 1e-10
+        @test dot(v2, H_val * v1) ≈ RBF.D²(phs, v2, v1)(x₁, x₂) rtol = 1e-10
+        @test dot(normal, H_val * normal) ≈ RBF.D²(phs, normal, normal)(x₁, x₂) rtol = 1e-10
+
+        # Test Hessian symmetry
+        @test H_val ≈ H_val' rtol = 1e-10
+
+        # Test against ForwardDiff Hessian
+        H_fd = FD.hessian(x -> phs(x, x₂), x₁)
+        @test H_val ≈ H_fd rtol = 1e-5
+    end
 end
 
 @testset "PHS, n=3" begin
@@ -201,6 +225,30 @@ end
         second_mixed = FD.gradient(y -> first_x_deriv(y), x₂) ⋅ v2
 
         @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
+    end
+
+    @testset "Hessian" begin
+        v1 = SVector(1.0, 0.0)
+        v2 = SVector(0.0, 1.0)
+        normal = SVector(1.0, 1) ./ sqrt(2)
+
+        Hrbf = RBF.H(phs)
+        H_val = Hrbf(x₁, x₂)
+
+        # Test matrix size
+        @test size(H_val) == (2, 2)
+
+        # Test consistency with D²: dot(v1, H * v2) should equal D²(basis, v1, v2)
+        @test dot(v1, H_val * v2) ≈ RBF.D²(phs, v1, v2)(x₁, x₂) rtol = 1e-10
+        @test dot(v2, H_val * v1) ≈ RBF.D²(phs, v2, v1)(x₁, x₂) rtol = 1e-10
+        @test dot(normal, H_val * normal) ≈ RBF.D²(phs, normal, normal)(x₁, x₂) rtol = 1e-10
+
+        # Test Hessian symmetry
+        @test H_val ≈ H_val' rtol = 1e-10
+
+        # Test against ForwardDiff Hessian
+        H_fd = FD.hessian(x -> phs(x, x₂), x₁)
+        @test H_val ≈ H_fd rtol = 1e-5
     end
 end
 
@@ -294,6 +342,30 @@ end
 
         @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
     end
+
+    @testset "Hessian" begin
+        v1 = SVector(1.0, 0.0)
+        v2 = SVector(0.0, 1.0)
+        normal = SVector(1.0, 1) ./ sqrt(2)
+
+        Hrbf = RBF.H(phs)
+        H_val = Hrbf(x₁, x₂)
+
+        # Test matrix size
+        @test size(H_val) == (2, 2)
+
+        # Test consistency with D²: dot(v1, H * v2) should equal D²(basis, v1, v2)
+        @test dot(v1, H_val * v2) ≈ RBF.D²(phs, v1, v2)(x₁, x₂) rtol = 1e-10
+        @test dot(v2, H_val * v1) ≈ RBF.D²(phs, v2, v1)(x₁, x₂) rtol = 1e-10
+        @test dot(normal, H_val * normal) ≈ RBF.D²(phs, normal, normal)(x₁, x₂) rtol = 1e-10
+
+        # Test Hessian symmetry
+        @test H_val ≈ H_val' rtol = 1e-10
+
+        # Test against ForwardDiff Hessian
+        H_fd = FD.hessian(x -> phs(x, x₂), x₁)
+        @test H_val ≈ H_fd rtol = 1e-5
+    end
 end
 
 @testset "PHS, n=7" begin
@@ -384,5 +456,29 @@ end
         second_mixed = FD.gradient(y -> first_x_deriv(y), x₂) ⋅ v2
 
         @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
+    end
+
+    @testset "Hessian" begin
+        v1 = SVector(1.0, 0.0)
+        v2 = SVector(0.0, 1.0)
+        normal = SVector(1.0, 1) ./ sqrt(2)
+
+        Hrbf = RBF.H(phs)
+        H_val = Hrbf(x₁, x₂)
+
+        # Test matrix size
+        @test size(H_val) == (2, 2)
+
+        # Test consistency with D²: dot(v1, H * v2) should equal D²(basis, v1, v2)
+        @test dot(v1, H_val * v2) ≈ RBF.D²(phs, v1, v2)(x₁, x₂) rtol = 1e-10
+        @test dot(v2, H_val * v1) ≈ RBF.D²(phs, v2, v1)(x₁, x₂) rtol = 1e-10
+        @test dot(normal, H_val * normal) ≈ RBF.D²(phs, normal, normal)(x₁, x₂) rtol = 1e-10
+
+        # Test Hessian symmetry
+        @test H_val ≈ H_val' rtol = 1e-10
+
+        # Test against ForwardDiff Hessian
+        H_fd = FD.hessian(x -> phs(x, x₂), x₁)
+        @test H_val ≈ H_fd rtol = 1e-5
     end
 end

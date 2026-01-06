@@ -56,3 +56,50 @@ end
     expected = FD.gradient(x -> imq(x, x₂), x₁) ⋅ normal
     @test RBF.D(imq, normal)(x₁, x₂) ≈ expected rtol = 1e-5
 end
+
+@testset "Directional Second Derivatives" begin
+    v1 = SVector(1.0, 0.0)
+    v2 = SVector(0.0, 1.0)
+    normal = SVector(1.0, 1) ./ sqrt(2)
+
+    # Same direction test
+    dir_deriv = RBF.D²(imq, normal, normal)
+
+    # Calculate expected value with ForwardDiff
+    first_normal_deriv(y) = FD.gradient(x -> imq(x, y), x₁) ⋅ normal
+    second_normal = FD.gradient(y -> first_normal_deriv(y), x₂) ⋅ normal
+
+    @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
+
+    # Test with orthogonal directions
+    dir_deriv_xy = RBF.D²(imq, v1, v2)
+
+    first_x_deriv(y) = FD.gradient(x -> imq(x, y), x₁) ⋅ v1
+    second_mixed = FD.gradient(y -> first_x_deriv(y), x₂) ⋅ v2
+
+    @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
+end
+
+@testset "Hessian" begin
+    v1 = SVector(1.0, 0.0)
+    v2 = SVector(0.0, 1.0)
+    normal = SVector(1.0, 1) ./ sqrt(2)
+
+    Hrbf = RBF.H(imq)
+    H_val = Hrbf(x₁, x₂)
+
+    # Test matrix size
+    @test size(H_val) == (2, 2)
+
+    # Test consistency with D²: dot(v1, H * v2) should equal D²(basis, v1, v2)
+    @test dot(v1, H_val * v2) ≈ RBF.D²(imq, v1, v2)(x₁, x₂) rtol = 1e-10
+    @test dot(v2, H_val * v1) ≈ RBF.D²(imq, v2, v1)(x₁, x₂) rtol = 1e-10
+    @test dot(normal, H_val * normal) ≈ RBF.D²(imq, normal, normal)(x₁, x₂) rtol = 1e-10
+
+    # Test Hessian symmetry
+    @test H_val ≈ H_val' rtol = 1e-10
+
+    # Test against ForwardDiff Hessian
+    H_fd = FD.hessian(x -> imq(x, x₂), x₁)
+    @test H_val ≈ H_fd rtol = 1e-5
+end

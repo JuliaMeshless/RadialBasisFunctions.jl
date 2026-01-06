@@ -31,6 +31,37 @@ function (op::D{<:IMQ})(x, xᵢ)
     return LinearAlgebra.dot(op.v, xᵢ .- x) * (ε2 / sqrt((ε2 * sqeuclidean(x, xᵢ) + 1)^3))
 end
 
+# D² - directional second derivative
+function (op::D²{<:IMQ})(x, xᵢ)
+    ε2 = op.basis.ε^2
+    ε4 = ε2^2
+    Δ = x .- xᵢ
+    s = ε2 * sqeuclidean(x, xᵢ) + 1
+    dot_v1_v2 = LinearAlgebra.dot(op.v1, op.v2)
+    dot_v1_r = LinearAlgebra.dot(op.v1, Δ)
+    dot_v2_r = LinearAlgebra.dot(op.v2, Δ)
+    return 3 * ε4 * dot_v1_r * dot_v2_r / sqrt(s^5) - ε2 * dot_v1_v2 / sqrt(s^3)
+end
+
+# H - Hessian matrix
+function (op::H{<:IMQ})(x, xᵢ)
+    ε2 = op.basis.ε^2
+    ε4 = ε2^2
+    Δ = x .- xᵢ
+    s = ε2 * sqeuclidean(x, xᵢ) + 1
+    s3 = sqrt(s^3)
+    s5 = sqrt(s^5)
+    N = length(x)
+    T = eltype(x)
+    # H[i,j] = -ε² * δᵢⱼ / s^(3/2) + 3ε⁴ * Δᵢ*Δⱼ / s^(5/2)
+    return StaticArrays.SMatrix{N,N,T}(
+        ntuple(N * N) do k
+            i, j = divrem(k - 1, N) .+ 1
+            3 * ε4 * Δ[i] * Δ[j] / s5 - ε2 * T(i == j) / s3
+        end
+    )
+end
+
 # ∂² - second partial derivative
 function (op::∂²{<:IMQ})(x, xᵢ)
     ε2 = op.basis.ε^2

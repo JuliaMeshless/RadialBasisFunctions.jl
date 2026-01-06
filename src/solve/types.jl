@@ -244,3 +244,38 @@ _num_ops(ℒ) = _num_ops(operator_arity(ℒ))
 _prepare_buffer(::SingleOperator, T, n) = zeros(T, n)
 _prepare_buffer(::MultiOperator{N}, T, n) where {N} = zeros(T, n, N)
 _prepare_buffer(ℒ, T, n) = _prepare_buffer(operator_arity(ℒ), T, n)
+
+# ============================================================================
+# Basis Operators Bundle (for hot loop optimization)
+# ============================================================================
+
+"""
+    BasisOperators{B,G,Hess}
+
+Bundle of pre-constructed basis operators for efficient evaluation in hot loops.
+Avoids repeated functor construction inside `hermite_rbf_dispatch`.
+
+Fields:
+- `φ`: The basis function itself
+- `∇φ`: Gradient operator (pre-constructed ∇(basis))
+- `Hφ`: Hessian operator (pre-constructed H(basis))
+
+Usage:
+```julia
+ops = BasisOperators(basis)
+# In hot loop:
+φ_val = ops.φ(x, xᵢ)
+grad = ops.∇φ(x, xᵢ)      # Returns vector
+hess = ops.Hφ(x, xᵢ)      # Returns matrix
+Dφ = dot(n, grad)         # Directional derivative
+D²φ = dot(ni, hess * nj)  # Second directional derivative
+```
+"""
+struct BasisOperators{B<:AbstractRadialBasis,G,Hess}
+    φ::B
+    ∇φ::G
+    Hφ::Hess
+end
+
+"""Construct BasisOperators from a basis function."""
+BasisOperators(basis::AbstractRadialBasis) = BasisOperators(basis, ∇(basis), H(basis))

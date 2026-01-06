@@ -71,6 +71,16 @@ struct D²{B<:AbstractRadialBasis,V1,V2}
     v2::V2
 end
 
+"""
+    H{B<:AbstractRadialBasis}
+
+Hessian operator functor. Construct with `H(basis)`.
+Returns the Hessian matrix of the basis function.
+"""
+struct H{B<:AbstractRadialBasis}
+    basis::B
+end
+
 include("polyharmonic_spline.jl")
 include("inverse_multiquadric.jl")
 include("gaussian.jl")

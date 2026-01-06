@@ -79,6 +79,21 @@ function (op::D²{<:PHS1})(x, xᵢ)
     return -dot_v1_v2 / (r + AVOID_INF) + (dot_v1_r * dot_v2_r) / (r^3 + AVOID_INF)
 end
 
+# H - Hessian matrix
+function (op::H{<:PHS1})(x, xᵢ)
+    r = euclidean(x, xᵢ)
+    Δ = x .- xᵢ
+    N = length(x)
+    T = eltype(x)
+    # H[i,j] = -δᵢⱼ/r + Δᵢ*Δⱼ/r³
+    return StaticArrays.SMatrix{N,N,T}(
+        ntuple(N * N) do k
+            i, j = divrem(k - 1, N) .+ 1
+            -T(i == j) / (r + AVOID_INF) + Δ[i] * Δ[j] / (r^3 + AVOID_INF)
+        end
+    )
+end
+
 # ∂² - second partial derivative
 function (op::∂²{<:PHS1})(x, xᵢ)
     r = euclidean(x, xᵢ)
@@ -162,6 +177,21 @@ function (op::D²{<:PHS3})(x, xᵢ)
     dot_v1_r = LinearAlgebra.dot(op.v1, x .- xᵢ)
     dot_v2_r = LinearAlgebra.dot(op.v2, x .- xᵢ)
     return -3 * (dot_v1_v2 * r + dot_v1_r * dot_v2_r / (r + AVOID_INF))
+end
+
+# H - Hessian matrix
+function (op::H{<:PHS3})(x, xᵢ)
+    r = euclidean(x, xᵢ)
+    Δ = x .- xᵢ
+    N = length(x)
+    T = eltype(x)
+    # H[i,j] = -3 * (δᵢⱼ * r + Δᵢ*Δⱼ/r)
+    return StaticArrays.SMatrix{N,N,T}(
+        ntuple(N * N) do k
+            i, j = divrem(k - 1, N) .+ 1
+            -3 * (T(i == j) * r + Δ[i] * Δ[j] / (r + AVOID_INF))
+        end
+    )
 end
 
 # ∂² - second partial derivative
@@ -249,6 +279,21 @@ function (op::D²{<:PHS5})(x, xᵢ)
     return -5 * (dot_v1_v2 * r^3 + 3 * dot_v1_r * dot_v2_r * r)
 end
 
+# H - Hessian matrix
+function (op::H{<:PHS5})(x, xᵢ)
+    r = euclidean(x, xᵢ)
+    Δ = x .- xᵢ
+    N = length(x)
+    T = eltype(x)
+    # H[i,j] = -5 * (δᵢⱼ * r³ + 3 * Δᵢ*Δⱼ * r)
+    return StaticArrays.SMatrix{N,N,T}(
+        ntuple(N * N) do k
+            i, j = divrem(k - 1, N) .+ 1
+            -5 * (T(i == j) * r^3 + 3 * Δ[i] * Δ[j] * r)
+        end
+    )
+end
+
 # ∂² - second partial derivative
 function (op::∂²{<:PHS5})(x, xᵢ)
     r = euclidean(x, xᵢ)
@@ -332,6 +377,21 @@ function (op::D²{<:PHS7})(x, xᵢ)
     dot_v1_r = LinearAlgebra.dot(op.v1, x .- xᵢ)
     dot_v2_r = LinearAlgebra.dot(op.v2, x .- xᵢ)
     return -7 * (dot_v1_v2 * r^5 + 5 * dot_v1_r * dot_v2_r * r^3)
+end
+
+# H - Hessian matrix
+function (op::H{<:PHS7})(x, xᵢ)
+    r = euclidean(x, xᵢ)
+    Δ = x .- xᵢ
+    N = length(x)
+    T = eltype(x)
+    # H[i,j] = -7 * (δᵢⱼ * r⁵ + 5 * Δᵢ*Δⱼ * r³)
+    return StaticArrays.SMatrix{N,N,T}(
+        ntuple(N * N) do k
+            i, j = divrem(k - 1, N) .+ 1
+            -7 * (T(i == j) * r^5 + 5 * Δ[i] * Δ[j] * r^3)
+        end
+    )
 end
 
 # ∂² - second partial derivative
