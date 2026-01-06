@@ -56,7 +56,7 @@ function (op::H{<:Gaussian})(x, xᵢ)
         ntuple(N * N) do k
             i, j = divrem(k - 1, N) .+ 1
             (4 * ε2^2 * Δ[i] * Δ[j] - 2 * ε2 * T(i == j)) * φ
-        end
+        end,
     )
 end
 

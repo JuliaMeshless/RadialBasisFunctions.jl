@@ -231,9 +231,7 @@ function hermite_rbf_dispatch(::InteriorPoint, ::DirichletPoint, i, j, xi, xj, d
 end
 
 # Interior-NeumannRobin: Apply boundary operator to second argument
-function hermite_rbf_dispatch(
-    ::InteriorPoint, ::NeumannRobinPoint, i, j, xi, xj, data, ops
-)
+function hermite_rbf_dispatch(::InteriorPoint, ::NeumannRobinPoint, i, j, xi, xj, data, ops)
     φ = ops.φ(xi, xj)
     bc_j = data.boundary_conditions[j]
     nj = data.normals[j]
@@ -265,9 +263,7 @@ function hermite_rbf_dispatch(
 end
 
 # NeumannRobin-Interior: Apply boundary operator to first argument
-function hermite_rbf_dispatch(
-    ::NeumannRobinPoint, ::InteriorPoint, i, j, xi, xj, data, ops
-)
+function hermite_rbf_dispatch(::NeumannRobinPoint, ::InteriorPoint, i, j, xi, xj, data, ops)
     φ = ops.φ(xi, xj)
     bc_i = data.boundary_conditions[i]
     ni = data.normals[i]

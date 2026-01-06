@@ -90,7 +90,7 @@ function (op::H{<:PHS1})(x, xᵢ)
         ntuple(N * N) do k
             i, j = divrem(k - 1, N) .+ 1
             T(i == j) / (r + AVOID_INF) - Δ[i] * Δ[j] / (r^3 + AVOID_INF)
-        end
+        end,
     )
 end
 
@@ -190,7 +190,7 @@ function (op::H{<:PHS3})(x, xᵢ)
         ntuple(N * N) do k
             i, j = divrem(k - 1, N) .+ 1
             3 * (T(i == j) * r + Δ[i] * Δ[j] / (r + AVOID_INF))
-        end
+        end,
     )
 end
 
@@ -290,7 +290,7 @@ function (op::H{<:PHS5})(x, xᵢ)
         ntuple(N * N) do k
             i, j = divrem(k - 1, N) .+ 1
             5 * (T(i == j) * r^3 + 3 * Δ[i] * Δ[j] * r)
-        end
+        end,
     )
 end
 
@@ -390,7 +390,7 @@ function (op::H{<:PHS7})(x, xᵢ)
         ntuple(N * N) do k
             i, j = divrem(k - 1, N) .+ 1
             7 * (T(i == j) * r^5 + 5 * Δ[i] * Δ[j] * r^3)
-        end
+        end,
     )
 end
 
