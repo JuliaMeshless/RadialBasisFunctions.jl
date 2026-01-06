@@ -52,7 +52,7 @@ function (op::H{<:Gaussian})(x, xᵢ)
     N = length(x)
     T = eltype(x)
     # H[i,j] = (4ε⁴ * Δᵢ*Δⱼ - 2ε² * δᵢⱼ) * φ
-    return StaticArrays.SMatrix{N,N,T}(
+    return StaticArraysCore.SMatrix{N,N,T}(
         ntuple(N * N) do k
             i, j = divrem(k - 1, N) .+ 1
             (4 * ε2^2 * Δ[i] * Δ[j] - 2 * ε2 * T(i == j)) * φ

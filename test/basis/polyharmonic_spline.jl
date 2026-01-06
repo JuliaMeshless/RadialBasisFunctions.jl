@@ -95,18 +95,17 @@ end
         # Same direction test (both normal)
         dir_deriv = RBF.D²(phs, normal, normal)
 
-        # Calculate expected value manually with ForwardDiff
-        first_normal_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ normal
-        second_normal = FD.gradient(y -> first_normal_deriv(y), x₂) ⋅ normal
+        # Calculate expected value using Hessian (D² computes v1' * H * v2)
+        H_fd = FD.hessian(x -> phs(x, x₂), x₁)
+        second_normal = dot(normal, H_fd * normal)
 
         @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
 
         # Test with orthogonal directions
         dir_deriv_xy = RBF.D²(phs, v1, v2)
 
-        # Calculate mixed partial derivative with ForwardDiff
-        first_x_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ v1
-        second_mixed = FD.gradient(y -> first_x_deriv(y), x₂) ⋅ v2
+        # Calculate mixed directional derivative using Hessian
+        second_mixed = dot(v1, H_fd * v2)
 
         @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
     end
@@ -211,18 +210,17 @@ end
         # Same direction test (both normal)
         dir_deriv = RBF.D²(phs, normal, normal)
 
-        # Calculate expected value manually with ForwardDiff
-        first_normal_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ normal
-        second_normal = FD.gradient(y -> first_normal_deriv(y), x₂) ⋅ normal
+        # Calculate expected value using Hessian (D² computes v1' * H * v2)
+        H_fd = FD.hessian(x -> phs(x, x₂), x₁)
+        second_normal = dot(normal, H_fd * normal)
 
         @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
 
         # Test with orthogonal directions
         dir_deriv_xy = RBF.D²(phs, v1, v2)
 
-        # Calculate mixed partial derivative with ForwardDiff
-        first_x_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ v1
-        second_mixed = FD.gradient(y -> first_x_deriv(y), x₂) ⋅ v2
+        # Calculate mixed directional derivative using Hessian
+        second_mixed = dot(v1, H_fd * v2)
 
         @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
     end
@@ -327,18 +325,17 @@ end
         # Same direction test (both normal)
         dir_deriv = RBF.D²(phs, normal, normal)
 
-        # Calculate expected value manually with ForwardDiff
-        first_normal_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ normal
-        second_normal = FD.gradient(y -> first_normal_deriv(y), x₂) ⋅ normal
+        # Calculate expected value using Hessian (D² computes v1' * H * v2)
+        H_fd = FD.hessian(x -> phs(x, x₂), x₁)
+        second_normal = dot(normal, H_fd * normal)
 
         @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
 
         # Test with orthogonal directions
         dir_deriv_xy = RBF.D²(phs, v1, v2)
 
-        # Calculate mixed partial derivative with ForwardDiff
-        first_x_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ v1
-        second_mixed = FD.gradient(y -> first_x_deriv(y), x₂) ⋅ v2
+        # Calculate mixed directional derivative using Hessian
+        second_mixed = dot(v1, H_fd * v2)
 
         @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
     end
@@ -442,18 +439,17 @@ end
         # Same direction test (both normal)
         dir_deriv = RBF.D²(phs, normal, normal)
 
-        # Calculate expected value manually with ForwardDiff
-        first_normal_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ normal
-        second_normal = FD.gradient(y -> first_normal_deriv(y), x₂) ⋅ normal
+        # Calculate expected value using Hessian (D² computes v1' * H * v2)
+        H_fd = FD.hessian(x -> phs(x, x₂), x₁)
+        second_normal = dot(normal, H_fd * normal)
 
         @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
 
         # Test with orthogonal directions
         dir_deriv_xy = RBF.D²(phs, v1, v2)
 
-        # Calculate mixed partial derivative with ForwardDiff
-        first_x_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ v1
-        second_mixed = FD.gradient(y -> first_x_deriv(y), x₂) ⋅ v2
+        # Calculate mixed directional derivative using Hessian
+        second_mixed = dot(v1, H_fd * v2)
 
         @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
     end
