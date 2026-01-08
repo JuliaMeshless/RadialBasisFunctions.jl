@@ -30,46 +30,116 @@ struct RadialBasisOperator{L,W,D,C,A,B<:AbstractRadialBasis}
     end
 end
 
-# convienience constructors
+# ============================================================================
+# Unified RadialBasisOperator Constructor
+# ============================================================================
+
+"""
+    RadialBasisOperator(ℒ, data; eval_points, basis, k, adjl, hermite)
+
+Unified constructor with keyword arguments.
+
+# Arguments
+- `ℒ`: The operator type (e.g., `Laplacian()`, `Partial(1, 2)`)
+- `data`: Vector of data points
+
+# Keyword Arguments
+- `eval_points`: Evaluation points (default: `data`)
+- `basis`: RBF basis (default: `PHS(3; poly_deg=2)`)
+- `k`: Stencil size (default: `autoselect_k(data, basis)`)
+- `adjl`: Adjacency list (default: computed via `find_neighbors`)
+- `hermite`: Optional NamedTuple for Hermite interpolation with fields:
+  - `is_boundary::Vector{Bool}`
+  - `bc::Vector{<:BoundaryCondition}`
+  - `normals::Vector{<:AbstractVector}`
+
+# Examples
+```julia
+# Basic usage
+op = RadialBasisOperator(Laplacian(), data)
+
+# With custom basis and stencil size
+op = RadialBasisOperator(Laplacian(), data; basis=PHS(5; poly_deg=3), k=40)
+
+# With different evaluation points
+op = RadialBasisOperator(Laplacian(), data; eval_points=eval_pts)
+
+# With Hermite boundary conditions
+op = RadialBasisOperator(Laplacian(), data;
+    hermite=(is_boundary=is_bound, bc=boundary_conds, normals=normal_vecs))
+```
+"""
+function RadialBasisOperator(
+    ℒ,
+    data::AbstractVector;
+    eval_points::AbstractVector=data,
+    basis::AbstractRadialBasis=PHS(3; poly_deg=2),
+    k::Int=autoselect_k(data, basis),
+    adjl=find_neighbors(data, eval_points, k),
+    hermite::Union{Nothing,NamedTuple}=nothing,
+)
+    weights = if isnothing(hermite)
+        _build_weights(ℒ, data, eval_points, adjl, basis)
+    else
+        _build_weights(
+            ℒ,
+            data,
+            eval_points,
+            adjl,
+            basis,
+            hermite.is_boundary,
+            hermite.bc,
+            hermite.normals,
+        )
+    end
+    return RadialBasisOperator(ℒ, weights, data, eval_points, adjl, basis, true)
+end
+
+# ============================================================================
+# Backward compatible positional constructors (delegate to unified constructor)
+# ============================================================================
+
+# Data + basis (positional)
 function RadialBasisOperator(
     ℒ,
     data::AbstractVector,
-    basis::B=PHS(3; poly_deg=2);
-    k::T=autoselect_k(data, basis),
+    basis::AbstractRadialBasis;
+    k::Int=autoselect_k(data, basis),
     adjl=find_neighbors(data, k),
-) where {T<:Int,B<:AbstractRadialBasis}
-    weights = _build_weights(ℒ, data, data, adjl, basis)
-    return RadialBasisOperator(ℒ, weights, data, data, adjl, basis, true)
+)
+    return RadialBasisOperator(ℒ, data; basis=basis, k=k, adjl=adjl)
 end
 
+# Data + eval_points + basis (positional)
 function RadialBasisOperator(
     ℒ,
-    data::AbstractVector{TD},
-    eval_points::AbstractVector{TE},
-    basis::B=PHS(3; poly_deg=2);
-    k::T=autoselect_k(data, basis),
+    data::AbstractVector,
+    eval_points::AbstractVector,
+    basis::AbstractRadialBasis;
+    k::Int=autoselect_k(data, basis),
     adjl=find_neighbors(data, eval_points, k),
-) where {TD,TE,T<:Int,B<:AbstractRadialBasis}
-    weights = _build_weights(ℒ, data, eval_points, adjl, basis)
-    return RadialBasisOperator(ℒ, weights, data, eval_points, adjl, basis, true)
+)
+    return RadialBasisOperator(
+        ℒ, data; eval_points=eval_points, basis=basis, k=k, adjl=adjl
+    )
 end
 
-# Hermite-compatible constructor
+# Hermite-compatible constructor (positional boundary arguments)
 function RadialBasisOperator(
     ℒ,
-    data::AbstractVector{TD},
-    eval_points::AbstractVector{TE},
-    basis::B,
+    data::AbstractVector,
+    eval_points::AbstractVector,
+    basis::AbstractRadialBasis,
     is_boundary::Vector{Bool},
     boundary_conditions::Vector{<:BoundaryCondition},
     normals::Vector{<:AbstractVector};
-    k::T=autoselect_k(data, basis),
+    k::Int=autoselect_k(data, basis),
     adjl=find_neighbors(data, eval_points, k),
-) where {TD,TE,T<:Int,B<:AbstractRadialBasis}
-    weights = _build_weights(
-        ℒ, data, eval_points, adjl, basis, is_boundary, boundary_conditions, normals
+)
+    hermite = (is_boundary=is_boundary, bc=boundary_conditions, normals=normals)
+    return RadialBasisOperator(
+        ℒ, data; eval_points=eval_points, basis=basis, k=k, adjl=adjl, hermite=hermite
     )
-    return RadialBasisOperator(ℒ, weights, data, eval_points, adjl, basis, true)
 end
 
 dim(op::RadialBasisOperator) = length(first(op.data))

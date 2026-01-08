@@ -2,8 +2,8 @@ using LinearAlgebra: Symmetric, dot
 
 # Compute RBF matrix entry - dispatch on data type
 _rbf_entry(i, j, data::AbstractVector, basis) = basis(data[i], data[j])
-function _rbf_entry(i, j, data::HermiteStencilData, basis)
-    return compute_hermite_rbf_entry(i, j, data, basis)
+function _rbf_entry(i, j, data::HermiteStencilData, ops::BasisOperators)
+    return compute_hermite_rbf_entry(i, j, data, ops)
 end
 
 # Compute polynomial entry - dispatch on data type
@@ -68,12 +68,24 @@ via `_rbf_entry` and `_poly_entry!` dispatch to maintain matrix symmetry.
 function _build_collocation_matrix!(
     A::Symmetric, data, basis::AbstractRadialBasis, mon::MonomialBasis{Dim,Deg}, k::Int
 ) where {Dim,Deg}
+    # Construct appropriate operator form for the data type
+    ops = _prepare_basis_ops(data, basis)
+    return _build_collocation_matrix_impl!(A, data, ops, mon, k)
+end
+
+# Dispatch to prepare basis operators - identity for non-Hermite, BasisOperators for Hermite
+_prepare_basis_ops(::AbstractVector, basis) = basis
+_prepare_basis_ops(::HermiteStencilData, basis) = BasisOperators(basis)
+
+function _build_collocation_matrix_impl!(
+    A::Symmetric, data, ops, mon::MonomialBasis{Dim,Deg}, k::Int
+) where {Dim,Deg}
     AA = parent(A)
     N = size(A, 2)
 
     # RBF block (upper triangular, symmetric) - dispatches on data type
     @inbounds for j in 1:k, i in 1:j
-        AA[i, j] = _rbf_entry(i, j, data, basis)
+        AA[i, j] = _rbf_entry(i, j, data, ops)
     end
 
     # Polynomial augmentation block - dispatches on data type
@@ -191,103 +203,105 @@ end
 # ============================================================================
 
 """
-    compute_hermite_rbf_entry(i, j, data, basis)
+    compute_hermite_rbf_entry(i, j, data, ops)
 
 Compute single RBF matrix entry with Hermite boundary modifications.
 Dispatches based on point types (Interior/Dirichlet/NeumannRobin).
+
+Uses `BasisOperators` for efficient evaluation (avoids functor construction in hot loop).
 """
 function compute_hermite_rbf_entry(
-    i::Int, j::Int, data::HermiteStencilData, basis::AbstractRadialBasis
+    i::Int, j::Int, data::HermiteStencilData, ops::BasisOperators
 )
     xi, xj = data.data[i], data.data[j]
     type_i = point_type(data.is_boundary[i], data.boundary_conditions[i])
     type_j = point_type(data.is_boundary[j], data.boundary_conditions[j])
 
-    return hermite_rbf_dispatch(type_i, type_j, i, j, xi, xj, data, basis)
+    return hermite_rbf_dispatch(type_i, type_j, i, j, xi, xj, data, ops)
 end
 
 # Interior-Interior: Standard RBF evaluation
-function hermite_rbf_dispatch(::InteriorPoint, ::InteriorPoint, i, j, xi, xj, data, basis)
-    return basis(xi, xj)
+function hermite_rbf_dispatch(::InteriorPoint, ::InteriorPoint, i, j, xi, xj, data, ops)
+    return ops.φ(xi, xj)
 end
 
 # Interior-Dirichlet: Standard RBF evaluation
-function hermite_rbf_dispatch(::InteriorPoint, ::DirichletPoint, i, j, xi, xj, data, basis)
-    return basis(xi, xj)
+function hermite_rbf_dispatch(::InteriorPoint, ::DirichletPoint, i, j, xi, xj, data, ops)
+    return ops.φ(xi, xj)
 end
 
 # Interior-NeumannRobin: Apply boundary operator to second argument
-function hermite_rbf_dispatch(
-    ::InteriorPoint, ::NeumannRobinPoint, i, j, xi, xj, data, basis
-)
-    φ = basis(xi, xj)
-    ∇φ = ∇(basis)(xi, xj)
+function hermite_rbf_dispatch(::InteriorPoint, ::NeumannRobinPoint, i, j, xi, xj, data, ops)
+    φ = ops.φ(xi, xj)
     bc_j = data.boundary_conditions[j]
     nj = data.normals[j]
-    return α(bc_j) * φ + β(bc_j) * dot(nj, -∇φ)
+    ∇φ = ops.∇φ(xi, xj)
+    Dⱼφ = LinearAlgebra.dot(nj, ∇φ)
+    return α(bc_j) * φ - β(bc_j) * Dⱼφ
 end
 
 # Dirichlet-Interior: Standard RBF evaluation
-function hermite_rbf_dispatch(::DirichletPoint, ::InteriorPoint, i, j, xi, xj, data, basis)
-    return basis(xi, xj)
+function hermite_rbf_dispatch(::DirichletPoint, ::InteriorPoint, i, j, xi, xj, data, ops)
+    return ops.φ(xi, xj)
 end
 
 # Dirichlet-Dirichlet: Standard RBF evaluation
-function hermite_rbf_dispatch(::DirichletPoint, ::DirichletPoint, i, j, xi, xj, data, basis)
-    return basis(xi, xj)
+function hermite_rbf_dispatch(::DirichletPoint, ::DirichletPoint, i, j, xi, xj, data, ops)
+    return ops.φ(xi, xj)
 end
 
 # Dirichlet-NeumannRobin: Apply boundary operator to second argument
 function hermite_rbf_dispatch(
-    ::DirichletPoint, ::NeumannRobinPoint, i, j, xi, xj, data, basis
+    ::DirichletPoint, ::NeumannRobinPoint, i, j, xi, xj, data, ops
 )
-    φ = basis(xi, xj)
-    ∇φ = ∇(basis)(xi, xj)
+    φ = ops.φ(xi, xj)
     bc_j = data.boundary_conditions[j]
     nj = data.normals[j]
-    return α(bc_j) * φ + β(bc_j) * dot(nj, -∇φ)
+    ∇φ = ops.∇φ(xi, xj)
+    Dⱼφ = LinearAlgebra.dot(nj, ∇φ)
+    return α(bc_j) * φ - β(bc_j) * Dⱼφ
 end
 
 # NeumannRobin-Interior: Apply boundary operator to first argument
-function hermite_rbf_dispatch(
-    ::NeumannRobinPoint, ::InteriorPoint, i, j, xi, xj, data, basis
-)
-    φ = basis(xi, xj)
-    ∇φ = ∇(basis)(xi, xj)
+function hermite_rbf_dispatch(::NeumannRobinPoint, ::InteriorPoint, i, j, xi, xj, data, ops)
+    φ = ops.φ(xi, xj)
     bc_i = data.boundary_conditions[i]
     ni = data.normals[i]
-    return α(bc_i) * φ + β(bc_i) * dot(ni, ∇φ)
+    ∇φ = ops.∇φ(xi, xj)
+    Dᵢφ = LinearAlgebra.dot(ni, ∇φ)
+    return α(bc_i) * φ + β(bc_i) * Dᵢφ
 end
 
 # NeumannRobin-Dirichlet: Apply boundary operator to first argument
 function hermite_rbf_dispatch(
-    ::NeumannRobinPoint, ::DirichletPoint, i, j, xi, xj, data, basis
+    ::NeumannRobinPoint, ::DirichletPoint, i, j, xi, xj, data, ops
 )
-    φ = basis(xi, xj)
-    ∇φ = ∇(basis)(xi, xj)
+    φ = ops.φ(xi, xj)
     bc_i = data.boundary_conditions[i]
     ni = data.normals[i]
-    return α(bc_i) * φ + β(bc_i) * dot(ni, ∇φ)
+    ∇φ = ops.∇φ(xi, xj)
+    Dᵢφ = LinearAlgebra.dot(ni, ∇φ)
+    return α(bc_i) * φ + β(bc_i) * Dᵢφ
 end
 
 # NeumannRobin-NeumannRobin: Apply boundary operators to both arguments
 function hermite_rbf_dispatch(
-    ::NeumannRobinPoint, ::NeumannRobinPoint, i, j, xi, xj, data, basis
+    ::NeumannRobinPoint, ::NeumannRobinPoint, i, j, xi, xj, data, ops
 )
-    φ = basis(xi, xj)
-    ∇φ = ∇(basis)(xi, xj)
+    φ = ops.φ(xi, xj)
     bc_i = data.boundary_conditions[i]
     bc_j = data.boundary_conditions[j]
     ni = data.normals[i]
     nj = data.normals[j]
-    ∂i∂j_φ = directional∂²(basis, ni, nj)(xi, xj)
+    ∇φ = ops.∇φ(xi, xj)
+    Hφ = ops.Hφ(xi, xj)
+    Dᵢφ = LinearAlgebra.dot(ni, ∇φ)
+    Dⱼφ = LinearAlgebra.dot(nj, ∇φ)
+    D²φ = LinearAlgebra.dot(ni, Hφ * nj)
 
-    return (
-        α(bc_i) * α(bc_j) * φ +
-        α(bc_i) * β(bc_j) * dot(nj, -∇φ) +
-        β(bc_i) * α(bc_j) * dot(ni, ∇φ) +
-        β(bc_i) * β(bc_j) * ∂i∂j_φ
-    )
+    return α(bc_i) * α(bc_j) * φ - α(bc_i) * β(bc_j) * Dⱼφ +
+           β(bc_i) * α(bc_j) * Dᵢφ +
+           β(bc_i) * β(bc_j) * D²φ
 end
 
 """

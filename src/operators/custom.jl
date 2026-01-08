@@ -9,68 +9,67 @@ struct Custom{F<:Function} <: AbstractOperator
 end
 (op::Custom)(basis) = op.ℒ(basis)
 
+# Primary interface using unified keyword constructor
 """
-    custom(data, ℒ, basis; k=autoselect_k(data, basis))
+    custom(data, ℒ; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl, hermite)
 
-Builds a `RadialBasisOperator` with a custom operator function `ℒ`.
-The function `ℒ` should accept a basis and return a callable `(x, xᵢ) -> value`.
+Build a `RadialBasisOperator` with a custom operator function.
+
+# Arguments
+- `data`: Vector of data points
+- `ℒ`: Custom function that accepts a basis and returns a callable `(x, xᵢ) -> value`
+
+# Keyword Arguments
+- `basis`: RBF basis (default: `PHS(3; poly_deg=2)`)
+- `eval_points`: Evaluation points (default: `data`)
+- `k`: Stencil size (default: `autoselect_k(data, basis)`)
+- `adjl`: Adjacency list (default: computed via `find_neighbors`)
+- `hermite`: Optional NamedTuple for Hermite interpolation
+
+# Examples
+```julia
+# Custom operator that returns the basis function itself
+op = custom(data, basis -> (x, xᵢ) -> basis(x, xᵢ))
+
+# Custom biharmonic operator (∇⁴)
+op = custom(data, basis -> ∇²(basis) ∘ ∇²(basis))
+```
 """
-function custom(
-    data::AbstractVector,
-    ℒ::Function,
-    basis::B=PHS(3; poly_deg=2);
-    k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, k),
-) where {T<:Int,B<:AbstractRadialBasis}
-    return RadialBasisOperator(Custom(ℒ), data, basis; k=k, adjl=adjl)
+function custom(data::AbstractVector, ℒ::Function; kw...)
+    RadialBasisOperator(Custom(ℒ), data; kw...)
 end
 
-"""
-    custom(data, eval_points, ℒ, basis; k=autoselect_k(data, basis))
+# Backward compatible positional signatures
+function custom(data::AbstractVector, ℒ::Function, basis::AbstractRadialBasis; kw...)
+    RadialBasisOperator(Custom(ℒ), data; basis=basis, kw...)
+end
 
-Builds a `RadialBasisOperator` with a custom operator function `ℒ`.
-The resulting operator will only evaluate at `eval_points`.
-"""
 function custom(
     data::AbstractVector,
     eval_points::AbstractVector,
     ℒ::Function,
-    basis::B=PHS(3; poly_deg=2);
-    k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, eval_points, k),
-) where {T<:Int,B<:AbstractRadialBasis}
-    return RadialBasisOperator(Custom(ℒ), data, eval_points, basis; k=k, adjl=adjl)
+    basis::AbstractRadialBasis=PHS(3; poly_deg=2);
+    kw...,
+)
+    RadialBasisOperator(Custom(ℒ), data; eval_points=eval_points, basis=basis, kw...)
 end
 
-"""
-    custom(data, eval_points, ℒ, basis, is_boundary, boundary_conditions, normals; k=autoselect_k(data, basis))
-
-Builds a Hermite-compatible `RadialBasisOperator` with a custom operator function `ℒ`.
-The additional boundary information enables Hermite interpolation with proper boundary condition handling.
-"""
+# Hermite backward compatibility (positional boundary arguments)
 function custom(
     data::AbstractVector,
     eval_points::AbstractVector,
     ℒ::Function,
-    basis::B,
+    basis::AbstractRadialBasis,
     is_boundary::Vector{Bool},
     boundary_conditions::Vector{<:BoundaryCondition},
     normals::Vector{<:AbstractVector};
-    k::T=autoselect_k(data, basis),
-    adjl=find_neighbors(data, eval_points, k),
-) where {T<:Int,B<:AbstractRadialBasis}
+    kw...,
+)
+    hermite = (is_boundary=is_boundary, bc=boundary_conditions, normals=normals)
     return RadialBasisOperator(
-        Custom(ℒ),
-        data,
-        eval_points,
-        basis,
-        is_boundary,
-        boundary_conditions,
-        normals;
-        k=k,
-        adjl=adjl,
+        Custom(ℒ), data; eval_points=eval_points, basis=basis, hermite=hermite, kw...
     )
 end
 
 # pretty printing
-print_op(op::Custom) = "Custom Operator"
+print_op(::Custom) = "Custom Operator"

@@ -49,6 +49,25 @@ end
     @test is_cache_valid(∇)
 end
 
+@testset "RadialBasisOperator Constructors" begin
+    # Test positional eval_points + basis constructor (operators.jl lines 114-125)
+    x2 = SVector{2}.(HaltonPoint(2)[101:150])
+    op = RadialBasisOperator(Partial(1, 1), x, x2, PHS(3; poly_deg=2))
+    @test op isa RadialBasisOperator
+    @test length(op.eval_points) == 50
+end
+
+@testset "dim()" begin
+    # Test dim() function (operators.jl line 145)
+    ∂ = partial(x, 1, 1)
+    @test RBF.dim(∂) == 2
+
+    # 3D test
+    x3d = [SVector{3}(rand(3)) for _ in 1:50]
+    ∂3d = partial(x3d, 1, 1)
+    @test RBF.dim(∂3d) == 3
+end
+
 @testset "Printing" begin
     ∂ = partial(x, 1, 1)
     @test repr(∂) == """

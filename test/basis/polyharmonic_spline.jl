@@ -49,16 +49,14 @@ end
         normal = SVector(1.0, 1) ./ sqrt(2)  # Normalize for better numerical stability
         dim = 1
 
-        # First derivative
+        # First derivative - functor handles both 2-arg and 3-arg calls
         ∂rbf = RBF.∂(phs, dim)
-        ∂rbf_n = RBF.∂(phs, dim, normal)
-        @test ∂rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∂rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
 
         # Gradient
         ∇rbf = RBF.∇(phs)
-        ∇rbf_n = RBF.∇(phs, normal)
         @test all(
-            ∇rbf_n(x₁, x₂, normal) .≈ [
+            ∇rbf(x₁, x₂, normal) .≈ [
                 (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[1], x₂) ⋅ normal),
                 (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[2], x₂) ⋅ normal),
             ],
@@ -66,13 +64,26 @@ end
 
         # Second derivative
         ∂²rbf = RBF.∂²(phs, dim)
-        ∂²rbf_n = RBF.∂²(phs, dim, normal)
-        @test ∂²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∂²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
 
         # Laplacian
         ∇²rbf = RBF.∇²(phs)
-        ∇²rbf_n = RBF.∇²(phs, normal)
-        @test ∇²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∇²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
+    end
+
+    @testset "Directional First Derivatives" begin
+        v1 = SVector(1.0, 0.0)  # x direction
+        v2 = SVector(0.0, 1.0)  # y direction
+        normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
+
+        # Test D equals dot(v, ∇)
+        @test RBF.D(phs, v1)(x₁, x₂) ≈ dot(v1, RBF.∇(phs)(x₁, x₂))
+        @test RBF.D(phs, v2)(x₁, x₂) ≈ dot(v2, RBF.∇(phs)(x₁, x₂))
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ dot(normal, RBF.∇(phs)(x₁, x₂))
+
+        # Test against ForwardDiff
+        expected = FD.gradient(x -> phs(x, x₂), x₁) ⋅ normal
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ expected rtol = 1e-5
     end
 
     @testset "Directional Second Derivatives" begin
@@ -82,22 +93,45 @@ end
         normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
 
         # Same direction test (both normal)
-        dir_deriv = RBF.directional∂²(phs, normal, normal)
+        dir_deriv = RBF.D²(phs, normal, normal)
 
-        # Calculate expected value manually with ForwardDiff
-        first_normal_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ normal
-        second_normal = FD.gradient(y -> first_normal_deriv(y), x₂) ⋅ normal
+        # Calculate expected value using Hessian (D² computes v1' * H * v2)
+        H_fd = FD.hessian(x -> phs(x, x₂), x₁)
+        second_normal = dot(normal, H_fd * normal)
 
         @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
 
         # Test with orthogonal directions
-        dir_deriv_xy = RBF.directional∂²(phs, v1, v2)
+        dir_deriv_xy = RBF.D²(phs, v1, v2)
 
-        # Calculate mixed partial derivative with ForwardDiff
-        first_x_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ v1
-        second_mixed = FD.gradient(y -> first_x_deriv(y), x₂) ⋅ v2
+        # Calculate mixed directional derivative using Hessian
+        second_mixed = dot(v1, H_fd * v2)
 
         @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
+    end
+
+    @testset "Hessian" begin
+        v1 = SVector(1.0, 0.0)
+        v2 = SVector(0.0, 1.0)
+        normal = SVector(1.0, 1) ./ sqrt(2)
+
+        Hrbf = RBF.H(phs)
+        H_val = Hrbf(x₁, x₂)
+
+        # Test matrix size
+        @test size(H_val) == (2, 2)
+
+        # Test consistency with D²: dot(v1, H * v2) should equal D²(basis, v1, v2)
+        @test dot(v1, H_val * v2) ≈ RBF.D²(phs, v1, v2)(x₁, x₂) rtol = 1e-10
+        @test dot(v2, H_val * v1) ≈ RBF.D²(phs, v2, v1)(x₁, x₂) rtol = 1e-10
+        @test dot(normal, H_val * normal) ≈ RBF.D²(phs, normal, normal)(x₁, x₂) rtol = 1e-10
+
+        # Test Hessian symmetry
+        @test H_val ≈ H_val' rtol = 1e-10
+
+        # Test against ForwardDiff Hessian
+        H_fd = FD.hessian(x -> phs(x, x₂), x₁)
+        @test H_val ≈ H_fd rtol = 1e-5
     end
 end
 
@@ -132,14 +166,12 @@ end
 
         # First derivative
         ∂rbf = RBF.∂(phs, dim)
-        ∂rbf_n = RBF.∂(phs, dim, normal)
-        @test ∂rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∂rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
 
         # Gradient
         ∇rbf = RBF.∇(phs)
-        ∇rbf_n = RBF.∇(phs, normal)
         @test all(
-            ∇rbf_n(x₁, x₂, normal) .≈ [
+            ∇rbf(x₁, x₂, normal) .≈ [
                 (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[1], x₂) ⋅ normal),
                 (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[2], x₂) ⋅ normal),
             ],
@@ -147,13 +179,26 @@ end
 
         # Second derivative
         ∂²rbf = RBF.∂²(phs, dim)
-        ∂²rbf_n = RBF.∂²(phs, dim, normal)
-        @test ∂²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∂²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
 
         # Laplacian
         ∇²rbf = RBF.∇²(phs)
-        ∇²rbf_n = RBF.∇²(phs, normal)
-        @test ∇²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∇²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
+    end
+
+    @testset "Directional First Derivatives" begin
+        v1 = SVector(1.0, 0.0)  # x direction
+        v2 = SVector(0.0, 1.0)  # y direction
+        normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
+
+        # Test D equals dot(v, ∇)
+        @test RBF.D(phs, v1)(x₁, x₂) ≈ dot(v1, RBF.∇(phs)(x₁, x₂))
+        @test RBF.D(phs, v2)(x₁, x₂) ≈ dot(v2, RBF.∇(phs)(x₁, x₂))
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ dot(normal, RBF.∇(phs)(x₁, x₂))
+
+        # Test against ForwardDiff
+        expected = FD.gradient(x -> phs(x, x₂), x₁) ⋅ normal
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ expected rtol = 1e-5
     end
 
     @testset "Directional Second Derivatives" begin
@@ -163,22 +208,45 @@ end
         normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
 
         # Same direction test (both normal)
-        dir_deriv = RBF.directional∂²(phs, normal, normal)
+        dir_deriv = RBF.D²(phs, normal, normal)
 
-        # Calculate expected value manually with ForwardDiff
-        first_normal_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ normal
-        second_normal = FD.gradient(y -> first_normal_deriv(y), x₂) ⋅ normal
+        # Calculate expected value using Hessian (D² computes v1' * H * v2)
+        H_fd = FD.hessian(x -> phs(x, x₂), x₁)
+        second_normal = dot(normal, H_fd * normal)
 
         @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
 
         # Test with orthogonal directions
-        dir_deriv_xy = RBF.directional∂²(phs, v1, v2)
+        dir_deriv_xy = RBF.D²(phs, v1, v2)
 
-        # Calculate mixed partial derivative with ForwardDiff
-        first_x_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ v1
-        second_mixed = FD.gradient(y -> first_x_deriv(y), x₂) ⋅ v2
+        # Calculate mixed directional derivative using Hessian
+        second_mixed = dot(v1, H_fd * v2)
 
         @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
+    end
+
+    @testset "Hessian" begin
+        v1 = SVector(1.0, 0.0)
+        v2 = SVector(0.0, 1.0)
+        normal = SVector(1.0, 1) ./ sqrt(2)
+
+        Hrbf = RBF.H(phs)
+        H_val = Hrbf(x₁, x₂)
+
+        # Test matrix size
+        @test size(H_val) == (2, 2)
+
+        # Test consistency with D²: dot(v1, H * v2) should equal D²(basis, v1, v2)
+        @test dot(v1, H_val * v2) ≈ RBF.D²(phs, v1, v2)(x₁, x₂) rtol = 1e-10
+        @test dot(v2, H_val * v1) ≈ RBF.D²(phs, v2, v1)(x₁, x₂) rtol = 1e-10
+        @test dot(normal, H_val * normal) ≈ RBF.D²(phs, normal, normal)(x₁, x₂) rtol = 1e-10
+
+        # Test Hessian symmetry
+        @test H_val ≈ H_val' rtol = 1e-10
+
+        # Test against ForwardDiff Hessian
+        H_fd = FD.hessian(x -> phs(x, x₂), x₁)
+        @test H_val ≈ H_fd rtol = 1e-5
     end
 end
 
@@ -213,14 +281,12 @@ end
 
         # First derivative
         ∂rbf = RBF.∂(phs, dim)
-        ∂rbf_n = RBF.∂(phs, dim, normal)
-        @test ∂rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∂rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
 
         # Gradient
         ∇rbf = RBF.∇(phs)
-        ∇rbf_n = RBF.∇(phs, normal)
         @test all(
-            ∇rbf_n(x₁, x₂, normal) .≈ [
+            ∇rbf(x₁, x₂, normal) .≈ [
                 (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[1], x₂) ⋅ normal),
                 (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[2], x₂) ⋅ normal),
             ],
@@ -228,13 +294,26 @@ end
 
         # Second derivative
         ∂²rbf = RBF.∂²(phs, dim)
-        ∂²rbf_n = RBF.∂²(phs, dim, normal)
-        @test ∂²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∂²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
 
         # Laplacian
         ∇²rbf = RBF.∇²(phs)
-        ∇²rbf_n = RBF.∇²(phs, normal)
-        @test ∇²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∇²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
+    end
+
+    @testset "Directional First Derivatives" begin
+        v1 = SVector(1.0, 0.0)  # x direction
+        v2 = SVector(0.0, 1.0)  # y direction
+        normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
+
+        # Test D equals dot(v, ∇)
+        @test RBF.D(phs, v1)(x₁, x₂) ≈ dot(v1, RBF.∇(phs)(x₁, x₂))
+        @test RBF.D(phs, v2)(x₁, x₂) ≈ dot(v2, RBF.∇(phs)(x₁, x₂))
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ dot(normal, RBF.∇(phs)(x₁, x₂))
+
+        # Test against ForwardDiff
+        expected = FD.gradient(x -> phs(x, x₂), x₁) ⋅ normal
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ expected rtol = 1e-5
     end
 
     @testset "Directional Second Derivatives" begin
@@ -244,22 +323,45 @@ end
         normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
 
         # Same direction test (both normal)
-        dir_deriv = RBF.directional∂²(phs, normal, normal)
+        dir_deriv = RBF.D²(phs, normal, normal)
 
-        # Calculate expected value manually with ForwardDiff
-        first_normal_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ normal
-        second_normal = FD.gradient(y -> first_normal_deriv(y), x₂) ⋅ normal
+        # Calculate expected value using Hessian (D² computes v1' * H * v2)
+        H_fd = FD.hessian(x -> phs(x, x₂), x₁)
+        second_normal = dot(normal, H_fd * normal)
 
         @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
 
         # Test with orthogonal directions
-        dir_deriv_xy = RBF.directional∂²(phs, v1, v2)
+        dir_deriv_xy = RBF.D²(phs, v1, v2)
 
-        # Calculate mixed partial derivative with ForwardDiff
-        first_x_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ v1
-        second_mixed = FD.gradient(y -> first_x_deriv(y), x₂) ⋅ v2
+        # Calculate mixed directional derivative using Hessian
+        second_mixed = dot(v1, H_fd * v2)
 
         @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
+    end
+
+    @testset "Hessian" begin
+        v1 = SVector(1.0, 0.0)
+        v2 = SVector(0.0, 1.0)
+        normal = SVector(1.0, 1) ./ sqrt(2)
+
+        Hrbf = RBF.H(phs)
+        H_val = Hrbf(x₁, x₂)
+
+        # Test matrix size
+        @test size(H_val) == (2, 2)
+
+        # Test consistency with D²: dot(v1, H * v2) should equal D²(basis, v1, v2)
+        @test dot(v1, H_val * v2) ≈ RBF.D²(phs, v1, v2)(x₁, x₂) rtol = 1e-10
+        @test dot(v2, H_val * v1) ≈ RBF.D²(phs, v2, v1)(x₁, x₂) rtol = 1e-10
+        @test dot(normal, H_val * normal) ≈ RBF.D²(phs, normal, normal)(x₁, x₂) rtol = 1e-10
+
+        # Test Hessian symmetry
+        @test H_val ≈ H_val' rtol = 1e-10
+
+        # Test against ForwardDiff Hessian
+        H_fd = FD.hessian(x -> phs(x, x₂), x₁)
+        @test H_val ≈ H_fd rtol = 1e-5
     end
 end
 
@@ -293,14 +395,12 @@ end
 
         # First derivative
         ∂rbf = RBF.∂(phs, dim)
-        ∂rbf_n = RBF.∂(phs, dim, normal)
-        @test ∂rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∂rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
 
         # Gradient
         ∇rbf = RBF.∇(phs)
-        ∇rbf_n = RBF.∇(phs, normal)
         @test all(
-            ∇rbf_n(x₁, x₂, normal) .≈ [
+            ∇rbf(x₁, x₂, normal) .≈ [
                 (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[1], x₂) ⋅ normal),
                 (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[2], x₂) ⋅ normal),
             ],
@@ -308,13 +408,26 @@ end
 
         # Second derivative
         ∂²rbf = RBF.∂²(phs, dim)
-        ∂²rbf_n = RBF.∂²(phs, dim, normal)
-        @test ∂²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∂²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
 
         # Laplacian
         ∇²rbf = RBF.∇²(phs)
-        ∇²rbf_n = RBF.∇²(phs, normal)
-        @test ∇²rbf_n(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
+        @test ∇²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
+    end
+
+    @testset "Directional First Derivatives" begin
+        v1 = SVector(1.0, 0.0)  # x direction
+        v2 = SVector(0.0, 1.0)  # y direction
+        normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
+
+        # Test D equals dot(v, ∇)
+        @test RBF.D(phs, v1)(x₁, x₂) ≈ dot(v1, RBF.∇(phs)(x₁, x₂))
+        @test RBF.D(phs, v2)(x₁, x₂) ≈ dot(v2, RBF.∇(phs)(x₁, x₂))
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ dot(normal, RBF.∇(phs)(x₁, x₂))
+
+        # Test against ForwardDiff
+        expected = FD.gradient(x -> phs(x, x₂), x₁) ⋅ normal
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ expected rtol = 1e-5
     end
 
     @testset "Directional Second Derivatives" begin
@@ -324,21 +437,44 @@ end
         normal = SVector(1.0, 1) ./ sqrt(2)  # Normalized diagonal direction
 
         # Same direction test (both normal)
-        dir_deriv = RBF.directional∂²(phs, normal, normal)
+        dir_deriv = RBF.D²(phs, normal, normal)
 
-        # Calculate expected value manually with ForwardDiff
-        first_normal_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ normal
-        second_normal = FD.gradient(y -> first_normal_deriv(y), x₂) ⋅ normal
+        # Calculate expected value using Hessian (D² computes v1' * H * v2)
+        H_fd = FD.hessian(x -> phs(x, x₂), x₁)
+        second_normal = dot(normal, H_fd * normal)
 
         @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
 
         # Test with orthogonal directions
-        dir_deriv_xy = RBF.directional∂²(phs, v1, v2)
+        dir_deriv_xy = RBF.D²(phs, v1, v2)
 
-        # Calculate mixed partial derivative with ForwardDiff
-        first_x_deriv(y) = FD.gradient(x -> phs(x, y), x₁) ⋅ v1
-        second_mixed = FD.gradient(y -> first_x_deriv(y), x₂) ⋅ v2
+        # Calculate mixed directional derivative using Hessian
+        second_mixed = dot(v1, H_fd * v2)
 
         @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
+    end
+
+    @testset "Hessian" begin
+        v1 = SVector(1.0, 0.0)
+        v2 = SVector(0.0, 1.0)
+        normal = SVector(1.0, 1) ./ sqrt(2)
+
+        Hrbf = RBF.H(phs)
+        H_val = Hrbf(x₁, x₂)
+
+        # Test matrix size
+        @test size(H_val) == (2, 2)
+
+        # Test consistency with D²: dot(v1, H * v2) should equal D²(basis, v1, v2)
+        @test dot(v1, H_val * v2) ≈ RBF.D²(phs, v1, v2)(x₁, x₂) rtol = 1e-10
+        @test dot(v2, H_val * v1) ≈ RBF.D²(phs, v2, v1)(x₁, x₂) rtol = 1e-10
+        @test dot(normal, H_val * normal) ≈ RBF.D²(phs, normal, normal)(x₁, x₂) rtol = 1e-10
+
+        # Test Hessian symmetry
+        @test H_val ≈ H_val' rtol = 1e-10
+
+        # Test against ForwardDiff Hessian
+        H_fd = FD.hessian(x -> phs(x, x₂), x₁)
+        @test H_val ≈ H_fd rtol = 1e-5
     end
 end
