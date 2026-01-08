@@ -15,11 +15,11 @@ Special cases:
 - Robin: α≠0, β≠0
 - Internal: α=0, β=0 (sentinel for interior points)
 """
-struct BoundaryCondition{T<:Real}
+struct BoundaryCondition{T <: Real}
     α::T
     β::T
 
-    function BoundaryCondition(α::A, β::B) where {A,B}
+    function BoundaryCondition(α::A, β::B) where {A, B}
         T = promote_type(A, B)
         return new{T}(α, β)
     end
@@ -36,10 +36,10 @@ is_robin(bc::BoundaryCondition) = !iszero(bc.α) && !iszero(bc.β)
 is_internal(bc::BoundaryCondition) = iszero(bc.α) && iszero(bc.β)
 
 # Constructors
-Dirichlet((::Type{T})=Float64) where {T<:Real} = BoundaryCondition(one(T), zero(T))
-Neumann((::Type{T})=Float64) where {T<:Real} = BoundaryCondition(zero(T), one(T))
+Dirichlet((::Type{T}) = Float64) where {T <: Real} = BoundaryCondition(one(T), zero(T))
+Neumann((::Type{T}) = Float64) where {T <: Real} = BoundaryCondition(zero(T), one(T))
 Robin(α::Real, β::Real) = BoundaryCondition(α, β)
-Internal((::Type{T})=Float64) where {T<:Real} = BoundaryCondition(zero(T), zero(T))
+Internal((::Type{T}) = Float64) where {T <: Real} = BoundaryCondition(zero(T), zero(T))
 
 # ============================================================================
 # Hermite Stencil Data
@@ -60,7 +60,7 @@ Fields:
 Note: For interior points (is_boundary[i] == false), boundary_conditions[i]
 and normals[i] contain sentinel values and should not be accessed.
 """
-struct HermiteStencilData{T<:Real}
+struct HermiteStencilData{T <: Real}
     data::AbstractVector{Vector{T}}
     is_boundary::Vector{Bool}
     boundary_conditions::Vector{BoundaryCondition{T}}
@@ -68,12 +68,12 @@ struct HermiteStencilData{T<:Real}
     poly_workspace::Vector{T}  # Pre-allocated buffer for polynomial operations
 
     function HermiteStencilData(
-        data::AbstractVector{<:AbstractVector{T}},
-        is_boundary::Vector{Bool},
-        boundary_conditions::Vector{BoundaryCondition{T}},
-        normals::AbstractVector{<:AbstractVector{T}},
-        poly_workspace::Vector{T}=Vector{T}(undef, 0),
-    ) where {T<:Real}
+            data::AbstractVector{<:AbstractVector{T}},
+            is_boundary::Vector{Bool},
+            boundary_conditions::Vector{BoundaryCondition{T}},
+            normals::AbstractVector{<:AbstractVector{T}},
+            poly_workspace::Vector{T} = Vector{T}(undef, 0),
+        ) where {T <: Real}
         @assert length(data) ==
             length(is_boundary) ==
             length(boundary_conditions) ==
@@ -90,7 +90,7 @@ struct HermiteStencilData{T<:Real}
 end
 
 """Pre-allocation constructor for HermiteStencilData"""
-function HermiteStencilData{T}(k::Int, dim::Int, nmon::Int=0) where {T<:Real}
+function HermiteStencilData{T}(k::Int, dim::Int, nmon::Int = 0) where {T <: Real}
     data = [Vector{T}(undef, dim) for _ in 1:k]
     is_boundary = Vector{Bool}(falses(k))
     boundary_conditions = [Internal(T) for _ in 1:k]
@@ -110,14 +110,14 @@ Populate local Hermite stencil data from global arrays.
 Used within kernels to extract boundary info for specific neighborhoods.
 """
 function update_hermite_stencil_data!(
-    hermite_data::HermiteStencilData{T},
-    global_data::AbstractVector{<:AbstractVector{T}},
-    neighbors::Vector{Int},
-    is_boundary::Vector{Bool},
-    boundary_conditions::Vector{BoundaryCondition{T}},
-    normals::AbstractVector{<:AbstractVector{T}},
-    global_to_boundary::Vector{Int},
-) where {T}
+        hermite_data::HermiteStencilData{T},
+        global_data::AbstractVector{<:AbstractVector{T}},
+        neighbors::Vector{Int},
+        is_boundary::Vector{Bool},
+        boundary_conditions::Vector{BoundaryCondition{T}},
+        normals::AbstractVector{<:AbstractVector{T}},
+        global_to_boundary::Vector{Int},
+    ) where {T}
     k = length(neighbors)
 
     @inbounds for local_idx in 1:k
@@ -170,16 +170,16 @@ struct HermiteStencil <: StencilType end    # Mixed interior/boundary
 Classify stencil type for dispatch in kernel execution.
 """
 function classify_stencil(
-    is_boundary::Vector{Bool},
-    boundary_conditions::Vector{BoundaryCondition{T}},
-    eval_idx::Int,
-    neighbors::Vector{Int},
-    global_to_boundary::Vector{Int},
-) where {T}
+        is_boundary::Vector{Bool},
+        boundary_conditions::Vector{BoundaryCondition{T}},
+        eval_idx::Int,
+        neighbors::Vector{Int},
+        global_to_boundary::Vector{Int},
+    ) where {T}
     if sum(is_boundary[neighbors]) == 0
         return InteriorStencil()
     elseif is_boundary[eval_idx] &&
-        is_dirichlet(boundary_conditions[global_to_boundary[eval_idx]])
+            is_dirichlet(boundary_conditions[global_to_boundary[eval_idx]])
         return DirichletStencil()
     else
         return HermiteStencil()
@@ -188,11 +188,11 @@ end
 
 # Convenience wrapper for BoundaryData
 function classify_stencil(
-    boundary_data::BoundaryData,
-    eval_idx::Int,
-    neighbors::Vector{Int},
-    global_to_boundary::Vector{Int},
-)
+        boundary_data::BoundaryData,
+        eval_idx::Int,
+        neighbors::Vector{Int},
+        global_to_boundary::Vector{Int},
+    )
     return classify_stencil(
         boundary_data.is_boundary,
         boundary_data.boundary_conditions,
@@ -232,7 +232,7 @@ struct MultiOperator{N} <: OperatorArity end
 
 """Extract operator arity at compile time"""
 operator_arity(::T) where {T} = operator_arity(T)
-operator_arity(::Type{<:Tuple{Vararg{Any,N}}}) where {N} = MultiOperator{N}()
+operator_arity(::Type{<:Tuple{Vararg{Any, N}}}) where {N} = MultiOperator{N}()
 operator_arity(::Type) = SingleOperator()
 
 """Get number of operators (type-stable)"""
@@ -271,7 +271,7 @@ Dφ = dot(n, grad)         # Directional derivative
 D²φ = dot(ni, hess * nj)  # Second directional derivative
 ```
 """
-struct BasisOperators{B<:AbstractRadialBasis,G,Hess}
+struct BasisOperators{B <: AbstractRadialBasis, G, Hess}
     φ::B
     ∇φ::G
     Hφ::Hess

@@ -18,10 +18,10 @@ dx = partial(x, 1, 1)
 dy = partial(x, 1, 2)
 
 dxdy = dx + dy
-@test mean_percent_error(dxdy(y), df_dx.(x) .+ df_dy.(x)) < 1e-6
+@test mean_percent_error(dxdy(y), df_dx.(x) .+ df_dy.(x)) < 1.0e-6
 
 dxdy = dx - dy
-@test mean_percent_error(dxdy(y), df_dx.(x) .- df_dy.(x)) < 1e-6
+@test mean_percent_error(dxdy(y), df_dx.(x) .- df_dy.(x)) < 1.0e-6
 
 # test compatibility with other operators
 dy = partial(x[1:500], 1, 2)
@@ -30,5 +30,5 @@ dy = partial(x[1:500], 1, 2)
 adjl = copy(dx.adjl)
 adjl[1] = dx.adjl[2]
 adjl[2] = dx.adjl[1]
-dy = partial(x, 1, 2; adjl=adjl)
+dy = partial(x, 1, 2; adjl = adjl)
 @test_throws ArgumentError dx + dy

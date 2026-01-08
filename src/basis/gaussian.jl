@@ -3,14 +3,14 @@
 
 Gaussian radial basis function:``ϕ(r) = e^{-(ε r)^2}``
 """
-struct Gaussian{T,D<:Int} <: AbstractRadialBasis
+struct Gaussian{T, D <: Int} <: AbstractRadialBasis
     ε::T
     poly_deg::D
-    function Gaussian(ε::T=1; poly_deg::D=2) where {T,D<:Int}
+    function Gaussian(ε::T = 1; poly_deg::D = 2) where {T, D <: Int}
         if all(ε .< 0)
             throw(ArgumentError("Shape parameter should be > 0. (ε=$ε)"))
         end
-        return new{T,D}(ε, poly_deg)
+        return new{T, D}(ε, poly_deg)
     end
 end
 
@@ -52,7 +52,7 @@ function (op::H{<:Gaussian})(x, xᵢ)
     N = length(x)
     T = eltype(x)
     # H[i,j] = (4ε⁴ * Δᵢ*Δⱼ - 2ε² * δᵢⱼ) * φ
-    return StaticArraysCore.SMatrix{N,N,T}(
+    return StaticArraysCore.SMatrix{N, N, T}(
         ntuple(N * N) do k
             i, j = divrem(k - 1, N) .+ 1
             (4 * ε2^2 * Δ[i] * Δ[j] - 2 * ε2 * T(i == j)) * φ

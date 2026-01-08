@@ -14,7 +14,7 @@ points = SVector{2}.(HaltonPoint(2)[1:N])
     # f(x,y) = sin(x) + cos(y)
     # ∂f/∂x = cos(x), ∂f/∂y = -sin(y)
     u = sin.(getindex.(points, 1)) .+ cos.(getindex.(points, 2))
-    op = jacobian(points, PHS(3; poly_deg=2))
+    op = jacobian(points, PHS(3; poly_deg = 2))
     J = op(u)
 
     @test J isa Matrix
@@ -34,10 +34,10 @@ end
     u2 = cos.(getindex.(points, 2))
     u = hcat(u1, u2)
 
-    op = jacobian(points, PHS(3; poly_deg=2))
+    op = jacobian(points, PHS(3; poly_deg = 2))
     J = op(u)
 
-    @test J isa Array{<:Any,3}
+    @test J isa Array{<:Any, 3}
     @test size(J) == (N, 2, 2)
 
     # ∂u₁/∂x = cos(x)
@@ -57,7 +57,7 @@ end
     u2 = getindex.(points, 1) .^ 2 .+ getindex.(points, 2) .^ 2
     u = hcat(u1, u2)
 
-    op = jacobian(points, PHS(3; poly_deg=2))
+    op = jacobian(points, PHS(3; poly_deg = 2))
     J = op(u)
 
     @test size(J) == (N, 2, 2)
@@ -74,7 +74,7 @@ end
 
 @testset "Jacobian in-place - Scalar" begin
     u = sin.(getindex.(points, 1)) .+ cos.(getindex.(points, 2))
-    op = jacobian(points, PHS(3; poly_deg=2))
+    op = jacobian(points, PHS(3; poly_deg = 2))
     out = Matrix{Float64}(undef, N, 2)
     op(out, u)
 
@@ -87,8 +87,8 @@ end
     u2 = cos.(getindex.(points, 2))
     u = hcat(u1, u2)
 
-    op = jacobian(points, PHS(3; poly_deg=2))
-    out = Array{Float64,3}(undef, N, 2, 2)
+    op = jacobian(points, PHS(3; poly_deg = 2))
+    out = Array{Float64, 3}(undef, N, 2, 2)
     op(out, u)
 
     @test mean_percent_error(out[:, 1, 1], cos.(getindex.(points, 1))) < 10
@@ -112,7 +112,7 @@ end
     eval_points = SVector{2}.(HaltonPoint(2)[(N + 1):(N + 100)])
     u = sin.(getindex.(points, 1)) .+ cos.(getindex.(points, 2))
 
-    op = jacobian(points, eval_points, PHS(3; poly_deg=2))
+    op = jacobian(points, eval_points, PHS(3; poly_deg = 2))
     J = op(u)
 
     @test size(J) == (100, 2)
@@ -131,7 +131,7 @@ end
         getindex.(points_3d, 2) .* getindex.(points_3d, 3) .+
         getindex.(points_3d, 3) .* getindex.(points_3d, 1)
 
-    op = jacobian(points_3d, PHS(3; poly_deg=2))
+    op = jacobian(points_3d, PHS(3; poly_deg = 2))
     J = op(u)
 
     @test J isa Matrix
@@ -151,7 +151,7 @@ end
     eval_pt = [SVector{2}(0.5, 0.5)]
     u = sin.(getindex.(points, 1)) .+ cos.(getindex.(points, 2))
 
-    op = jacobian(points, eval_pt, PHS(3; poly_deg=2))
+    op = jacobian(points, eval_pt, PHS(3; poly_deg = 2))
 
     # Weights should be SparseVectors, not matrices
     @test op.weights[1] isa SparseVector
@@ -177,7 +177,7 @@ end
     u2 = getindex.(points, 1) .^ 2 .+ getindex.(points, 2) .^ 2
     u = hcat(u1, u2)
 
-    op = jacobian(points, eval_pt, PHS(3; poly_deg=2))
+    op = jacobian(points, eval_pt, PHS(3; poly_deg = 2))
     J = op(u)
 
     # Result should be a D_in × D Matrix, not 1×D_in×D tensor

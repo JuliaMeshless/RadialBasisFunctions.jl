@@ -1,13 +1,13 @@
 ########################################################################################
 # Inverse Multiquadrics
-struct IMQ{T,D<:Int} <: AbstractRadialBasis
+struct IMQ{T, D <: Int} <: AbstractRadialBasis
     ε::T
     poly_deg::D
-    function IMQ(ε::T=1; poly_deg::D=2) where {T,D<:Int}
+    function IMQ(ε::T = 1; poly_deg::D = 2) where {T, D <: Int}
         if all(ε .< 0)
             throw(ArgumentError("Shape parameter should be > 0. (ε=$ε)"))
         end
-        return new{T,D}(ε, poly_deg)
+        return new{T, D}(ε, poly_deg)
     end
 end
 
@@ -54,7 +54,7 @@ function (op::H{<:IMQ})(x, xᵢ)
     N = length(x)
     T = eltype(x)
     # H[i,j] = -ε² * δᵢⱼ / s^(3/2) + 3ε⁴ * Δᵢ*Δⱼ / s^(5/2)
-    return StaticArraysCore.SMatrix{N,N,T}(
+    return StaticArraysCore.SMatrix{N, N, T}(
         ntuple(N * N) do k
             i, j = divrem(k - 1, N) .+ 1
             3 * ε4 * Δ[i] * Δ[j] / s5 - ε2 * T(i == j) / s3

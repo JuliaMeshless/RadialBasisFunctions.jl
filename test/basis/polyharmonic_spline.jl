@@ -9,24 +9,24 @@ import ForwardDiff as FD
     @test phs isa PHS3
     @test phs.poly_deg == 2
 
-    phs = PHS(5; poly_deg=0)
+    phs = PHS(5; poly_deg = 0)
     @test phs.poly_deg == 0
 
-    @test_throws ArgumentError PHS(2; poly_deg=-1)
-    @test_throws ArgumentError PHS(3; poly_deg=-2)
+    @test_throws ArgumentError PHS(2; poly_deg = -1)
+    @test_throws ArgumentError PHS(3; poly_deg = -2)
 
     @test repr(phs) == """
-    Polyharmonic spline (r⁵)
-    └─Polynomial augmentation: degree 0"""
+        Polyharmonic spline (r⁵)
+        └─Polynomial augmentation: degree 0"""
 end
 
 @testset "PHS, n=1" begin
     x₁ = SVector(1.0, 2)
     x₂ = SVector(2.0, 4)
-    phs = PHS(1; poly_deg=-1)
+    phs = PHS(1; poly_deg = -1)
     @test phs isa PHS1
     @test phs.poly_deg == -1
-    phs = PHS1(; poly_deg=-1)
+    phs = PHS1(; poly_deg = -1)
     @test phs isa PHS1
     @test phs.poly_deg == -1
 
@@ -83,7 +83,7 @@ end
 
         # Test against ForwardDiff
         expected = FD.gradient(x -> phs(x, x₂), x₁) ⋅ normal
-        @test RBF.D(phs, normal)(x₁, x₂) ≈ expected rtol = 1e-5
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ expected rtol = 1.0e-5
     end
 
     @testset "Directional Second Derivatives" begin
@@ -99,7 +99,7 @@ end
         H_fd = FD.hessian(x -> phs(x, x₂), x₁)
         second_normal = dot(normal, H_fd * normal)
 
-        @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
+        @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1.0e-5
 
         # Test with orthogonal directions
         dir_deriv_xy = RBF.D²(phs, v1, v2)
@@ -107,7 +107,7 @@ end
         # Calculate mixed directional derivative using Hessian
         second_mixed = dot(v1, H_fd * v2)
 
-        @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
+        @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1.0e-5
     end
 
     @testset "Hessian" begin
@@ -122,26 +122,26 @@ end
         @test size(H_val) == (2, 2)
 
         # Test consistency with D²: dot(v1, H * v2) should equal D²(basis, v1, v2)
-        @test dot(v1, H_val * v2) ≈ RBF.D²(phs, v1, v2)(x₁, x₂) rtol = 1e-10
-        @test dot(v2, H_val * v1) ≈ RBF.D²(phs, v2, v1)(x₁, x₂) rtol = 1e-10
-        @test dot(normal, H_val * normal) ≈ RBF.D²(phs, normal, normal)(x₁, x₂) rtol = 1e-10
+        @test dot(v1, H_val * v2) ≈ RBF.D²(phs, v1, v2)(x₁, x₂) rtol = 1.0e-10
+        @test dot(v2, H_val * v1) ≈ RBF.D²(phs, v2, v1)(x₁, x₂) rtol = 1.0e-10
+        @test dot(normal, H_val * normal) ≈ RBF.D²(phs, normal, normal)(x₁, x₂) rtol = 1.0e-10
 
         # Test Hessian symmetry
-        @test H_val ≈ H_val' rtol = 1e-10
+        @test H_val ≈ H_val' rtol = 1.0e-10
 
         # Test against ForwardDiff Hessian
         H_fd = FD.hessian(x -> phs(x, x₂), x₁)
-        @test H_val ≈ H_fd rtol = 1e-5
+        @test H_val ≈ H_fd rtol = 1.0e-5
     end
 end
 
 @testset "PHS, n=3" begin
     x₁ = SVector(1.0, 2)
     x₂ = SVector(2.0, 4)
-    phs = PHS(3; poly_deg=-1)
+    phs = PHS(3; poly_deg = -1)
     @test phs isa PHS3
     @test phs.poly_deg == -1
-    phs = PHS3(; poly_deg=-1)
+    phs = PHS3(; poly_deg = -1)
     @test phs isa PHS3
     @test phs.poly_deg == -1
 
@@ -198,7 +198,7 @@ end
 
         # Test against ForwardDiff
         expected = FD.gradient(x -> phs(x, x₂), x₁) ⋅ normal
-        @test RBF.D(phs, normal)(x₁, x₂) ≈ expected rtol = 1e-5
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ expected rtol = 1.0e-5
     end
 
     @testset "Directional Second Derivatives" begin
@@ -214,7 +214,7 @@ end
         H_fd = FD.hessian(x -> phs(x, x₂), x₁)
         second_normal = dot(normal, H_fd * normal)
 
-        @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
+        @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1.0e-5
 
         # Test with orthogonal directions
         dir_deriv_xy = RBF.D²(phs, v1, v2)
@@ -222,7 +222,7 @@ end
         # Calculate mixed directional derivative using Hessian
         second_mixed = dot(v1, H_fd * v2)
 
-        @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
+        @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1.0e-5
     end
 
     @testset "Hessian" begin
@@ -237,26 +237,26 @@ end
         @test size(H_val) == (2, 2)
 
         # Test consistency with D²: dot(v1, H * v2) should equal D²(basis, v1, v2)
-        @test dot(v1, H_val * v2) ≈ RBF.D²(phs, v1, v2)(x₁, x₂) rtol = 1e-10
-        @test dot(v2, H_val * v1) ≈ RBF.D²(phs, v2, v1)(x₁, x₂) rtol = 1e-10
-        @test dot(normal, H_val * normal) ≈ RBF.D²(phs, normal, normal)(x₁, x₂) rtol = 1e-10
+        @test dot(v1, H_val * v2) ≈ RBF.D²(phs, v1, v2)(x₁, x₂) rtol = 1.0e-10
+        @test dot(v2, H_val * v1) ≈ RBF.D²(phs, v2, v1)(x₁, x₂) rtol = 1.0e-10
+        @test dot(normal, H_val * normal) ≈ RBF.D²(phs, normal, normal)(x₁, x₂) rtol = 1.0e-10
 
         # Test Hessian symmetry
-        @test H_val ≈ H_val' rtol = 1e-10
+        @test H_val ≈ H_val' rtol = 1.0e-10
 
         # Test against ForwardDiff Hessian
         H_fd = FD.hessian(x -> phs(x, x₂), x₁)
-        @test H_val ≈ H_fd rtol = 1e-5
+        @test H_val ≈ H_fd rtol = 1.0e-5
     end
 end
 
 @testset "PHS, n=5" begin
     x₁ = SVector(1.0, 2)
     x₂ = SVector(2.0, 4)
-    phs = PHS(5; poly_deg=-1)
+    phs = PHS(5; poly_deg = -1)
     @test phs isa PHS5
     @test phs.poly_deg == -1
-    phs = PHS5(; poly_deg=-1)
+    phs = PHS5(; poly_deg = -1)
     @test phs isa PHS5
     @test phs.poly_deg == -1
 
@@ -313,7 +313,7 @@ end
 
         # Test against ForwardDiff
         expected = FD.gradient(x -> phs(x, x₂), x₁) ⋅ normal
-        @test RBF.D(phs, normal)(x₁, x₂) ≈ expected rtol = 1e-5
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ expected rtol = 1.0e-5
     end
 
     @testset "Directional Second Derivatives" begin
@@ -329,7 +329,7 @@ end
         H_fd = FD.hessian(x -> phs(x, x₂), x₁)
         second_normal = dot(normal, H_fd * normal)
 
-        @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
+        @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1.0e-5
 
         # Test with orthogonal directions
         dir_deriv_xy = RBF.D²(phs, v1, v2)
@@ -337,7 +337,7 @@ end
         # Calculate mixed directional derivative using Hessian
         second_mixed = dot(v1, H_fd * v2)
 
-        @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
+        @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1.0e-5
     end
 
     @testset "Hessian" begin
@@ -352,26 +352,26 @@ end
         @test size(H_val) == (2, 2)
 
         # Test consistency with D²: dot(v1, H * v2) should equal D²(basis, v1, v2)
-        @test dot(v1, H_val * v2) ≈ RBF.D²(phs, v1, v2)(x₁, x₂) rtol = 1e-10
-        @test dot(v2, H_val * v1) ≈ RBF.D²(phs, v2, v1)(x₁, x₂) rtol = 1e-10
-        @test dot(normal, H_val * normal) ≈ RBF.D²(phs, normal, normal)(x₁, x₂) rtol = 1e-10
+        @test dot(v1, H_val * v2) ≈ RBF.D²(phs, v1, v2)(x₁, x₂) rtol = 1.0e-10
+        @test dot(v2, H_val * v1) ≈ RBF.D²(phs, v2, v1)(x₁, x₂) rtol = 1.0e-10
+        @test dot(normal, H_val * normal) ≈ RBF.D²(phs, normal, normal)(x₁, x₂) rtol = 1.0e-10
 
         # Test Hessian symmetry
-        @test H_val ≈ H_val' rtol = 1e-10
+        @test H_val ≈ H_val' rtol = 1.0e-10
 
         # Test against ForwardDiff Hessian
         H_fd = FD.hessian(x -> phs(x, x₂), x₁)
-        @test H_val ≈ H_fd rtol = 1e-5
+        @test H_val ≈ H_fd rtol = 1.0e-5
     end
 end
 
 @testset "PHS, n=7" begin
     x₁ = SVector(1.0, 2)
     x₂ = SVector(2.0, 4)
-    phs = PHS(7; poly_deg=-1)
+    phs = PHS(7; poly_deg = -1)
     @test phs isa PHS7
     @test phs.poly_deg == -1
-    phs = PHS7(; poly_deg=-1)
+    phs = PHS7(; poly_deg = -1)
     @test phs isa PHS7
     @test phs.poly_deg == -1
     @testset "Distances" begin
@@ -427,7 +427,7 @@ end
 
         # Test against ForwardDiff
         expected = FD.gradient(x -> phs(x, x₂), x₁) ⋅ normal
-        @test RBF.D(phs, normal)(x₁, x₂) ≈ expected rtol = 1e-5
+        @test RBF.D(phs, normal)(x₁, x₂) ≈ expected rtol = 1.0e-5
     end
 
     @testset "Directional Second Derivatives" begin
@@ -443,7 +443,7 @@ end
         H_fd = FD.hessian(x -> phs(x, x₂), x₁)
         second_normal = dot(normal, H_fd * normal)
 
-        @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1e-5
+        @test dir_deriv(x₁, x₂) ≈ second_normal rtol = 1.0e-5
 
         # Test with orthogonal directions
         dir_deriv_xy = RBF.D²(phs, v1, v2)
@@ -451,7 +451,7 @@ end
         # Calculate mixed directional derivative using Hessian
         second_mixed = dot(v1, H_fd * v2)
 
-        @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1e-5
+        @test dir_deriv_xy(x₁, x₂) ≈ second_mixed rtol = 1.0e-5
     end
 
     @testset "Hessian" begin
@@ -466,15 +466,15 @@ end
         @test size(H_val) == (2, 2)
 
         # Test consistency with D²: dot(v1, H * v2) should equal D²(basis, v1, v2)
-        @test dot(v1, H_val * v2) ≈ RBF.D²(phs, v1, v2)(x₁, x₂) rtol = 1e-10
-        @test dot(v2, H_val * v1) ≈ RBF.D²(phs, v2, v1)(x₁, x₂) rtol = 1e-10
-        @test dot(normal, H_val * normal) ≈ RBF.D²(phs, normal, normal)(x₁, x₂) rtol = 1e-10
+        @test dot(v1, H_val * v2) ≈ RBF.D²(phs, v1, v2)(x₁, x₂) rtol = 1.0e-10
+        @test dot(v2, H_val * v1) ≈ RBF.D²(phs, v2, v1)(x₁, x₂) rtol = 1.0e-10
+        @test dot(normal, H_val * normal) ≈ RBF.D²(phs, normal, normal)(x₁, x₂) rtol = 1.0e-10
 
         # Test Hessian symmetry
-        @test H_val ≈ H_val' rtol = 1e-10
+        @test H_val ≈ H_val' rtol = 1.0e-10
 
         # Test against ForwardDiff Hessian
         H_fd = FD.hessian(x -> phs(x, x₂), x₁)
-        @test H_val ≈ H_fd rtol = 1e-5
+        @test H_val ≈ H_fd rtol = 1.0e-5
     end
 end

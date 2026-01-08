@@ -3,7 +3,7 @@
 
 Construct a radial basis interpolation.
 """
-struct Interpolator{X,Y,R,M,RB,MB}
+struct Interpolator{X, Y, R, M, RB, MB}
     x::X
     y::Y
     rbf_weights::R
@@ -17,7 +17,7 @@ end
 
 Construct a radial basis interpolator.
 """
-function Interpolator(x, y, basis::B=PHS()) where {B<:AbstractRadialBasis}
+function Interpolator(x, y, basis::B = PHS()) where {B <: AbstractRadialBasis}
     dim = length(first(x))
     k = length(x)  # number of data in influence/support domain
     npoly = binomial(dim + basis.poly_deg, basis.poly_deg)

@@ -23,7 +23,7 @@ Per-stencil storage from forward pass needed for backward pass.
 - `k`: Number of RBF neighbors in stencil
 - `nmon`: Number of monomial basis functions
 """
-struct StencilForwardCache{T,M<:AbstractMatrix{T}}
+struct StencilForwardCache{T, M <: AbstractMatrix{T}}
     lambda::M          # (k+nmon) × num_ops solution
     A_mat::Matrix{T}   # Collocation matrix (dense, for A⁻ᵀ solve)
     k::Int
@@ -41,7 +41,7 @@ Global cache storing all stencil results and references to inputs.
 - `num_ops`: Number of operators (1 for scalar, D for gradient)
 """
 struct WeightsBuildForwardCache{T}
-    stencil_caches::Vector{StencilForwardCache{T,Matrix{T}}}
+    stencil_caches::Vector{StencilForwardCache{T, Matrix{T}}}
     k::Int
     nmon::Int
     num_ops::Int

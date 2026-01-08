@@ -3,10 +3,10 @@
 
 Operator for the directional derivative (∇f⋅v), the inner product of the gradient and a direction vector.
 """
-struct Directional{Dim,T} <: ScalarValuedOperator
+struct Directional{Dim, T} <: ScalarValuedOperator
     v::T
 end
-Directional{Dim}(v) where {Dim} = Directional{Dim,typeof(v)}(v)
+Directional{Dim}(v) where {Dim} = Directional{Dim, typeof(v)}(v)
 
 # Primary interface using unified keyword constructor
 """
@@ -44,44 +44,44 @@ end
 
 # Backward compatible positional signatures
 function directional(
-    data::AbstractVector, v::AbstractVector, basis::AbstractRadialBasis; kw...
-)
+        data::AbstractVector, v::AbstractVector, basis::AbstractRadialBasis; kw...
+    )
     Dim = length(first(data))
-    return RadialBasisOperator(Directional{Dim}(v), data; basis=basis, kw...)
+    return RadialBasisOperator(Directional{Dim}(v), data; basis = basis, kw...)
 end
 
 function directional(
-    data::AbstractVector,
-    eval_points::AbstractVector,
-    v::AbstractVector,
-    basis::AbstractRadialBasis=PHS(3; poly_deg=2);
-    kw...,
-)
+        data::AbstractVector,
+        eval_points::AbstractVector,
+        v::AbstractVector,
+        basis::AbstractRadialBasis = PHS(3; poly_deg = 2);
+        kw...,
+    )
     Dim = length(first(data))
     return RadialBasisOperator(
-        Directional{Dim}(v), data; eval_points=eval_points, basis=basis, kw...
+        Directional{Dim}(v), data; eval_points = eval_points, basis = basis, kw...
     )
 end
 
 # Hermite backward compatibility (positional boundary arguments)
 function directional(
-    data::AbstractVector,
-    eval_points::AbstractVector,
-    v::AbstractVector,
-    basis::AbstractRadialBasis,
-    is_boundary::Vector{Bool},
-    boundary_conditions::Vector{<:BoundaryCondition},
-    normals::Vector{<:AbstractVector};
-    kw...,
-)
+        data::AbstractVector,
+        eval_points::AbstractVector,
+        v::AbstractVector,
+        basis::AbstractRadialBasis,
+        is_boundary::Vector{Bool},
+        boundary_conditions::Vector{<:BoundaryCondition},
+        normals::Vector{<:AbstractVector};
+        kw...,
+    )
     Dim = length(first(data))
-    hermite = (is_boundary=is_boundary, bc=boundary_conditions, normals=normals)
+    hermite = (is_boundary = is_boundary, bc = boundary_conditions, normals = normals)
     return RadialBasisOperator(
         Directional{Dim}(v),
         data;
-        eval_points=eval_points,
-        basis=basis,
-        hermite=hermite,
+        eval_points = eval_points,
+        basis = basis,
+        hermite = hermite,
         kw...,
     )
 end
@@ -94,7 +94,7 @@ end
 
 # Helper: validate direction vector dimensions
 function _validate_directional_vector(v, Dim::Int, data_length::Int)
-    if !(length(v) == Dim || length(v) == data_length)
+    return if !(length(v) == Dim || length(v) == data_length)
         throw(
             DomainError(
                 "Direction vector length $(length(v)) must equal dimension $Dim or data length $data_length",
@@ -129,15 +129,15 @@ end
 
 # Custom _build_weights: Hermite path (with boundary conditions)
 function _build_weights(
-    ℒ::Directional{Dim},
-    data::AbstractVector,
-    eval_points::AbstractVector,
-    adjl::AbstractVector,
-    basis::AbstractRadialBasis,
-    is_boundary::Vector{Bool},
-    boundary_conditions::Vector{<:BoundaryCondition},
-    normals::Vector{<:AbstractVector},
-) where {Dim}
+        ℒ::Directional{Dim},
+        data::AbstractVector,
+        eval_points::AbstractVector,
+        adjl::AbstractVector,
+        basis::AbstractRadialBasis,
+        is_boundary::Vector{Bool},
+        boundary_conditions::Vector{<:BoundaryCondition},
+        normals::Vector{<:AbstractVector},
+    ) where {Dim}
     v = ℒ.v
     _validate_directional_vector(v, Dim, length(data))
 

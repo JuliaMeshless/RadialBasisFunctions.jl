@@ -14,8 +14,8 @@ Allocate sparse matrix arrays for COO format sparse matrix construction.
 Exactly counts non-zeros: interior points get k entries, Dirichlet points get 1 entry.
 """
 function allocate_sparse_arrays(
-    TD, k::Int, N_eval::Int, num_ops::Int, adjl, boundary_data::BoundaryData
-)
+        TD, k::Int, N_eval::Int, num_ops::Int, adjl, boundary_data::BoundaryData
+    )
     # Count exact non-zeros needed
     total_nnz, row_offsets = count_nonzeros(
         adjl, boundary_data.is_boundary, boundary_data.boundary_conditions
@@ -35,8 +35,8 @@ Count exact number of non-zero entries for optimized allocation.
 Returns (total_nnz, row_offsets) where row_offsets[i] is the starting position for row i.
 """
 function count_nonzeros(
-    adjl, is_boundary::Vector{Bool}, boundary_conditions::Vector{<:BoundaryCondition}
-)
+        adjl, is_boundary::Vector{Bool}, boundary_conditions::Vector{<:BoundaryCondition}
+    )
     N_eval = length(adjl)
     row_offsets = Vector{Int}(undef, N_eval + 1)
     global_to_boundary = construct_global_to_boundary(is_boundary)
@@ -101,17 +101,17 @@ end
 Main orchestrator: allocate memory, launch kernel, construct sparse matrix.
 """
 function build_weights_kernel(
-    data,
-    eval_points,
-    adjl,
-    basis,
-    ℒrbf,
-    ℒmon,
-    mon,
-    boundary_data::BoundaryData;
-    batch_size::Int=10,
-    device=CPU(),
-)
+        data,
+        eval_points,
+        adjl,
+        basis,
+        ℒrbf,
+        ℒmon,
+        mon,
+        boundary_data::BoundaryData;
+        batch_size::Int = 10,
+        device = CPU(),
+    )
     TD = eltype(first(data))
     k = length(first(adjl))
     nmon = binomial(length(first(data)) + basis.poly_deg, basis.poly_deg)
@@ -177,34 +177,6 @@ Launch parallel kernel for weight computation.
 Handles Dirichlet/Interior/Hermite stencil classification via dispatch.
 """
 function launch_kernel!(
-    I,
-    J,
-    V,
-    data,
-    eval_points,
-    adjl,
-    basis,
-    ℒrbf,
-    ℒmon,
-    mon,
-    boundary_data::BoundaryData,
-    row_offsets,
-    batch_size,
-    N_eval,
-    n_batches,
-    k,
-    nmon,
-    num_ops,
-    device,
-)
-    TD = eltype(first(data))
-    dim = length(first(data))
-
-    # Pre-allocate Hermite workspace for each batch (includes polynomial workspace)
-    batch_hermite_datas = [HermiteStencilData{TD}(k, dim, nmon) for _ in 1:n_batches]
-    global_to_boundary = construct_global_to_boundary(boundary_data.is_boundary)
-
-    @kernel function weight_kernel(
         I,
         J,
         V,
@@ -215,19 +187,47 @@ function launch_kernel!(
         ℒrbf,
         ℒmon,
         mon,
-        is_boundary,
-        boundary_conditions,
-        normals,
-        batch_hermite_datas,
-        global_to_boundary,
+        boundary_data::BoundaryData,
         row_offsets,
         batch_size,
         N_eval,
-        nmon,
+        n_batches,
         k,
+        nmon,
         num_ops,
-        TD,
+        device,
     )
+    TD = eltype(first(data))
+    dim = length(first(data))
+
+    # Pre-allocate Hermite workspace for each batch (includes polynomial workspace)
+    batch_hermite_datas = [HermiteStencilData{TD}(k, dim, nmon) for _ in 1:n_batches]
+    global_to_boundary = construct_global_to_boundary(boundary_data.is_boundary)
+
+    @kernel function weight_kernel(
+            I,
+            J,
+            V,
+            data,
+            eval_points,
+            adjl,
+            basis,
+            ℒrbf,
+            ℒmon,
+            mon,
+            is_boundary,
+            boundary_conditions,
+            normals,
+            batch_hermite_datas,
+            global_to_boundary,
+            row_offsets,
+            batch_size,
+            N_eval,
+            nmon,
+            k,
+            num_ops,
+            TD,
+        )
         batch_idx = @index(Global)
         hermite_data = batch_hermite_datas[batch_idx]
         start_idx, end_idx = calculate_batch_range(batch_idx, batch_size, N_eval)
@@ -302,8 +302,8 @@ function launch_kernel!(
         k,
         num_ops,
         TD;
-        ndrange=n_batches,
-        workgroupsize=1,
+        ndrange = n_batches,
+        workgroupsize = 1,
     )
     return KernelAbstractions.synchronize(device)
 end
@@ -321,9 +321,9 @@ end
 
 """Fill sparse matrix entries using indexed storage (row_offsets)"""
 @inline function fill_entries!(
-    I, J, V, weights, eval_idx::Int, neighbors, start_pos::Int, k::Int, num_ops::Int
-)
-    @inbounds for local_idx in 1:k
+        I, J, V, weights, eval_idx::Int, neighbors, start_pos::Int, k::Int, num_ops::Int
+    )
+    return @inbounds for local_idx in 1:k
         pos = start_pos + local_idx - 1
         I[pos] = eval_idx
         J[pos] = neighbors[local_idx]
@@ -341,7 +341,7 @@ end
 @inline function fill_dirichlet_entry!(I, J, V, eval_idx::Int, start_pos::Int, num_ops::Int)
     I[start_pos] = eval_idx
     J[start_pos] = eval_idx
-    @inbounds for op in 1:num_ops
+    return @inbounds for op in 1:num_ops
         V[start_pos, op] = 1.0
     end
 end

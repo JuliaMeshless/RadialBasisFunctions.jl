@@ -37,28 +37,28 @@ gradient(data::AbstractVector{<:AbstractVector}; kw...) = jacobian(data; kw...)
 
 # Backward compatible positional signatures (all delegate to jacobian)
 function gradient(data::AbstractVector{<:AbstractVector}, basis::AbstractRadialBasis; kw...)
-    jacobian(data, basis; kw...)
+    return jacobian(data, basis; kw...)
 end
 
 function gradient(
-    data::AbstractVector{<:AbstractVector},
-    eval_points::AbstractVector{<:AbstractVector},
-    basis::AbstractRadialBasis=PHS(3; poly_deg=2);
-    kw...,
-)
-    jacobian(data, eval_points, basis; kw...)
+        data::AbstractVector{<:AbstractVector},
+        eval_points::AbstractVector{<:AbstractVector},
+        basis::AbstractRadialBasis = PHS(3; poly_deg = 2);
+        kw...,
+    )
+    return jacobian(data, eval_points, basis; kw...)
 end
 
 # Hermite backward compatibility
 function gradient(
-    data::AbstractVector{<:AbstractVector},
-    eval_points::AbstractVector{<:AbstractVector},
-    basis::AbstractRadialBasis,
-    is_boundary::Vector{Bool},
-    boundary_conditions::Vector{<:BoundaryCondition},
-    normals::Vector{<:AbstractVector};
-    kw...,
-)
+        data::AbstractVector{<:AbstractVector},
+        eval_points::AbstractVector{<:AbstractVector},
+        basis::AbstractRadialBasis,
+        is_boundary::Vector{Bool},
+        boundary_conditions::Vector{<:BoundaryCondition},
+        normals::Vector{<:AbstractVector};
+        kw...,
+    )
     return jacobian(
         data, eval_points, basis, is_boundary, boundary_conditions, normals; kw...
     )

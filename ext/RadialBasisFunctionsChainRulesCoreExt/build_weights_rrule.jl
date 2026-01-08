@@ -25,15 +25,15 @@ Returns: (W, cache) where W is the sparse weight matrix and cache contains
 per-stencil factorizations and solutions needed for the pullback.
 """
 function _forward_with_cache(
-    data::AbstractVector,
-    eval_points::AbstractVector,
-    adjl::AbstractVector,
-    basis::AbstractRadialBasis,
-    ℒrbf,
-    ℒmon,
-    mon::MonomialBasis{Dim,Deg},
-    ::Type{ℒType},
-) where {Dim,Deg,ℒType}
+        data::AbstractVector,
+        eval_points::AbstractVector,
+        adjl::AbstractVector,
+        basis::AbstractRadialBasis,
+        ℒrbf,
+        ℒmon,
+        mon::MonomialBasis{Dim, Deg},
+        ::Type{ℒType},
+    ) where {Dim, Deg, ℒType}
     TD = eltype(first(data))
     k = length(first(adjl))
     nmon = Deg >= 0 ? binomial(Dim + Deg, Deg) : 0
@@ -51,7 +51,7 @@ function _forward_with_cache(
     V = Vector{TD}(undef, nnz)
 
     # Allocate stencil caches
-    stencil_caches = Vector{StencilForwardCache{TD,Matrix{TD}}}(undef, N_eval)
+    stencil_caches = Vector{StencilForwardCache{TD, Matrix{TD}}}(undef, N_eval)
 
     # Process each evaluation point
     pos = 1
@@ -132,8 +132,8 @@ end
 Extract the cotangent values for a single stencil from the sparse matrix cotangent.
 """
 function extract_stencil_cotangent(
-    ΔW::AbstractMatrix{T}, eval_idx::Int, neighbors::Vector{Int}, k::Int, num_ops::Int
-) where {T}
+        ΔW::AbstractMatrix{T}, eval_idx::Int, neighbors::Vector{Int}, k::Int, num_ops::Int
+    ) where {T}
     Δw = zeros(T, k, num_ops)
     for (local_idx, global_idx) in enumerate(neighbors)
         Δw[local_idx, 1] = ΔW[eval_idx, global_idx]
@@ -146,13 +146,13 @@ end
 # ============================================================================
 
 function ChainRulesCore.rrule(
-    ::typeof(_build_weights),
-    ℒ::Partial,
-    data::AbstractVector,
-    eval_points::AbstractVector,
-    adjl::AbstractVector,
-    basis::AbstractRadialBasis,
-)
+        ::typeof(_build_weights),
+        ℒ::Partial,
+        data::AbstractVector,
+        eval_points::AbstractVector,
+        adjl::AbstractVector,
+        basis::AbstractRadialBasis,
+    )
     # Build monomial basis and apply operator (same as forward pass)
     dim = length(first(data))
     mon = MonomialBasis(dim, basis.poly_deg)
@@ -235,13 +235,13 @@ end
 # ============================================================================
 
 function ChainRulesCore.rrule(
-    ::typeof(_build_weights),
-    ℒ::Laplacian,
-    data::AbstractVector,
-    eval_points::AbstractVector,
-    adjl::AbstractVector,
-    basis::AbstractRadialBasis,
-)
+        ::typeof(_build_weights),
+        ℒ::Laplacian,
+        data::AbstractVector,
+        eval_points::AbstractVector,
+        adjl::AbstractVector,
+        basis::AbstractRadialBasis,
+    )
     # Build monomial basis and apply operator
     dim = length(first(data))
     mon = MonomialBasis(dim, basis.poly_deg)

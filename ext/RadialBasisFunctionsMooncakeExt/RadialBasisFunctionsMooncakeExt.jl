@@ -29,8 +29,8 @@ import RadialBasisFunctions: _build_weights, Partial, Laplacian, AbstractRadialB
 
 # Generic version that handles any SVector dimension
 function Mooncake.increment_and_get_rdata!(
-    f::Vector{<:Mooncake.Tangent}, ::Mooncake.NoRData, t::Vector{SVector{N,T}}
-) where {N,T}
+        f::Vector{<:Mooncake.Tangent}, ::Mooncake.NoRData, t::Vector{SVector{N, T}}
+    ) where {N, T}
     for i in eachindex(f, t)
         # Mooncake.Tangent has a `fields` field containing the NamedTuple
         # The NamedTuple has a `data` field with the tuple of values
@@ -39,7 +39,7 @@ function Mooncake.increment_and_get_rdata!(
         sv = t[i]
         new_data = ntuple(j -> old_data[j] + sv[j], Val(N))
         # Reconstruct the tangent with the same type
-        f[i] = typeof(f[i])((data=new_data,))
+        f[i] = typeof(f[i])((data = new_data,))
     end
     return Mooncake.NoRData()
 end
@@ -52,33 +52,33 @@ end
 
 # Scalar operator: _eval_op(op, x) -> vector
 Mooncake.@from_rrule(
-    Mooncake.DefaultCtx, Tuple{typeof(_eval_op),RadialBasisOperator,Vector{Float64}}
+    Mooncake.DefaultCtx, Tuple{typeof(_eval_op), RadialBasisOperator, Vector{Float64}}
 )
 
 # Vector-valued operator (Gradient): _eval_op(op, x) -> matrix
 # This covers gradient, jacobian operators
 Mooncake.@from_rrule(
     Mooncake.DefaultCtx,
-    Tuple{typeof(_eval_op),RadialBasisOperator{<:VectorValuedOperator},Vector{Float64}}
+    Tuple{typeof(_eval_op), RadialBasisOperator{<:VectorValuedOperator}, Vector{Float64}}
 )
 
 # Basis function rules for common types (Float64 vectors)
 # These enable differentiating through weight computation if needed
 
-Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{PHS1,Vector{Float64},Vector{Float64}})
+Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{PHS1, Vector{Float64}, Vector{Float64}})
 
-Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{PHS3,Vector{Float64},Vector{Float64}})
+Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{PHS3, Vector{Float64}, Vector{Float64}})
 
-Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{PHS5,Vector{Float64},Vector{Float64}})
+Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{PHS5, Vector{Float64}, Vector{Float64}})
 
-Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{PHS7,Vector{Float64},Vector{Float64}})
+Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{PHS7, Vector{Float64}, Vector{Float64}})
 
-Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{IMQ,Vector{Float64},Vector{Float64}})
+Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{IMQ, Vector{Float64}, Vector{Float64}})
 
-Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{Gaussian,Vector{Float64},Vector{Float64}})
+Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{Gaussian, Vector{Float64}, Vector{Float64}})
 
 # Interpolator rules
-Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{Interpolator,Vector{Float64}})
+Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{Interpolator, Vector{Float64}})
 
 # _build_weights rules for shape optimization
 # These enable differentiating through operator construction w.r.t. point positions
@@ -86,50 +86,50 @@ Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{Interpolator,Vector{Float64}})
 # Partial operator with different PHS types
 Mooncake.@from_rrule(
     Mooncake.DefaultCtx,
-    Tuple{typeof(_build_weights),Partial,AbstractVector,AbstractVector,AbstractVector,PHS1}
+    Tuple{typeof(_build_weights), Partial, AbstractVector, AbstractVector, AbstractVector, PHS1}
 )
 
 Mooncake.@from_rrule(
     Mooncake.DefaultCtx,
-    Tuple{typeof(_build_weights),Partial,AbstractVector,AbstractVector,AbstractVector,PHS3}
+    Tuple{typeof(_build_weights), Partial, AbstractVector, AbstractVector, AbstractVector, PHS3}
 )
 
 Mooncake.@from_rrule(
     Mooncake.DefaultCtx,
-    Tuple{typeof(_build_weights),Partial,AbstractVector,AbstractVector,AbstractVector,PHS5}
+    Tuple{typeof(_build_weights), Partial, AbstractVector, AbstractVector, AbstractVector, PHS5}
 )
 
 Mooncake.@from_rrule(
     Mooncake.DefaultCtx,
-    Tuple{typeof(_build_weights),Partial,AbstractVector,AbstractVector,AbstractVector,PHS7}
+    Tuple{typeof(_build_weights), Partial, AbstractVector, AbstractVector, AbstractVector, PHS7}
 )
 
 # Laplacian operator with different PHS types
 Mooncake.@from_rrule(
     Mooncake.DefaultCtx,
     Tuple{
-        typeof(_build_weights),Laplacian,AbstractVector,AbstractVector,AbstractVector,PHS1
+        typeof(_build_weights), Laplacian, AbstractVector, AbstractVector, AbstractVector, PHS1,
     }
 )
 
 Mooncake.@from_rrule(
     Mooncake.DefaultCtx,
     Tuple{
-        typeof(_build_weights),Laplacian,AbstractVector,AbstractVector,AbstractVector,PHS3
+        typeof(_build_weights), Laplacian, AbstractVector, AbstractVector, AbstractVector, PHS3,
     }
 )
 
 Mooncake.@from_rrule(
     Mooncake.DefaultCtx,
     Tuple{
-        typeof(_build_weights),Laplacian,AbstractVector,AbstractVector,AbstractVector,PHS5
+        typeof(_build_weights), Laplacian, AbstractVector, AbstractVector, AbstractVector, PHS5,
     }
 )
 
 Mooncake.@from_rrule(
     Mooncake.DefaultCtx,
     Tuple{
-        typeof(_build_weights),Laplacian,AbstractVector,AbstractVector,AbstractVector,PHS7
+        typeof(_build_weights), Laplacian, AbstractVector, AbstractVector, AbstractVector, PHS7,
     }
 )
 

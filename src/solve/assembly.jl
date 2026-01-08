@@ -66,8 +66,8 @@ For Hermite stencils with Neumann/Robin conditions, basis functions are modified
 via `_rbf_entry` and `_poly_entry!` dispatch to maintain matrix symmetry.
 """
 function _build_collocation_matrix!(
-    A::Symmetric, data, basis::AbstractRadialBasis, mon::MonomialBasis{Dim,Deg}, k::Int
-) where {Dim,Deg}
+        A::Symmetric, data, basis::AbstractRadialBasis, mon::MonomialBasis{Dim, Deg}, k::Int
+    ) where {Dim, Deg}
     # Construct appropriate operator form for the data type
     ops = _prepare_basis_ops(data, basis)
     return _build_collocation_matrix_impl!(A, data, ops, mon, k)
@@ -78,8 +78,8 @@ _prepare_basis_ops(::AbstractVector, basis) = basis
 _prepare_basis_ops(::HermiteStencilData, basis) = BasisOperators(basis)
 
 function _build_collocation_matrix_impl!(
-    A::Symmetric, data, ops, mon::MonomialBasis{Dim,Deg}, k::Int
-) where {Dim,Deg}
+        A::Symmetric, data, ops, mon::MonomialBasis{Dim, Deg}, k::Int
+    ) where {Dim, Deg}
     AA = parent(A)
     N = size(A, 2)
 
@@ -110,15 +110,15 @@ Build RHS vector for single operator. Works for both interior stencils (Abstract
 and Hermite stencils (HermiteStencilData) via dispatch helpers.
 """
 function _build_rhs!(
-    b::AbstractVector,
-    ℒrbf,
-    ℒmon,
-    data,
-    eval_point,
-    basis::AbstractRadialBasis,
-    mon::MonomialBasis,
-    k::Int,
-)
+        b::AbstractVector,
+        ℒrbf,
+        ℒmon,
+        data,
+        eval_point,
+        basis::AbstractRadialBasis,
+        mon::MonomialBasis,
+        k::Int,
+    )
     # RBF section - dispatches on data type
     @inbounds for i in 1:k
         b[i] = _rbf_rhs(ℒrbf, eval_point, data, i)
@@ -140,15 +140,15 @@ Build RHS vector for multiple operators. Works for both interior stencils (Abstr
 and Hermite stencils (HermiteStencilData) via dispatch helpers.
 """
 function _build_rhs!(
-    b::AbstractMatrix,
-    ℒrbf::Tuple,
-    ℒmon::Tuple,
-    data,
-    eval_point,
-    basis::AbstractRadialBasis,
-    mon::MonomialBasis,
-    k::Int,
-)
+        b::AbstractMatrix,
+        ℒrbf::Tuple,
+        ℒmon::Tuple,
+        data,
+        eval_point,
+        basis::AbstractRadialBasis,
+        mon::MonomialBasis,
+        k::Int,
+    )
     @assert size(b, 2) == length(ℒrbf) == length(ℒmon)
 
     # RBF section - each operator, dispatches on data type
@@ -183,16 +183,16 @@ via dispatch helpers in `_build_collocation_matrix!` and `_build_rhs!`.
 Returns: weights (first k rows of solution, size k×num_ops)
 """
 function _build_stencil!(
-    A::Symmetric,
-    b,
-    ℒrbf,
-    ℒmon,
-    data,
-    eval_point,
-    basis::AbstractRadialBasis,
-    mon::MonomialBasis,
-    k::Int,
-)
+        A::Symmetric,
+        b,
+        ℒrbf,
+        ℒmon,
+        data,
+        eval_point,
+        basis::AbstractRadialBasis,
+        mon::MonomialBasis,
+        k::Int,
+    )
     _build_collocation_matrix!(A, data, basis, mon, k)
     _build_rhs!(b, ℒrbf, ℒmon, data, eval_point, basis, mon, k)
     return (A \ b)[1:k, :]
@@ -211,8 +211,8 @@ Dispatches based on point types (Interior/Dirichlet/NeumannRobin).
 Uses `BasisOperators` for efficient evaluation (avoids functor construction in hot loop).
 """
 function compute_hermite_rbf_entry(
-    i::Int, j::Int, data::HermiteStencilData, ops::BasisOperators
-)
+        i::Int, j::Int, data::HermiteStencilData, ops::BasisOperators
+    )
     xi, xj = data.data[i], data.data[j]
     type_i = point_type(data.is_boundary[i], data.boundary_conditions[i])
     type_j = point_type(data.is_boundary[j], data.boundary_conditions[j])
@@ -252,8 +252,8 @@ end
 
 # Dirichlet-NeumannRobin: Apply boundary operator to second argument
 function hermite_rbf_dispatch(
-    ::DirichletPoint, ::NeumannRobinPoint, i, j, xi, xj, data, ops
-)
+        ::DirichletPoint, ::NeumannRobinPoint, i, j, xi, xj, data, ops
+    )
     φ = ops.φ(xi, xj)
     bc_j = data.boundary_conditions[j]
     nj = data.normals[j]
@@ -274,8 +274,8 @@ end
 
 # NeumannRobin-Dirichlet: Apply boundary operator to first argument
 function hermite_rbf_dispatch(
-    ::NeumannRobinPoint, ::DirichletPoint, i, j, xi, xj, data, ops
-)
+        ::NeumannRobinPoint, ::DirichletPoint, i, j, xi, xj, data, ops
+    )
     φ = ops.φ(xi, xj)
     bc_i = data.boundary_conditions[i]
     ni = data.normals[i]
@@ -286,8 +286,8 @@ end
 
 # NeumannRobin-NeumannRobin: Apply boundary operators to both arguments
 function hermite_rbf_dispatch(
-    ::NeumannRobinPoint, ::NeumannRobinPoint, i, j, xi, xj, data, ops
-)
+        ::NeumannRobinPoint, ::NeumannRobinPoint, i, j, xi, xj, data, ops
+    )
     φ = ops.φ(xi, xj)
     bc_i = data.boundary_conditions[i]
     bc_j = data.boundary_conditions[j]
@@ -300,8 +300,8 @@ function hermite_rbf_dispatch(
     D²φ = LinearAlgebra.dot(ni, Hφ * nj)
 
     return α(bc_i) * α(bc_j) * φ - α(bc_i) * β(bc_j) * Dⱼφ +
-           β(bc_i) * α(bc_j) * Dᵢφ +
-           β(bc_i) * β(bc_j) * D²φ
+        β(bc_i) * α(bc_j) * Dᵢφ +
+        β(bc_i) * β(bc_j) * D²φ
 end
 
 """
@@ -311,8 +311,8 @@ Compute polynomial entries for Hermite interpolation.
 Dispatches based on boundary point type for type stability.
 """
 function compute_hermite_poly_entry!(
-    a::AbstractVector, i::Int, data::HermiteStencilData, mon::MonomialBasis
-)
+        a::AbstractVector, i::Int, data::HermiteStencilData, mon::MonomialBasis
+    )
     xi = data.data[i]
     pt = point_type(data.is_boundary[i], data.boundary_conditions[i])
     return hermite_poly_dispatch!(a, pt, xi, data, i, mon)
@@ -320,26 +320,26 @@ end
 
 # Interior/Dirichlet: standard polynomial evaluation
 function hermite_poly_dispatch!(
-    a::AbstractVector,
-    ::Union{InteriorPoint,DirichletPoint},
-    xi,
-    data,
-    i,
-    mon::MonomialBasis,
-)
+        a::AbstractVector,
+        ::Union{InteriorPoint, DirichletPoint},
+        xi,
+        data,
+        i,
+        mon::MonomialBasis,
+    )
     mon(a, xi)
     return nothing
 end
 
 # NeumannRobin: α*P + β*∂ₙP using pre-allocated workspace
 function hermite_poly_dispatch!(
-    a::AbstractVector,
-    ::NeumannRobinPoint,
-    xi,
-    data::HermiteStencilData,
-    i,
-    mon::MonomialBasis,
-)
+        a::AbstractVector,
+        ::NeumannRobinPoint,
+        xi,
+        data::HermiteStencilData,
+        i,
+        mon::MonomialBasis,
+    )
     bc = data.boundary_conditions[i]
     ni = data.normals[i]
     workspace = data.poly_workspace
@@ -370,14 +370,14 @@ Apply boundary conditions to RBF operator evaluation.
 - Neumann/Robin: α*ℒΦ + β*ℒ(∂ₙΦ)
 """
 @inline function hermite_rbf_rhs(
-    ℒrbf, eval_point, data_point, is_bound::Bool, bc::BoundaryCondition, normal
-)
+        ℒrbf, eval_point, data_point, is_bound::Bool, bc::BoundaryCondition, normal
+    )
     if !is_bound || is_dirichlet(bc)
         return ℒrbf(eval_point, data_point)
     else
         # Neumann/Robin: α*ℒφ + β*ℒ(∂ₙφ)
         return α(bc) * ℒrbf(eval_point, data_point) +
-               β(bc) * ℒrbf(eval_point, data_point, normal)
+            β(bc) * ℒrbf(eval_point, data_point, normal)
     end
 end
 
@@ -388,15 +388,15 @@ Apply boundary conditions to monomial operator evaluation.
 Dispatches based on boundary point type for type stability.
 """
 @inline function hermite_mono_rhs!(
-    bmono::AbstractVector,
-    ℒmon,
-    mon::MonomialBasis,
-    eval_point,
-    is_bound::Bool,
-    bc::BoundaryCondition,
-    normal,
-    workspace::AbstractVector,
-)
+        bmono::AbstractVector,
+        ℒmon,
+        mon::MonomialBasis,
+        eval_point,
+        is_bound::Bool,
+        bc::BoundaryCondition,
+        normal,
+        workspace::AbstractVector,
+    )
     pt = point_type(is_bound, bc)
     return hermite_mono_rhs_dispatch!(
         bmono, pt, ℒmon, mon, eval_point, bc, normal, workspace
@@ -405,23 +405,23 @@ end
 
 # Interior/Dirichlet: apply operator to standard monomial basis
 function hermite_mono_rhs_dispatch!(
-    bmono,
-    ::Union{InteriorPoint,DirichletPoint},
-    ℒmon,
-    mon,
-    eval_point,
-    bc,
-    normal,
-    workspace,
-)
+        bmono,
+        ::Union{InteriorPoint, DirichletPoint},
+        ℒmon,
+        mon,
+        eval_point,
+        bc,
+        normal,
+        workspace,
+    )
     ℒmon(bmono, eval_point)
     return nothing
 end
 
 # NeumannRobin: α*ℒ(P) + β*ℒ(∂ₙP) using pre-allocated workspace
 function hermite_mono_rhs_dispatch!(
-    bmono, ::NeumannRobinPoint, ℒmon, mon::MonomialBasis, eval_point, bc, normal, workspace
-)
+        bmono, ::NeumannRobinPoint, ℒmon, mon::MonomialBasis, eval_point, bc, normal, workspace
+    )
     # Compute P(eval_point) into bmono
     mon(bmono, eval_point)
 

@@ -29,11 +29,11 @@ Using implicit function theorem:
   Δb = η
 """
 function backward_linear_solve!(
-    ΔA::AbstractMatrix{T},
-    Δb::AbstractVecOrMat{T},
-    Δw::AbstractVecOrMat{T},
-    cache::StencilForwardCache{T},
-) where {T}
+        ΔA::AbstractMatrix{T},
+        Δb::AbstractVecOrMat{T},
+        Δw::AbstractVecOrMat{T},
+        cache::StencilForwardCache{T},
+    ) where {T}
     k = cache.k
     nmon = cache.nmon
     n = k + nmon
@@ -85,14 +85,14 @@ For polynomial block:
 Note: A is symmetric, so we need to handle both triangles.
 """
 function backward_collocation!(
-    Δdata::Vector{Vector{T}},
-    ΔA::AbstractMatrix{T},
-    neighbors::Vector{Int},
-    data::AbstractVector,
-    basis::AbstractRadialBasis,
-    mon::MonomialBasis{Dim,Deg},
-    k::Int,
-) where {T,Dim,Deg}
+        Δdata::Vector{Vector{T}},
+        ΔA::AbstractMatrix{T},
+        neighbors::Vector{Int},
+        data::AbstractVector,
+        basis::AbstractRadialBasis,
+        mon::MonomialBasis{Dim, Deg},
+        k::Int,
+    ) where {T, Dim, Deg}
     grad_φ = ∇(basis)
     n = k + binomial(Dim + Deg, Deg)
 
@@ -161,16 +161,16 @@ For polynomial section, we need:
   ∂/∂eval_point [ℒpⱼ(eval_point)]
 """
 function backward_rhs_partial!(
-    Δdata::Vector{Vector{T}},
-    Δeval_point::Vector{T},
-    Δb::AbstractVecOrMat{T},
-    neighbors::Vector{Int},
-    eval_point,
-    data::AbstractVector,
-    basis::AbstractRadialBasis,
-    dim::Int,
-    k::Int,
-) where {T}
+        Δdata::Vector{Vector{T}},
+        Δeval_point::Vector{T},
+        Δb::AbstractVecOrMat{T},
+        neighbors::Vector{Int},
+        eval_point,
+        data::AbstractVector,
+        basis::AbstractRadialBasis,
+        dim::Int,
+        k::Int,
+    ) where {T}
     num_ops = size(Δb, 2)
 
     # Get gradient functions for the applied partial operator
@@ -209,15 +209,15 @@ end
 Chain rule through RHS for Laplacian operator.
 """
 function backward_rhs_laplacian!(
-    Δdata::Vector{Vector{T}},
-    Δeval_point::Vector{T},
-    Δb::AbstractVecOrMat{T},
-    neighbors::Vector{Int},
-    eval_point,
-    data::AbstractVector,
-    basis::AbstractRadialBasis,
-    k::Int,
-) where {T}
+        Δdata::Vector{Vector{T}},
+        Δeval_point::Vector{T},
+        Δb::AbstractVecOrMat{T},
+        neighbors::Vector{Int},
+        eval_point,
+        data::AbstractVector,
+        basis::AbstractRadialBasis,
+        k::Int,
+    ) where {T}
     num_ops = size(Δb, 2)
 
     # Get gradient functions for the applied Laplacian operator
@@ -255,18 +255,18 @@ Combines:
 3. backward_rhs! - chain Δb to Δdata and Δeval_point
 """
 function backward_stencil_partial!(
-    Δdata::Vector{Vector{T}},
-    Δeval_point::Vector{T},
-    Δw::AbstractVecOrMat{T},
-    cache::StencilForwardCache{T},
-    neighbors::Vector{Int},
-    eval_point,
-    data::AbstractVector,
-    basis::AbstractRadialBasis,
-    mon::MonomialBasis{Dim,Deg},
-    k::Int,
-    dim::Int,  # Partial derivative dimension
-) where {T,Dim,Deg}
+        Δdata::Vector{Vector{T}},
+        Δeval_point::Vector{T},
+        Δw::AbstractVecOrMat{T},
+        cache::StencilForwardCache{T},
+        neighbors::Vector{Int},
+        eval_point,
+        data::AbstractVector,
+        basis::AbstractRadialBasis,
+        mon::MonomialBasis{Dim, Deg},
+        k::Int,
+        dim::Int,  # Partial derivative dimension
+    ) where {T, Dim, Deg}
     n = k + cache.nmon
 
     # Allocate workspace for ΔA and Δb
@@ -288,17 +288,17 @@ function backward_stencil_partial!(
 end
 
 function backward_stencil_laplacian!(
-    Δdata::Vector{Vector{T}},
-    Δeval_point::Vector{T},
-    Δw::AbstractVecOrMat{T},
-    cache::StencilForwardCache{T},
-    neighbors::Vector{Int},
-    eval_point,
-    data::AbstractVector,
-    basis::AbstractRadialBasis,
-    mon::MonomialBasis{Dim,Deg},
-    k::Int,
-) where {T,Dim,Deg}
+        Δdata::Vector{Vector{T}},
+        Δeval_point::Vector{T},
+        Δw::AbstractVecOrMat{T},
+        cache::StencilForwardCache{T},
+        neighbors::Vector{Int},
+        eval_point,
+        data::AbstractVector,
+        basis::AbstractRadialBasis,
+        mon::MonomialBasis{Dim, Deg},
+        k::Int,
+    ) where {T, Dim, Deg}
     n = k + cache.nmon
 
     # Allocate workspace for ΔA and Δb

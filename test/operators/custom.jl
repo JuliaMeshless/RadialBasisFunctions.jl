@@ -26,17 +26,17 @@ end
     @test op isa RadialBasisOperator
 
     # Test with explicit keyword arguments
-    op2 = custom(x, basis -> (x, xᵢ) -> basis(x, xᵢ); basis=PHS(5; poly_deg=3))
+    op2 = custom(x, basis -> (x, xᵢ) -> basis(x, xᵢ); basis = PHS(5; poly_deg = 3))
     @test op2 isa RadialBasisOperator
 end
 
 @testset "custom() Positional Basis Constructor" begin
     # Test custom.jl lines 43-45: backward compatible positional basis
-    op = custom(x, basis -> (x, xᵢ) -> basis(x, xᵢ), PHS(3; poly_deg=2))
+    op = custom(x, basis -> (x, xᵢ) -> basis(x, xᵢ), PHS(3; poly_deg = 2))
     @test op isa RadialBasisOperator
 
     # Test with different basis types
-    op_imq = custom(x, basis -> (x, xᵢ) -> basis(x, xᵢ), IMQ(1; poly_deg=2))
+    op_imq = custom(x, basis -> (x, xᵢ) -> basis(x, xᵢ), IMQ(1; poly_deg = 2))
     @test op_imq isa RadialBasisOperator
 end
 
@@ -48,7 +48,7 @@ end
     @test length(op.eval_points) == 100
 
     # With explicit basis
-    op2 = custom(x, x2, basis -> (x, xᵢ) -> basis(x, xᵢ), PHS(5; poly_deg=3))
+    op2 = custom(x, x2, basis -> (x, xᵢ) -> basis(x, xᵢ), PHS(5; poly_deg = 3))
     @test op2 isa RadialBasisOperator
 end
 
@@ -75,7 +75,7 @@ end
         domain,
         domain,
         basis -> (x, xᵢ) -> basis(x, xᵢ),
-        PHS(3; poly_deg=2),
+        PHS(3; poly_deg = 2),
         is_boundary,
         boundary_conditions,
         normals,

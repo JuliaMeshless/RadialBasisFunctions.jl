@@ -12,7 +12,7 @@ abstract type AbstractPHS <: AbstractRadialBasis end
 
 Convienience contructor for polyharmonic splines.
 """
-function PHS(n::T=3; poly_deg::T=2) where {T<:Int}
+function PHS(n::T = 3; poly_deg::T = 2) where {T <: Int}
     check_poly_deg(poly_deg)
     if iseven(n) || n > 7
         throw(ArgumentError("n must be 1, 3, 5, or 7. (n = $n)"))
@@ -21,7 +21,7 @@ function PHS(n::T=3; poly_deg::T=2) where {T<:Int}
     n == 3 && return PHS3(poly_deg)
     n == 5 && return PHS5(poly_deg)
     return PHS7(poly_deg)
-end#==============================================================================##==============================================================================#
+end #==============================================================================# #==============================================================================#
 
 #                                    PHS1                                      #
 
@@ -30,9 +30,9 @@ end#============================================================================
 
 Polyharmonic spline radial basis function:``ϕ(r) = r``
 """
-struct PHS1{T<:Int} <: AbstractPHS
+struct PHS1{T <: Int} <: AbstractPHS
     poly_deg::T
-    function PHS1(poly_deg::T) where {T<:Int}
+    function PHS1(poly_deg::T) where {T <: Int}
         check_poly_deg(poly_deg)
         return new{T}(poly_deg)
     end
@@ -49,7 +49,7 @@ function (op::∂{<:PHS1})(x, xᵢ, normal)
     r = euclidean(x, xᵢ)
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
     return -normal[op.dim] / (r + AVOID_INF) +
-           dot_normal * (x[op.dim] - xᵢ[op.dim]) / (r^3 + AVOID_INF)
+        dot_normal * (x[op.dim] - xᵢ[op.dim]) / (r^3 + AVOID_INF)
 end
 
 # ∇ - gradient
@@ -86,7 +86,7 @@ function (op::H{<:PHS1})(x, xᵢ)
     N = length(x)
     T = eltype(x)
     # H[i,j] = δᵢⱼ/r - Δᵢ*Δⱼ/r³
-    return StaticArraysCore.SMatrix{N,N,T}(
+    return StaticArraysCore.SMatrix{N, N, T}(
         ntuple(N * N) do k
             i, j = divrem(k - 1, N) .+ 1
             T(i == j) / (r + AVOID_INF) - Δ[i] * Δ[j] / (r^3 + AVOID_INF)
@@ -107,7 +107,7 @@ function (op::∂²{<:PHS1})(x, xᵢ, normal)
     Δ_d = x[op.dim] - xᵢ[op.dim]
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
     return (2 * n_d * Δ_d + dot_normal) / (r^3 + AVOID_INF) -
-           3 * Δ_d^2 * dot_normal / (r^5 + AVOID_INF)
+        3 * Δ_d^2 * dot_normal / (r^5 + AVOID_INF)
 end
 
 # ∇² - Laplacian
@@ -120,7 +120,7 @@ function (op::∇²{<:PHS1})(x, xᵢ, normal)
     r = euclidean(x, xᵢ)
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
     return 2 * dot_normal / (r^3 + AVOID_INF)
-end#==============================================================================##==============================================================================#
+end #==============================================================================# #==============================================================================#
 
 #                                    PHS3                                      #
 
@@ -129,9 +129,9 @@ end#============================================================================
 
 Polyharmonic spline radial basis function:``ϕ(r) = r^3``
 """
-struct PHS3{T<:Int} <: AbstractPHS
+struct PHS3{T <: Int} <: AbstractPHS
     poly_deg::T
-    function PHS3(poly_deg::T) where {T<:Int}
+    function PHS3(poly_deg::T) where {T <: Int}
         check_poly_deg(poly_deg)
         return new{T}(poly_deg)
     end
@@ -186,7 +186,7 @@ function (op::H{<:PHS3})(x, xᵢ)
     N = length(x)
     T = eltype(x)
     # H[i,j] = 3 * (δᵢⱼ * r + Δᵢ*Δⱼ/r)
-    return StaticArraysCore.SMatrix{N,N,T}(
+    return StaticArraysCore.SMatrix{N, N, T}(
         ntuple(N * N) do k
             i, j = divrem(k - 1, N) .+ 1
             3 * (T(i == j) * r + Δ[i] * Δ[j] / (r + AVOID_INF))
@@ -207,7 +207,7 @@ function (op::∂²{<:PHS3})(x, xᵢ, normal)
     Δ_d = x[op.dim] - xᵢ[op.dim]
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
     return -3 * (2 * Δ_d * n_d + dot_normal - dot_normal * Δ_d^2 / (r² + AVOID_INF)) /
-           (r + AVOID_INF)
+        (r + AVOID_INF)
 end
 
 # ∇² - Laplacian
@@ -220,7 +220,7 @@ function (op::∇²{<:PHS3})(x, xᵢ, normal)
     r = euclidean(x, xᵢ)
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
     return -12 * dot_normal / (r + AVOID_INF)
-end#==============================================================================##==============================================================================#
+end #==============================================================================# #==============================================================================#
 
 #                                    PHS5                                      #
 
@@ -229,9 +229,9 @@ end#============================================================================
 
 Polyharmonic spline radial basis function:``ϕ(r) = r^5``
 """
-struct PHS5{T<:Int} <: AbstractPHS
+struct PHS5{T <: Int} <: AbstractPHS
     poly_deg::T
-    function PHS5(poly_deg::T) where {T<:Int}
+    function PHS5(poly_deg::T) where {T <: Int}
         check_poly_deg(poly_deg)
         return new{T}(poly_deg)
     end
@@ -286,7 +286,7 @@ function (op::H{<:PHS5})(x, xᵢ)
     N = length(x)
     T = eltype(x)
     # H[i,j] = 5 * (δᵢⱼ * r³ + 3 * Δᵢ*Δⱼ * r)
-    return StaticArraysCore.SMatrix{N,N,T}(
+    return StaticArraysCore.SMatrix{N, N, T}(
         ntuple(N * N) do k
             i, j = divrem(k - 1, N) .+ 1
             5 * (T(i == j) * r^3 + 3 * Δ[i] * Δ[j] * r)
@@ -319,7 +319,7 @@ function (op::∇²{<:PHS5})(x, xᵢ, normal)
     r = euclidean(x, xᵢ)
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
     return -90 * dot_normal * r
-end#==============================================================================##==============================================================================#
+end #==============================================================================# #==============================================================================#
 
 #                                    PHS7                                      #
 
@@ -328,9 +328,9 @@ end#============================================================================
 
 Polyharmonic spline radial basis function:``ϕ(r) = r^7``
 """
-struct PHS7{T<:Int} <: AbstractPHS
+struct PHS7{T <: Int} <: AbstractPHS
     poly_deg::T
-    function PHS7(poly_deg::T) where {T<:Int}
+    function PHS7(poly_deg::T) where {T <: Int}
         check_poly_deg(poly_deg)
         return new{T}(poly_deg)
     end
@@ -386,7 +386,7 @@ function (op::H{<:PHS7})(x, xᵢ)
     N = length(x)
     T = eltype(x)
     # H[i,j] = 7 * (δᵢⱼ * r⁵ + 5 * Δᵢ*Δⱼ * r³)
-    return StaticArraysCore.SMatrix{N,N,T}(
+    return StaticArraysCore.SMatrix{N, N, T}(
         ntuple(N * N) do k
             i, j = divrem(k - 1, N) .+ 1
             7 * (T(i == j) * r^5 + 5 * Δ[i] * Δ[j] * r^3)
@@ -419,18 +419,18 @@ function (op::∇²{<:PHS7})(x, xᵢ, normal)
     r = euclidean(x, xᵢ)
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
     return -280 * dot_normal * r^3
-end#==============================================================================##==============================================================================#
+end #==============================================================================# #==============================================================================#
 
 #                           Keyword Constructors                               #
 
 # convient constructors using keyword arguments
 for phs in (:PHS1, :PHS3, :PHS5, :PHS7)
-    @eval function $phs(; poly_deg::Int=2)
+    @eval function $phs(; poly_deg::Int = 2)
         return $phs(poly_deg)
     end
 end
 
-function Base.show(io::IO, rbf::R) where {R<:AbstractPHS}
+function Base.show(io::IO, rbf::R) where {R <: AbstractPHS}
     print(io, print_basis(rbf))
     print(io, "\n└─Polynomial augmentation: degree $(rbf.poly_deg)")
     return nothing

@@ -1,7 +1,7 @@
 for N in (:1, :2, :3)
     for Dim in (:1, :2, :3)
         @eval begin
-            function ∂(::MonomialBasis{$Dim,0}, ::Val{$N})
+            function ∂(::MonomialBasis{$Dim, 0}, ::Val{$N})
                 function basis!(b, x)
                     b[1] = zero(_get_underlying_type(x))
                     return nothing
@@ -12,7 +12,7 @@ for N in (:1, :2, :3)
     end
 end
 
-function ∂(::MonomialBasis{1,Deg}, ::Val{N}) where {Deg,N}
+function ∂(::MonomialBasis{1, Deg}, ::Val{N}) where {Deg, N}
     function basis!(b, x)
         x_type = _get_underlying_type(x)
         b[1] = zero(x_type)
@@ -27,7 +27,7 @@ function ∂(::MonomialBasis{1,Deg}, ::Val{N}) where {Deg,N}
     return ℒMonomialBasis(1, Deg, basis!)
 end
 
-function ∂(::MonomialBasis{2,1}, ::Val{1})
+function ∂(::MonomialBasis{2, 1}, ::Val{1})
     function basis!(b, x)
         T = eltype(x)
         b[1] = zero(T)
@@ -38,7 +38,7 @@ function ∂(::MonomialBasis{2,1}, ::Val{1})
     return ℒMonomialBasis(2, 1, basis!)
 end
 
-function ∂(::MonomialBasis{2,1}, ::Val{2})
+function ∂(::MonomialBasis{2, 1}, ::Val{2})
     function basis!(b, x)
         T = eltype(x)
         b[1] = zero(T)
@@ -49,7 +49,7 @@ function ∂(::MonomialBasis{2,1}, ::Val{2})
     return ℒMonomialBasis(2, 1, basis!)
 end
 
-function ∂(::MonomialBasis{2,2}, ::Val{1})
+function ∂(::MonomialBasis{2, 2}, ::Val{1})
     function basis!(b, x)
         T = eltype(x)
         b[1] = zero(T)
@@ -63,7 +63,7 @@ function ∂(::MonomialBasis{2,2}, ::Val{1})
     return ℒMonomialBasis(2, 2, basis!)
 end
 
-function ∂(::MonomialBasis{2,2}, ::Val{2})
+function ∂(::MonomialBasis{2, 2}, ::Val{2})
     function basis!(b, x)
         T = eltype(x)
         b[1] = zero(T)
@@ -77,7 +77,7 @@ function ∂(::MonomialBasis{2,2}, ::Val{2})
     return ℒMonomialBasis(2, 2, basis!)
 end
 
-function ∂(::MonomialBasis{3,1}, ::Val{1})
+function ∂(::MonomialBasis{3, 1}, ::Val{1})
     function basis!(b, x)
         T = eltype(x)
         b[1] = zero(T)
@@ -89,7 +89,7 @@ function ∂(::MonomialBasis{3,1}, ::Val{1})
     return ℒMonomialBasis(3, 1, basis!)
 end
 
-function ∂(::MonomialBasis{3,1}, ::Val{2})
+function ∂(::MonomialBasis{3, 1}, ::Val{2})
     function basis!(b, x)
         T = eltype(x)
         b[1] = zero(T)
@@ -101,7 +101,7 @@ function ∂(::MonomialBasis{3,1}, ::Val{2})
     return ℒMonomialBasis(3, 1, basis!)
 end
 
-function ∂(::MonomialBasis{3,1}, ::Val{3})
+function ∂(::MonomialBasis{3, 1}, ::Val{3})
     function basis!(b, x)
         T = eltype(x)
         b[1] = zero(T)
@@ -113,7 +113,7 @@ function ∂(::MonomialBasis{3,1}, ::Val{3})
     return ℒMonomialBasis(3, 1, basis!)
 end
 
-function ∂(::MonomialBasis{3,2}, ::Val{1})
+function ∂(::MonomialBasis{3, 2}, ::Val{1})
     function basis!(b, x)
         T = eltype(x)
         b[1] = zero(T)
@@ -131,7 +131,7 @@ function ∂(::MonomialBasis{3,2}, ::Val{1})
     return ℒMonomialBasis(3, 2, basis!)
 end
 
-function ∂(::MonomialBasis{3,2}, ::Val{2})
+function ∂(::MonomialBasis{3, 2}, ::Val{2})
     function basis!(b, x)
         T = eltype(x)
         b[1] = zero(T)
@@ -149,7 +149,7 @@ function ∂(::MonomialBasis{3,2}, ::Val{2})
     return ℒMonomialBasis(3, 2, basis!)
 end
 
-function ∂(::MonomialBasis{3,2}, ::Val{3})
+function ∂(::MonomialBasis{3, 2}, ::Val{3})
     function basis!(b, x)
         T = eltype(x)
         b[1] = zero(T)
@@ -169,12 +169,12 @@ end
 
 ## ∂²
 
-∂²(m::MonomialBasis{Dim,0}, n::Val{N}) where {Dim,N} = ∂(m, n)
-∂²(m::MonomialBasis{1,0}, n::Val{N}) where {N} = ∂(m, n)
+∂²(m::MonomialBasis{Dim, 0}, n::Val{N}) where {Dim, N} = ∂(m, n)
+∂²(m::MonomialBasis{1, 0}, n::Val{N}) where {N} = ∂(m, n)
 
 _∂²(x, n) = (n - 1) * n * x^(n - 2)
-_∂²(x::Union{AbstractArray,Tuple}, n) = (n - 1) * n * x[1]^(n - 2)
-function ∂²(::MonomialBasis{1,Deg}, ::Val{N}) where {Deg,N}
+_∂²(x::Union{AbstractArray, Tuple}, n) = (n - 1) * n * x[1]^(n - 2)
+function ∂²(::MonomialBasis{1, Deg}, ::Val{N}) where {Deg, N}
     function basis!(b, x)
         x_type = _get_underlying_type(x)
         b[1] = zero(x_type)
@@ -189,7 +189,7 @@ function ∂²(::MonomialBasis{1,Deg}, ::Val{N}) where {Deg,N}
     end
     return ℒMonomialBasis(1, Deg, basis!)
 end
-function ∂²(::MonomialBasis{1,1}, ::Val{N}) where {N}
+function ∂²(::MonomialBasis{1, 1}, ::Val{N}) where {N}
     function basis!(b, x)
         x_type = _get_underlying_type(x)
         b[1] = zero(x_type)
@@ -199,7 +199,7 @@ function ∂²(::MonomialBasis{1,1}, ::Val{N}) where {N}
     return ℒMonomialBasis(1, 1, basis!)
 end
 
-function ∂²(::MonomialBasis{2,1}, ::Val{1})
+function ∂²(::MonomialBasis{2, 1}, ::Val{1})
     function basis!(b, x)
         T = eltype(x)
         b[1] = zero(T)
@@ -210,7 +210,7 @@ function ∂²(::MonomialBasis{2,1}, ::Val{1})
     return ℒMonomialBasis(2, 1, basis!)
 end
 
-function ∂²(::MonomialBasis{2,1}, ::Val{2})
+function ∂²(::MonomialBasis{2, 1}, ::Val{2})
     function basis!(b, x)
         T = eltype(x)
         b[1] = zero(T)
@@ -221,7 +221,7 @@ function ∂²(::MonomialBasis{2,1}, ::Val{2})
     return ℒMonomialBasis(2, 1, basis!)
 end
 
-function ∂²(::MonomialBasis{2,2}, ::Val{1})
+function ∂²(::MonomialBasis{2, 2}, ::Val{1})
     function basis!(b, x)
         T = eltype(x)
         b[1] = zero(T)
@@ -235,7 +235,7 @@ function ∂²(::MonomialBasis{2,2}, ::Val{1})
     return ℒMonomialBasis(2, 2, basis!)
 end
 
-function ∂²(::MonomialBasis{2,2}, ::Val{2})
+function ∂²(::MonomialBasis{2, 2}, ::Val{2})
     function basis!(b, x)
         T = eltype(x)
         b[1] = zero(T)
@@ -249,7 +249,7 @@ function ∂²(::MonomialBasis{2,2}, ::Val{2})
     return ℒMonomialBasis(2, 2, basis!)
 end
 
-function ∂²(::MonomialBasis{3,1}, ::Val{1})
+function ∂²(::MonomialBasis{3, 1}, ::Val{1})
     function basis!(b, x)
         T = eltype(x)
         b[1] = zero(T)
@@ -261,7 +261,7 @@ function ∂²(::MonomialBasis{3,1}, ::Val{1})
     return ℒMonomialBasis(3, 1, basis!)
 end
 
-function ∂²(::MonomialBasis{3,1}, ::Val{2})
+function ∂²(::MonomialBasis{3, 1}, ::Val{2})
     function basis!(b, x)
         T = eltype(x)
         b[1] = zero(T)
@@ -273,7 +273,7 @@ function ∂²(::MonomialBasis{3,1}, ::Val{2})
     return ℒMonomialBasis(3, 1, basis!)
 end
 
-function ∂²(::MonomialBasis{3,1}, ::Val{3})
+function ∂²(::MonomialBasis{3, 1}, ::Val{3})
     function basis!(b, x)
         T = eltype(x)
         b[1] = zero(T)
@@ -285,7 +285,7 @@ function ∂²(::MonomialBasis{3,1}, ::Val{3})
     return ℒMonomialBasis(3, 1, basis!)
 end
 
-function ∂²(::MonomialBasis{3,2}, ::Val{1})
+function ∂²(::MonomialBasis{3, 2}, ::Val{1})
     function basis!(b, x)
         T = eltype(x)
         b[1] = zero(T)
@@ -303,7 +303,7 @@ function ∂²(::MonomialBasis{3,2}, ::Val{1})
     return ℒMonomialBasis(3, 2, basis!)
 end
 
-function ∂²(::MonomialBasis{3,2}, ::Val{2})
+function ∂²(::MonomialBasis{3, 2}, ::Val{2})
     function basis!(b, x)
         T = eltype(x)
         b[1] = zero(T)
@@ -321,7 +321,7 @@ function ∂²(::MonomialBasis{3,2}, ::Val{2})
     return ℒMonomialBasis(3, 2, basis!)
 end
 
-function ∂²(::MonomialBasis{3,2}, ::Val{3})
+function ∂²(::MonomialBasis{3, 2}, ::Val{3})
     function basis!(b, x)
         T = eltype(x)
         T = eltype(x)
@@ -341,7 +341,7 @@ function ∂²(::MonomialBasis{3,2}, ::Val{3})
 end
 
 # Add normal derivative functionality
-function ∂_normal(mb::MonomialBasis{Dim,Deg}, normal::AbstractVector) where {Dim,Deg}
+function ∂_normal(mb::MonomialBasis{Dim, Deg}, normal::AbstractVector) where {Dim, Deg}
     function basis!(b, x)
         T = eltype(x)
 
@@ -373,8 +373,8 @@ function ∂_normal(mb::MonomialBasis{Dim,Deg}, normal::AbstractVector) where {D
 end
 
 # Hermite derivative - works for both regular and Neumann boundaries
-function ∂_Hermite(mb::MonomialBasis{Dim,Deg}, dim::Int) where {Dim,Deg}
-    function hermite_derivative(x, normal=nothing)
+function ∂_Hermite(mb::MonomialBasis{Dim, Deg}, dim::Int) where {Dim, Deg}
+    function hermite_derivative(x, normal = nothing)
         result = ones(eltype(x), binomial(Dim + Deg, Dim))
 
         if normal === nothing || all(iszero, normal)

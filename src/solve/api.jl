@@ -46,8 +46,8 @@ Build weights for interior-only problems (no boundary conditions).
 Creates empty BoundaryData to indicate all interior points.
 """
 function _build_weights(
-    data, eval_points, adjl, basis, ℒrbf, ℒmon, mon; batch_size::Int=10, device=CPU()
-)
+        data, eval_points, adjl, basis, ℒrbf, ℒmon, mon; batch_size::Int = 10, device = CPU()
+    )
     # Create empty boundary data for interior-only case
     TD = eltype(first(data))
     is_boundary = fill(false, length(data))
@@ -64,8 +64,8 @@ function _build_weights(
         ℒmon,
         mon,
         boundary_data;
-        batch_size=batch_size,
-        device=device,
+        batch_size = batch_size,
+        device = device,
     )
 end
 
@@ -82,19 +82,19 @@ Build weights for problems with boundary conditions using Hermite interpolation.
 Exact allocation: Dirichlet points get single entry, others get full stencil.
 """
 function _build_weights(
-    data,
-    eval_points,
-    adjl,
-    basis,
-    ℒrbf,
-    ℒmon,
-    mon,
-    is_boundary::Vector{Bool},
-    boundary_conditions::Vector{<:BoundaryCondition},
-    normals::Vector{<:AbstractVector};
-    batch_size::Int=10,
-    device=CPU(),
-)
+        data,
+        eval_points,
+        adjl,
+        basis,
+        ℒrbf,
+        ℒmon,
+        mon,
+        is_boundary::Vector{Bool},
+        boundary_conditions::Vector{<:BoundaryCondition},
+        normals::Vector{<:AbstractVector};
+        batch_size::Int = 10,
+        device = CPU(),
+    )
     boundary_data = BoundaryData(is_boundary, boundary_conditions, normals)
     return build_weights_kernel(
         data,
@@ -105,8 +105,8 @@ function _build_weights(
         ℒmon,
         mon,
         boundary_data;
-        batch_size=batch_size,
-        device=device,
+        batch_size = batch_size,
+        device = device,
     )
 end
 
@@ -121,15 +121,15 @@ This eliminates repetitive _build_weights methods across operator files.
 Note: Type constraint removed to avoid circular dependency with operators.jl
 """
 function _build_weights(
-    ℒ,  # Any operator type
-    data::AbstractVector,
-    eval_points::AbstractVector,
-    adjl::AbstractVector,
-    basis::AbstractRadialBasis,
-    is_boundary::Vector{Bool},
-    boundary_conditions::Vector{<:BoundaryCondition},
-    normals::Vector{<:AbstractVector},
-)
+        ℒ,  # Any operator type
+        data::AbstractVector,
+        eval_points::AbstractVector,
+        adjl::AbstractVector,
+        basis::AbstractRadialBasis,
+        is_boundary::Vector{Bool},
+        boundary_conditions::Vector{<:BoundaryCondition},
+        normals::Vector{<:AbstractVector},
+    )
     dim = length(first(data))
     mon = MonomialBasis(dim, basis.poly_deg)
     ℒmon = ℒ(mon)
