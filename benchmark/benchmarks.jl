@@ -11,7 +11,7 @@ y = f.(x)
 
 const SUITE = BenchmarkGroup()
 
-basis = PHS(3; poly_deg=2)
+basis = PHS(3; poly_deg = 2)
 
 ∂x = partial(x, 1, 1, basis)
 SUITE["Partial"] = let s = BenchmarkGroup()
@@ -63,7 +63,7 @@ end
 
 for poly_deg in 0:2
     for basis in (IMQ, Gaussian)
-        rbf = basis(; poly_deg=poly_deg)
+        rbf = basis(; poly_deg = poly_deg)
         benchmark_basis(SUITE, rbf, poly_deg, x1, x2)
     end
     for basis in (PHS1, PHS3, PHS5, PHS7)

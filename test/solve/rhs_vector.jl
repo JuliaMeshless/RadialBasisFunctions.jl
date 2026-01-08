@@ -13,7 +13,7 @@ import RadialBasisFunctions as RBF
 
 @testset "RHS Vector Building" begin
     # Test setup
-    basis = PHS(3; poly_deg=1)
+    basis = PHS(3; poly_deg = 1)
     data_2d = [[0.0, 0.0], [0.5, 0.3], [1.0, 0.0], [0.5, 0.7]]
     eval_point_2d = [0.5, 0.5]
     k = 4

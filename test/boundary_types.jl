@@ -28,7 +28,7 @@ import RadialBasisFunctions as RBF
         @test !is_neumann(dirichlet)
         @test !is_robin(dirichlet)
 
-        # Neumann condition: α=0, β=1  
+        # Neumann condition: α=0, β=1
         neumann = BoundaryCondition(0.0, 1.0)
         @test !is_dirichlet(neumann)
         @test is_neumann(neumann)
@@ -162,7 +162,7 @@ end
 
         # Check data copying
         @test hsd.data[1] == [1.0, 0.0]  # global_data[2]
-        @test hsd.data[2] == [2.0, 0.0]  # global_data[3]  
+        @test hsd.data[2] == [2.0, 0.0]  # global_data[3]
         @test hsd.data[3] == [0.0, 1.0]  # global_data[4]
 
         # Check boundary flags
@@ -170,9 +170,9 @@ end
         @test hsd.is_boundary[2] == false  # is_boundary[3]
         @test hsd.is_boundary[3] == true   # is_boundary[4]
 
-        # Check boundary conditions  
+        # Check boundary conditions
         # neighbors[1] = 2 -> is_boundary[2] = true -> boundary_idx = global_to_boundary[2] = 1 -> boundary_conditions[1] = Dirichlet()
-        @test is_dirichlet(hsd.boundary_conditions[1])  # boundary_conditions[1] is Dirichlet  
+        @test is_dirichlet(hsd.boundary_conditions[1])  # boundary_conditions[1] is Dirichlet
         @test is_internal(hsd.boundary_conditions[2])  # Default for interior
         # neighbors[3] = 4 -> is_boundary[4] = true -> boundary_idx = global_to_boundary[4] = 2 -> boundary_conditions[2] = Neumann()
         @test is_neumann(hsd.boundary_conditions[3])  # boundary_conditions[2] is Neumann

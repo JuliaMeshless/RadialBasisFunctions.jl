@@ -12,8 +12,8 @@ PDE solving and optimization where point positions are fixed.
 # Scalar-valued operator: y = W * x
 # Pullback: Δx = W' * Δy
 function ChainRulesCore.rrule(
-    ::typeof(_eval_op), op::RadialBasisOperator, x::AbstractVector
-)
+        ::typeof(_eval_op), op::RadialBasisOperator, x::AbstractVector
+    )
     y = _eval_op(op, x)
 
     function _eval_op_pullback(Δy)
@@ -29,10 +29,10 @@ end
 # The weights are stored as a tuple of sparse matrices, one per dimension.
 # Pullback: Δx = Σ_d W[d]' * Δy[:,d]
 function ChainRulesCore.rrule(
-    ::typeof(_eval_op),
-    op::RadialBasisOperator{<:VectorValuedOperator{D}},
-    x::AbstractVector,
-) where {D}
+        ::typeof(_eval_op),
+        op::RadialBasisOperator{<:VectorValuedOperator{D}},
+        x::AbstractVector,
+    ) where {D}
     y = _eval_op(op, x)
 
     function _eval_op_vector_pullback(Δy)
@@ -52,8 +52,8 @@ end
 # In-place scalar operator: mul!(y, W, x)
 # For completeness, though in-place operations are tricky with AD
 function ChainRulesCore.rrule(
-    ::typeof(_eval_op), op::RadialBasisOperator, y::AbstractVector, x::AbstractVector
-)
+        ::typeof(_eval_op), op::RadialBasisOperator, y::AbstractVector, x::AbstractVector
+    )
     result = _eval_op(op, y, x)
 
     function _eval_op_inplace_pullback(Δy)

@@ -10,7 +10,7 @@ import RadialBasisFunctions as RBF
 
 @testset "Collocation Matrix Building" begin
     # Test setup
-    basis = PHS(3; poly_deg=1)
+    basis = PHS(3; poly_deg = 1)
     data_2d = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]
     k = 4
     mon = MonomialBasis(2, 1)

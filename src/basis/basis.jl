@@ -16,7 +16,7 @@ abstract type AbstractRadialBasis <: AbstractBasis end
 
 Partial derivative operator functor. Construct with `∂(basis, dim)`.
 """
-struct ∂{B<:AbstractRadialBasis}
+struct ∂{B <: AbstractRadialBasis}
     basis::B
     dim::Int
 end
@@ -26,7 +26,7 @@ end
 
 Gradient operator functor. Construct with `∇(basis)`.
 """
-struct ∇{B<:AbstractRadialBasis}
+struct ∇{B <: AbstractRadialBasis}
     basis::B
 end
 
@@ -35,7 +35,7 @@ end
 
 Second partial derivative operator functor. Construct with `∂²(basis, dim)`.
 """
-struct ∂²{B<:AbstractRadialBasis}
+struct ∂²{B <: AbstractRadialBasis}
     basis::B
     dim::Int
 end
@@ -45,7 +45,7 @@ end
 
 Laplacian operator functor. Construct with `∇²(basis)`.
 """
-struct ∇²{B<:AbstractRadialBasis}
+struct ∇²{B <: AbstractRadialBasis}
     basis::B
 end
 
@@ -55,7 +55,7 @@ end
 Directional derivative operator functor. Construct with `D(basis, v)`.
 Computes the derivative of the basis function in direction `v`.
 """
-struct D{B<:AbstractRadialBasis,V}
+struct D{B <: AbstractRadialBasis, V}
     basis::B
     v::V
 end
@@ -65,7 +65,7 @@ end
 
 Directional second derivative operator functor. Construct with `D²(basis, v1, v2)`.
 """
-struct D²{B<:AbstractRadialBasis,V1,V2}
+struct D²{B <: AbstractRadialBasis, V1, V2}
     basis::B
     v1::V1
     v2::V2
@@ -77,7 +77,7 @@ end
 Hessian operator functor. Construct with `H(basis)`.
 Returns the Hessian matrix of the basis function.
 """
-struct H{B<:AbstractRadialBasis}
+struct H{B <: AbstractRadialBasis}
     basis::B
 end
 

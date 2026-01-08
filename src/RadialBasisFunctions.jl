@@ -69,7 +69,7 @@ export Regrid, regrid
 
 # Some consts and aliases
 const Δ = ∇² # some people like this notation for the Laplacian
-const AVOID_INF = 1e-16
+const AVOID_INF = 1.0e-16
 
 using PrecompileTools
 @setup_workload begin
@@ -81,10 +81,10 @@ using PrecompileTools
         basis_funcs = [
             IMQ(1),
             Gaussian(1),
-            PHS(1; poly_deg=0),
-            PHS(3; poly_deg=0),
-            PHS(5; poly_deg=1),
-            PHS(7; poly_deg=2),
+            PHS(1; poly_deg = 0),
+            PHS(3; poly_deg = 0),
+            PHS(5; poly_deg = 1),
+            PHS(7; poly_deg = 2),
         ]
 
         for b in basis_funcs

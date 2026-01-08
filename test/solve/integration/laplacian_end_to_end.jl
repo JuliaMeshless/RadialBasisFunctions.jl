@@ -18,7 +18,7 @@ import RadialBasisFunctions as RBF
     normals = compute_normals(domain_2d, is_boundary)
     @test length(normals) == n_boundary
 
-    basis_phs = RBF.PHS(3; poly_deg=2)
+    basis_phs = RBF.PHS(3; poly_deg = 2)
     mon = RBF.MonomialBasis(2, 2)
 
     k = RBF.autoselect_k(domain_2d, basis_phs)
@@ -41,8 +41,8 @@ import RadialBasisFunctions as RBF
         is_boundary,
         boundary_conditions,
         normals;
-        k=k,
-        adjl=adjl,
+        k = k,
+        adjl = adjl,
     )
 
     @testset "Test 1: Weights Calculation (Forward Problem)" begin
@@ -57,8 +57,8 @@ import RadialBasisFunctions as RBF
         max_error = maximum(abs.(laplacian_error))
         rms_error = sqrt(mean(laplacian_error .^ 2))
 
-        @test max_error < 1e-10
-        @test rms_error < 1e-11
+        @test max_error < 1.0e-10
+        @test rms_error < 1.0e-11
     end
 
     @testset "Test 2: Manufactured Solution (Inverse Problem)" begin
@@ -68,7 +68,7 @@ import RadialBasisFunctions as RBF
 
         laplacian_result = L_op(u_values)
         rhs_error = abs.(rhs - laplacian_result)
-        @test maximum(rhs_error) < 1e-10
+        @test maximum(rhs_error) < 1.0e-10
 
         solution = L_op.weights \ rhs
 
@@ -76,7 +76,7 @@ import RadialBasisFunctions as RBF
         max_error = maximum(abs.(solution_error))
         rms_error = sqrt(mean(solution_error .^ 2))
 
-        @test max_error < 1e-9  # Machine precision
-        @test rms_error < 1e-10  # RMS should be even better
+        @test max_error < 1.0e-9  # Machine precision
+        @test rms_error < 1.0e-10  # RMS should be even better
     end
 end

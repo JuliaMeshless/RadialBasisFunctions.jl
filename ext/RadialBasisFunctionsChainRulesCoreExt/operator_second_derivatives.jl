@@ -125,7 +125,7 @@ function grad_partial_phs1_wrt_x(dim::Int)
     function grad_Lφ_x(x, xi)
         r = euclidean(x, xi)
         # At r=0, PHS1 and its derivatives are 0, so gradient contribution is 0
-        if r < 1e-12
+        if r < 1.0e-12
             return zero(x)
         end
         δ = x .- xi
@@ -168,7 +168,7 @@ function grad_laplacian_phs1_wrt_x()
     function grad_Lφ_x(x, xi)
         r = euclidean(x, xi)
         # At r=0, PHS1 Laplacian is singular, return 0 for gradient
-        if r < 1e-12
+        if r < 1.0e-12
             return zero(x)
         end
         r3 = r^3

@@ -38,16 +38,16 @@ laplacian(data::AbstractVector; kw...) = RadialBasisOperator(Laplacian(), data; 
 
 # Backward compatible positional signatures
 function laplacian(data::AbstractVector, basis::AbstractRadialBasis; kw...)
-    RadialBasisOperator(Laplacian(), data; basis=basis, kw...)
+    return RadialBasisOperator(Laplacian(), data; basis = basis, kw...)
 end
 
 function laplacian(
-    data::AbstractVector,
-    eval_points::AbstractVector,
-    basis::AbstractRadialBasis=PHS(3; poly_deg=2);
-    kw...,
-)
-    RadialBasisOperator(Laplacian(), data; eval_points=eval_points, basis=basis, kw...)
+        data::AbstractVector,
+        eval_points::AbstractVector,
+        basis::AbstractRadialBasis = PHS(3; poly_deg = 2);
+        kw...,
+    )
+    return RadialBasisOperator(Laplacian(), data; eval_points = eval_points, basis = basis, kw...)
 end
 
 # Hermite backward compatibility (positional boundary arguments)
@@ -58,17 +58,17 @@ Build a Hermite-compatible `RadialBasisOperator` for the Laplacian.
 Maintains backward compatibility with the positional argument API.
 """
 function laplacian(
-    data::AbstractVector,
-    eval_points::AbstractVector,
-    basis::AbstractRadialBasis,
-    is_boundary::Vector{Bool},
-    boundary_conditions::Vector{<:BoundaryCondition},
-    normals::Vector{<:AbstractVector};
-    kw...,
-)
-    hermite = (is_boundary=is_boundary, bc=boundary_conditions, normals=normals)
+        data::AbstractVector,
+        eval_points::AbstractVector,
+        basis::AbstractRadialBasis,
+        is_boundary::Vector{Bool},
+        boundary_conditions::Vector{<:BoundaryCondition},
+        normals::Vector{<:AbstractVector};
+        kw...,
+    )
+    hermite = (is_boundary = is_boundary, bc = boundary_conditions, normals = normals)
     return RadialBasisOperator(
-        Laplacian(), data; eval_points=eval_points, basis=basis, hermite=hermite, kw...
+        Laplacian(), data; eval_points = eval_points, basis = basis, hermite = hermite, kw...
     )
 end
 

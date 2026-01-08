@@ -22,7 +22,7 @@ end
     ∂(y, z)
     @test y ≈ ∂.weights * z
 
-    ∇ = gradient(x, PHS(3; poly_deg=2))
+    ∇ = gradient(x, PHS(3; poly_deg = 2))
     y_mat = Matrix{Float64}(undef, N, 2)
     ∇(y_mat, z)
     @test y_mat[:, 1] ≈ ∇.weights[1] * z
@@ -39,7 +39,7 @@ end
     @test ∂.weights ≈ correct_weights
     @test is_cache_valid(∂)
 
-    ∇ = gradient(x, PHS(3; poly_deg=2))
+    ∇ = gradient(x, PHS(3; poly_deg = 2))
     correct_weights = copy.(∇.weights)
     ∇.weights[1] .= rand(size(∇.weights[1]))
     ∇.weights[2] .= rand(size(∇.weights[2]))
@@ -52,7 +52,7 @@ end
 @testset "RadialBasisOperator Constructors" begin
     # Test positional eval_points + basis constructor (operators.jl lines 114-125)
     x2 = SVector{2}.(HaltonPoint(2)[101:150])
-    op = RadialBasisOperator(Partial(1, 1), x, x2, PHS(3; poly_deg=2))
+    op = RadialBasisOperator(Partial(1, 1), x, x2, PHS(3; poly_deg = 2))
     @test op isa RadialBasisOperator
     @test length(op.eval_points) == 50
 end
@@ -71,13 +71,13 @@ end
 @testset "Printing" begin
     ∂ = partial(x, 1, 1)
     @test repr(∂) == """
-RadialBasisOperator
-├─Operator: ∂ⁿf/∂xᵢ (n = 1, i = 1)
-├─Data type: StaticArraysCore.SVector{2, Float64}
-├─Number of points: 100
-├─Stencil size: 12
-└─Basis: Polyharmonic spline (r³) with degree 2 polynomial augmentation
-"""
+        RadialBasisOperator
+        ├─Operator: ∂ⁿf/∂xᵢ (n = 1, i = 1)
+        ├─Data type: StaticArraysCore.SVector{2, Float64}
+        ├─Number of points: 100
+        ├─Stencil size: 12
+        └─Basis: Polyharmonic spline (r³) with degree 2 polynomial augmentation
+        """
 
     @test RBF.print_op(∂.ℒ) == "∂ⁿf/∂xᵢ (n = 1, i = 1)"
 end

@@ -37,14 +37,14 @@ u_fine = op(u_coarse)
 ```
 """
 function regrid(data::AbstractVector, eval_points::AbstractVector; kw...)
-    RadialBasisOperator(Regrid(), data; eval_points=eval_points, kw...)
+    return RadialBasisOperator(Regrid(), data; eval_points = eval_points, kw...)
 end
 
 # Backward compatible positional signature
 function regrid(
-    data::AbstractVector, eval_points::AbstractVector, basis::AbstractRadialBasis; kw...
-)
-    RadialBasisOperator(Regrid(), data; eval_points=eval_points, basis=basis, kw...)
+        data::AbstractVector, eval_points::AbstractVector, basis::AbstractRadialBasis; kw...
+    )
+    return RadialBasisOperator(Regrid(), data; eval_points = eval_points, basis = basis, kw...)
 end
 
 # pretty printing

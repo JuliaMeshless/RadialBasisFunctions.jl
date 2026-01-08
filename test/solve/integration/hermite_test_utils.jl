@@ -2,8 +2,8 @@ using Test
 using StaticArraysCore
 using LinearAlgebra
 
-function create_2d_unit_square_domain(spacing::Float64=0.05; randomize=false)
-    domain_2d = SVector{2,Float64}[]
+function create_2d_unit_square_domain(spacing::Float64 = 0.05; randomize = false)
+    domain_2d = SVector{2, Float64}[]
     for x in 0.0:spacing:1.0
         for y in 0.0:spacing:1.0
             # Check if point is on boundary
@@ -27,16 +27,16 @@ function identify_boundary_points(domain_2d)
     is_boundary = zeros(Bool, length(domain_2d))
     for i in eachindex(domain_2d)
         if domain_2d[i][1] == 0.0 ||
-            domain_2d[i][1] == 1.0 ||
-            domain_2d[i][2] == 0.0 ||
-            domain_2d[i][2] == 1.0
+                domain_2d[i][1] == 1.0 ||
+                domain_2d[i][2] == 0.0 ||
+                domain_2d[i][2] == 1.0
             is_boundary[i] = true
         end
     end
     return is_boundary
 end
 
-function calculate_normal(point::SVector{2,Float64})
+function calculate_normal(point::SVector{2, Float64})
     n = SVector(0.0, 0.0)
     if point[1] == 0.0
         n += SVector(-1.0, 0.0)
@@ -52,7 +52,7 @@ function calculate_normal(point::SVector{2,Float64})
 end
 
 function compute_normals(domain_2d, is_boundary)
-    normals = SVector{2,Float64}[]
+    normals = SVector{2, Float64}[]
     for i in eachindex(domain_2d)
         if is_boundary[i]
             push!(normals, calculate_normal(domain_2d[i]))
@@ -93,8 +93,8 @@ function setup_test_boundary_conditions(domain_2d, is_boundary, RBF)
 end
 
 function construct_u_values_hermite(
-    domain_2d, is_boundary, boundary_conditions, normals, RBF
-)
+        domain_2d, is_boundary, boundary_conditions, normals, RBF
+    )
     u_values = [target_function(p[1], p[2]) for p in domain_2d]
     bnd_counter = 0
     for i in eachindex(domain_2d)
@@ -133,8 +133,8 @@ Generic RHS construction for integration tests with Hermite interpolation.
 - For gradient operator: Tuple of (rhs_x, rhs_y) vectors
 """
 function construct_rhs(
-    operator_func, domain_2d, is_boundary, boundary_conditions, normals, RBF
-)
+        operator_func, domain_2d, is_boundary, boundary_conditions, normals, RBF
+    )
     N = length(domain_2d)
 
     # Check if operator_func returns a tuple (gradient case)

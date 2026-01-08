@@ -17,7 +17,7 @@ import RadialBasisFunctions as RBF
 @testset "Solve Utils Integration Tests" begin
 
     # Test setup - basis function and data configuration
-    basis_phs = PHS(3; poly_deg=1)
+    basis_phs = PHS(3; poly_deg = 1)
     basis_imq = IMQ(1.0)
     basis_gaussian = Gaussian(1.0)
 
@@ -25,7 +25,7 @@ import RadialBasisFunctions as RBF
     hermite_compatible_bases = [basis_phs]  # TODO: Add basis_imq, basis_gaussian when operators are implemented
     all_bases = [basis_phs, basis_imq, basis_gaussian]  # For standard tests
 
-    # Test data configurations using SVector format (consistent with codebase) 
+    # Test data configurations using SVector format (consistent with codebase)
     data_1d = [SVector(0.0), SVector(0.5), SVector(1.0), SVector(1.5), SVector(2.0)]
     data_2d = [
         SVector(0.0, 0.0),
@@ -68,7 +68,7 @@ import RadialBasisFunctions as RBF
             )
             nnz_per_row_mixed = [
                 row_offsets_mixed[i + 1] - row_offsets_mixed[i] for
-                i in 1:length(adjl_simple)
+                    i in 1:length(adjl_simple)
             ]
 
             @test length(nnz_per_row_mixed) == length(adjl_simple)
@@ -85,7 +85,7 @@ import RadialBasisFunctions as RBF
 
             @test length(global_to_boundary) == length(is_boundary)
             @test global_to_boundary[2] == 1  # First boundary point
-            @test global_to_boundary[4] == 2  # Second boundary point  
+            @test global_to_boundary[4] == 2  # Second boundary point
             @test global_to_boundary[6] == 3  # Third boundary point
             @test global_to_boundary[1] == 0  # Interior point (not used)
             @test global_to_boundary[3] == 0  # Interior point (not used)

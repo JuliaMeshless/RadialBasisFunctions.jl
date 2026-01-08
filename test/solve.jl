@@ -6,7 +6,7 @@ using Test
 
 x = [SVector(1.0, 2.0), SVector(2.0, 1.0), SVector(1.5, 0.0)]
 
-rb = PHS(3; poly_deg=1)
+rb = PHS(3; poly_deg = 1)
 mb = MonomialBasis(2, 1)
 L(x) = RBF.∂(x, 1, 1)
 Lrb = L(rb)

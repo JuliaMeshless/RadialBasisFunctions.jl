@@ -18,7 +18,7 @@ using SparseArrays
 @testset "Hermite Integration Tests" begin
 
     # Setup: Currently only PHS supports Hermite interpolation
-    basis_phs = PHS(3; poly_deg=2)
+    basis_phs = PHS(3; poly_deg = 2)
 
     # Common 2D test geometry for integration tests
     function create_2d_domain()
@@ -38,7 +38,7 @@ using SparseArrays
             SVector(1.0, 0.0),   # boundary
         ]
         is_boundary = [
-            true, false, false, false, false, false, false, false, false, false, false, true
+            true, false, false, false, false, false, false, false, false, false, false, true,
         ]
         boundary_bcs = [RBF.Dirichlet(), RBF.Dirichlet()]
         boundary_normals = [SVector(1.0, 0.0), SVector(-1.0, 0.0)]
@@ -62,7 +62,7 @@ using SparseArrays
             interior_results = result[interior_indices]
 
             @test all(isfinite.(result))
-            @test all(abs.(interior_results .- 4.0) .< 1e-10)
+            @test all(abs.(interior_results .- 4.0) .< 1.0e-10)
 
             # At Dirichlet boundary points, operator returns function value
             boundary_indices = findall(is_boundary)
@@ -84,7 +84,7 @@ using SparseArrays
 
             # Interior points: Laplacian should be exactly 2.0
             interior_indices = findall(.!is_boundary)
-            @test all(abs.(result[interior_indices] .- 2.0) .< 1e-10)
+            @test all(abs.(result[interior_indices] .- 2.0) .< 1.0e-10)
         end
 
         @testset "Laplacian of Quadratic (Mixed Dirichlet/Neumann)" begin
@@ -101,7 +101,7 @@ using SparseArrays
 
             # Interior points: Laplacian should be exactly 2.0
             interior_indices = findall(.!is_boundary)
-            @test all(abs.(result[interior_indices] .- 2.0) .< 1e-10)
+            @test all(abs.(result[interior_indices] .- 2.0) .< 1.0e-10)
         end
 
         @testset "Laplacian of Quadratic (Robin BCs)" begin
@@ -119,7 +119,7 @@ using SparseArrays
 
             # Interior points: Laplacian should be exactly 2.0
             interior_indices = findall(.!is_boundary)
-            @test all(abs.(result[interior_indices] .- 2.0) .< 1e-10)
+            @test all(abs.(result[interior_indices] .- 2.0) .< 1.0e-10)
         end
 
         @testset "Gradient of Linear Function (Dirichlet BCs)" begin
@@ -133,8 +133,8 @@ using SparseArrays
 
             # At interior points, gradient should be exactly (2, 3)
             interior_indices = findall(.!is_boundary)
-            @test all(abs.(result[interior_indices, 1] .- 2.0) .< 1e-10)
-            @test all(abs.(result[interior_indices, 2] .- 3.0) .< 1e-10)
+            @test all(abs.(result[interior_indices, 1] .- 2.0) .< 1.0e-10)
+            @test all(abs.(result[interior_indices, 2] .- 3.0) .< 1.0e-10)
         end
 
         @testset "Gradient of Linear Function (Neumann BCs)" begin
@@ -149,8 +149,8 @@ using SparseArrays
 
             # Interior points: gradient should be exactly (0, 3)
             interior_indices = findall(.!is_boundary)
-            @test all(abs.(result[interior_indices, 1] .- 0.0) .< 1e-10)
-            @test all(abs.(result[interior_indices, 2] .- 3.0) .< 1e-10)
+            @test all(abs.(result[interior_indices, 1] .- 0.0) .< 1.0e-10)
+            @test all(abs.(result[interior_indices, 2] .- 3.0) .< 1.0e-10)
         end
 
         @testset "Partial ∂/∂x of Linear Function" begin
@@ -165,7 +165,7 @@ using SparseArrays
 
             # Interior points: exact ∂/∂x = 2.0
             interior_indices = findall(.!is_boundary)
-            @test all(abs.(result[interior_indices] .- 2.0) .< 1e-10)
+            @test all(abs.(result[interior_indices] .- 2.0) .< 1.0e-10)
         end
 
         @testset "Partial ∂/∂y of Linear Function" begin
@@ -180,7 +180,7 @@ using SparseArrays
 
             # Interior points: exact ∂/∂y = 3.0
             interior_indices = findall(.!is_boundary)
-            @test all(abs.(result[interior_indices] .- 3.0) .< 1e-10)
+            @test all(abs.(result[interior_indices] .- 3.0) .< 1.0e-10)
         end
 
         @testset "Directional Derivative (Single Direction)" begin
@@ -196,7 +196,7 @@ using SparseArrays
 
             # Interior points: exact directional derivative = 2.0
             interior_indices = findall(.!is_boundary)
-            @test all(abs.(result[interior_indices] .- 2.0) .< 1e-10)
+            @test all(abs.(result[interior_indices] .- 2.0) .< 1.0e-10)
         end
 
         @testset "Directional Derivative (Per-Point Vectors)" begin
@@ -212,7 +212,7 @@ using SparseArrays
 
             # Interior points: exact directional derivative = 2.0
             interior_indices = findall(.!is_boundary)
-            @test all(abs.(result[interior_indices] .- 2.0) .< 1e-10)
+            @test all(abs.(result[interior_indices] .- 2.0) .< 1.0e-10)
         end
 
         @testset "Zero Function Gives Zero" begin
@@ -224,7 +224,7 @@ using SparseArrays
 
             # Interior points should give exactly zero
             interior_indices = findall(.!is_boundary)
-            @test all(abs.(result[interior_indices]) .< 1e-10)
+            @test all(abs.(result[interior_indices]) .< 1.0e-10)
         end
     end
 
@@ -234,14 +234,14 @@ using SparseArrays
             data = [SVector(0.1 * i, 0.1 * j) for i in 1:3 for j in 1:3]
             is_boundary = fill(false, length(data))
             bcs = BoundaryCondition{Float64}[]  # Empty - properly typed
-            normals = SVector{2,Float64}[]  # Empty
+            normals = SVector{2, Float64}[]  # Empty
 
             op = laplacian(data, data, basis_phs, is_boundary, bcs, normals)
             u = [x[1]^2 + x[2]^2 for x in data]
             result = op(u)
 
             # All points should give Laplacian ≈ 4.0
-            @test all(abs.(result .- 4.0) .< 1e-9)
+            @test all(abs.(result .- 4.0) .< 1.0e-9)
         end
     end
 end

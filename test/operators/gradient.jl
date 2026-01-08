@@ -16,7 +16,7 @@ x = SVector{2}.(HaltonPoint(2)[1:N])
 y = f.(x)
 
 @testset "First Derivative gradients" begin
-    ∇ = gradient(x, PHS(3; poly_deg=2))
+    ∇ = gradient(x, PHS(3; poly_deg = 2))
     ∇y = ∇(y)
     @test ∇y isa Matrix
     @test size(∇y) == (N, 2)
@@ -26,7 +26,7 @@ end
 
 @testset "Different Evaluation Points" begin
     x2 = map(x -> SVector{2}(rand(2)), 1:100)
-    ∇ = gradient(x, x2, PHS(3; poly_deg=2))
+    ∇ = gradient(x, x2, PHS(3; poly_deg = 2))
     ∇y = ∇(y)
     @test ∇y isa Matrix
     @test size(∇y) == (100, 2)
@@ -35,7 +35,7 @@ end
 end
 
 @testset "In-place gradient evaluation" begin
-    ∇ = gradient(x, PHS(3; poly_deg=2))
+    ∇ = gradient(x, PHS(3; poly_deg = 2))
     out = Matrix{Float64}(undef, N, 2)
     ∇(out, y)
     @test mean_percent_error(out[:, 1], df_dx.(x)) < 10

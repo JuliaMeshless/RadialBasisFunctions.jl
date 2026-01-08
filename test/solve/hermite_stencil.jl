@@ -15,7 +15,7 @@ import RadialBasisFunctions as RBF
     eval_point = SVector(0.5)  # evaluate at middle point
 
     # Create basis and operators
-    basis = RBF.PHS(3; poly_deg=1)  # PHS3 with linear polynomial
+    basis = RBF.PHS(3; poly_deg = 1)  # PHS3 with linear polynomial
     mon = RBF.MonomialBasis(1, 1)  # 1D linear monomial basis
 
     @testset "Standard stencil (no boundary points)" begin

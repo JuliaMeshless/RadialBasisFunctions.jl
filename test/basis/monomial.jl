@@ -13,7 +13,7 @@ end
     foreach(inputs) do x
         m = MonomialBasis(1, 0)
         @test m isa MonomialBasis
-        @test typeof(m) <: MonomialBasis{1,0}
+        @test typeof(m) <: MonomialBasis{1, 0}
 
         # standard evaluation
         @test all(isapprox.(m(x), [1]))
@@ -31,7 +31,7 @@ end
     foreach(inputs) do x
         m = MonomialBasis(1, 1)
         @test m isa MonomialBasis
-        @test typeof(m) <: MonomialBasis{1,1}
+        @test typeof(m) <: MonomialBasis{1, 1}
 
         # standard evaluation
         @test all(isapprox.(m(x), [1, 2]))
@@ -54,7 +54,7 @@ end
     foreach(inputs) do x
         m = MonomialBasis(1, 2)
         @test m isa MonomialBasis
-        @test typeof(m) <: MonomialBasis{1,2}
+        @test typeof(m) <: MonomialBasis{1, 2}
 
         # standard evaluation
         @test all(isapprox.(m(x), [1, 2, 4]))
@@ -71,7 +71,7 @@ end
 
     m = MonomialBasis(2, 0)
     @test m isa MonomialBasis
-    @test typeof(m) <: MonomialBasis{2,0}
+    @test typeof(m) <: MonomialBasis{2, 0}
 
     # standard evaluation
     @test all(isapprox.(m(x), [1]))
@@ -89,7 +89,7 @@ end
 
     m = MonomialBasis(2, 1)
     @test m isa MonomialBasis
-    @test typeof(m) <: MonomialBasis{2,1}
+    @test typeof(m) <: MonomialBasis{2, 1}
 
     # standard evaluation
     @test all(isapprox.(m(x), [1, 2, 3]))
@@ -107,7 +107,7 @@ end
 
     m = MonomialBasis(2, 2)
     @test m isa MonomialBasis
-    @test typeof(m) <: MonomialBasis{2,2}
+    @test typeof(m) <: MonomialBasis{2, 2}
 
     # standard evaluation
     @test all(isapprox.(m(x), [1, 2, 3, 6, 4, 9]))
@@ -125,7 +125,7 @@ end
 
     m = MonomialBasis(2, 3)
     @test m isa MonomialBasis
-    @test typeof(m) <: MonomialBasis{2,3}
+    @test typeof(m) <: MonomialBasis{2, 3}
 
     # standard evaluation
     @test all(isapprox.(m(x), [8, 12, 4, 18, 6, 2, 27, 9, 3, 1]))
@@ -143,7 +143,7 @@ end
 
     m = MonomialBasis(3, 0)
     @test m isa MonomialBasis
-    @test typeof(m) <: MonomialBasis{3,0}
+    @test typeof(m) <: MonomialBasis{3, 0}
 
     # standard evaluation
     @test all(isapprox.(m(x), [1]))
@@ -163,7 +163,7 @@ end
 
     m = MonomialBasis(3, 1)
     @test m isa MonomialBasis
-    @test typeof(m) <: MonomialBasis{3,1}
+    @test typeof(m) <: MonomialBasis{3, 1}
 
     # standard evaluation
     @test all(isapprox.(m(x), [1, 2, 3, 4]))
@@ -183,7 +183,7 @@ end
 
     m = MonomialBasis(3, 2)
     @test m isa MonomialBasis
-    @test typeof(m) <: MonomialBasis{3,2}
+    @test typeof(m) <: MonomialBasis{3, 2}
 
     # standard evaluation
     @test all(isapprox.(m(x), [1, 2, 3, 4, 6, 8, 12, 4, 9, 16]))

@@ -9,7 +9,7 @@ import RadialBasisFunctions as RBF
 partial_y_func(x, y) = 2.0 * y
 
 @testset "Partial ∂/∂y End-to-End with Hermite" begin
-    domain_2d = create_2d_unit_square_domain(0.05; randomize=true)
+    domain_2d = create_2d_unit_square_domain(0.05; randomize = true)
     @test length(domain_2d) == 441
 
     is_boundary = identify_boundary_points(domain_2d)
@@ -18,7 +18,7 @@ partial_y_func(x, y) = 2.0 * y
     @test n_boundary == 80
     @test n_interior == 361
 
-    basis_phs = RBF.PHS(3; poly_deg=2)
+    basis_phs = RBF.PHS(3; poly_deg = 2)
     mon = RBF.MonomialBasis(2, 2)
 
     k = RBF.autoselect_k(domain_2d, basis_phs)
@@ -40,8 +40,8 @@ partial_y_func(x, y) = 2.0 * y
         is_boundary,
         boundary_conditions,
         normals;
-        k=k,
-        adjl=adjl,
+        k = k,
+        adjl = adjl,
     )
 
     @testset "Test 1: Weights Calculation (Forward Problem)" begin
@@ -60,8 +60,8 @@ partial_y_func(x, y) = 2.0 * y
         max_error = maximum(errors)
         rms_error = sqrt(mean(errors .^ 2))
 
-        @test max_error < 1e-10  # Machine precision
-        @test rms_error < 1e-11  # RMS should be even better
+        @test max_error < 1.0e-10  # Machine precision
+        @test rms_error < 1.0e-11  # RMS should be even better
     end
 
     @testset "Test 2: RHS Consistency Verification" begin
@@ -73,7 +73,7 @@ partial_y_func(x, y) = 2.0 * y
         rhs_error = abs.(rhs - partial_y_result)
         max_rhs_error = maximum(rhs_error)
 
-        @test max_rhs_error < 1e-10
+        @test max_rhs_error < 1.0e-10
     end
 
     @testset "Test 3: Solution of PDE (Inverse Problem)" begin
@@ -87,7 +87,7 @@ partial_y_func(x, y) = 2.0 * y
         max_error = maximum(abs.(solution_error))
         rms_error = sqrt(mean(solution_error .^ 2))
 
-        @test max_error < 1e-7  # Machine precision
-        @test rms_error < 1e-8  # RMS should be even better
+        @test max_error < 1.0e-7  # Machine precision
+        @test rms_error < 1.0e-8  # RMS should be even better
     end
 end

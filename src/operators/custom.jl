@@ -4,7 +4,7 @@
 Custom operator that applies a user-defined function to basis functions.
 The function `ℒ` should accept a basis and return a callable `(x, xᵢ) -> value`.
 """
-struct Custom{F<:Function} <: AbstractOperator
+struct Custom{F <: Function} <: AbstractOperator
     ℒ::F
 end
 (op::Custom)(basis) = op.ℒ(basis)
@@ -36,38 +36,38 @@ op = custom(data, basis -> ∇²(basis) ∘ ∇²(basis))
 ```
 """
 function custom(data::AbstractVector, ℒ::Function; kw...)
-    RadialBasisOperator(Custom(ℒ), data; kw...)
+    return RadialBasisOperator(Custom(ℒ), data; kw...)
 end
 
 # Backward compatible positional signatures
 function custom(data::AbstractVector, ℒ::Function, basis::AbstractRadialBasis; kw...)
-    RadialBasisOperator(Custom(ℒ), data; basis=basis, kw...)
+    return RadialBasisOperator(Custom(ℒ), data; basis = basis, kw...)
 end
 
 function custom(
-    data::AbstractVector,
-    eval_points::AbstractVector,
-    ℒ::Function,
-    basis::AbstractRadialBasis=PHS(3; poly_deg=2);
-    kw...,
-)
-    RadialBasisOperator(Custom(ℒ), data; eval_points=eval_points, basis=basis, kw...)
+        data::AbstractVector,
+        eval_points::AbstractVector,
+        ℒ::Function,
+        basis::AbstractRadialBasis = PHS(3; poly_deg = 2);
+        kw...,
+    )
+    return RadialBasisOperator(Custom(ℒ), data; eval_points = eval_points, basis = basis, kw...)
 end
 
 # Hermite backward compatibility (positional boundary arguments)
 function custom(
-    data::AbstractVector,
-    eval_points::AbstractVector,
-    ℒ::Function,
-    basis::AbstractRadialBasis,
-    is_boundary::Vector{Bool},
-    boundary_conditions::Vector{<:BoundaryCondition},
-    normals::Vector{<:AbstractVector};
-    kw...,
-)
-    hermite = (is_boundary=is_boundary, bc=boundary_conditions, normals=normals)
+        data::AbstractVector,
+        eval_points::AbstractVector,
+        ℒ::Function,
+        basis::AbstractRadialBasis,
+        is_boundary::Vector{Bool},
+        boundary_conditions::Vector{<:BoundaryCondition},
+        normals::Vector{<:AbstractVector};
+        kw...,
+    )
+    hermite = (is_boundary = is_boundary, bc = boundary_conditions, normals = normals)
     return RadialBasisOperator(
-        Custom(ℒ), data; eval_points=eval_points, basis=basis, hermite=hermite, kw...
+        Custom(ℒ), data; eval_points = eval_points, basis = basis, hermite = hermite, kw...
     )
 end
 

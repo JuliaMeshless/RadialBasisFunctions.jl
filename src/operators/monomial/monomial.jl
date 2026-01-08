@@ -1,21 +1,21 @@
-struct ℒMonomialBasis{Dim,Deg,F<:Function}
+struct ℒMonomialBasis{Dim, Deg, F <: Function}
     f::F
-    function ℒMonomialBasis(dim::T, deg::T, f) where {T<:Int}
+    function ℒMonomialBasis(dim::T, deg::T, f) where {T <: Int}
         if deg < 0
             throw(ArgumentError("Monomial basis must have non-negative degree"))
         end
-        return new{dim,deg,typeof(f)}(f)
+        return new{dim, deg, typeof(f)}(f)
     end
 end
-function (ℒmon::ℒMonomialBasis{Dim,Deg})(x) where {Dim,Deg}
+function (ℒmon::ℒMonomialBasis{Dim, Deg})(x) where {Dim, Deg}
     b = ones(_get_underlying_type(x), binomial(Dim + Deg, Dim))
     ℒmon(b, x)
     return b
 end
 (m::ℒMonomialBasis)(b, x) = m.f(b, x)
 
-degree(::ℒMonomialBasis{Dim,Deg}) where {Dim,Deg} = Deg
-dim(::ℒMonomialBasis{Dim,Deg}) where {Dim,Deg} = Dim
+degree(::ℒMonomialBasis{Dim, Deg}) where {Dim, Deg} = Deg
+dim(::ℒMonomialBasis{Dim, Deg}) where {Dim, Deg} = Dim
 
 # include partial definitions for monomials
 include("partial.jl")
@@ -25,14 +25,14 @@ include("partial.jl")
 ∂(basis::MonomialBasis, ::Val{N}) where {N} = _∂(basis, 1, Val(N))
 ∂²(basis::MonomialBasis, ::Val{N}) where {N} = _∂(basis, 2, Val(N))
 
-function _∂(m::MonomialBasis{Dim,Deg}, order::Int, ::Val{N}) where {Dim,Deg,N}
+function _∂(m::MonomialBasis{Dim, Deg}, order::Int, ::Val{N}) where {Dim, Deg, N}
     me = ∂exponents(m, order, N)
     ids = monomial_recursive_list(m, me)
     basis! = build_monomial_basis(ids, me.coeffs)
     return ℒMonomialBasis(Dim, Deg, basis!)
 end
 
-function ∇(m::MonomialBasis{Dim,Deg}) where {Dim,Deg}
+function ∇(m::MonomialBasis{Dim, Deg}) where {Dim, Deg}
     ∂¹_ops = ntuple(dim -> ∂(m, dim), Dim)
     function basis!(b, x)
         for (i, ∂¹!) in enumerate(∂¹_ops)
@@ -43,7 +43,7 @@ function ∇(m::MonomialBasis{Dim,Deg}) where {Dim,Deg}
     return ℒMonomialBasis(Dim, Deg, basis!)
 end
 
-function ∇²(m::MonomialBasis{Dim,Deg}) where {Dim,Deg}
+function ∇²(m::MonomialBasis{Dim, Deg}) where {Dim, Deg}
     ∂²_ops = ntuple(dim -> ∂²(m, dim), Dim)
     function basis!(b, x)
         cache = ones(eltype(x), size(b))
@@ -57,12 +57,12 @@ function ∇²(m::MonomialBasis{Dim,Deg}) where {Dim,Deg}
     return ℒMonomialBasis(Dim, Deg, basis!)
 end
 
-struct Monomial{E,C}
+struct Monomial{E, C}
     exponents::E
     coeffs::C
 end
 
-function build_monomial_basis(ids::Vector{Vector{Vector{T}}}, c::Vector{T}) where {T<:Int}
+function build_monomial_basis(ids::Vector{Vector{Vector{T}}}, c::Vector{T}) where {T <: Int}
     function basis!(db::AbstractVector{B}, x::AbstractVector) where {B}
         db .= one(eltype(x))
         # TODO optimize - allocations
@@ -75,7 +75,7 @@ function build_monomial_basis(ids::Vector{Vector{Vector{T}}}, c::Vector{T}) wher
     return basis!
 end
 
-function ∂exponents(::MonomialBasis{Dim,Deg}, order::T, dim::T) where {Dim,Deg,T<:Int}
+function ∂exponents(::MonomialBasis{Dim, Deg}, order::T, dim::T) where {Dim, Deg, T <: Int}
     ex = collect(Vector{Int}, multiexponents(Dim + 1, Deg))
     N = binomial(Dim + Deg, Deg)
     e = [zeros(Int, N) for _ in 1:Dim]
@@ -99,7 +99,7 @@ function ∂exponents!(e, c, order::Int, dim::Int)
     return ∂exponents!(e, c, order - 1, dim)
 end
 
-function monomial_recursive_list(::MonomialBasis{Dim,Deg}, me::Monomial) where {Dim,Deg}
+function monomial_recursive_list(::MonomialBasis{Dim, Deg}, me::Monomial) where {Dim, Deg}
     return Vector{Vector{Int}}[
         Vector{Int}[findall(x -> x >= i, me.exponents[j]) for i in 1:(Deg)] for j in 1:(Dim)
     ]
@@ -109,6 +109,6 @@ function monomial_recursive_list(m::MonomialBasis, me::Vector{<:Monomial})
     return [monomial_recursive_list(m, me[i]) for i in eachindex(me)]
 end
 
-function Base.show(io::IO, ::ℒMonomialBasis{Dim,Deg}) where {Dim,Deg}
+function Base.show(io::IO, ::ℒMonomialBasis{Dim, Deg}) where {Dim, Deg}
     return print(io, "ℒMonomialBasis of degree $(Deg) in $(Dim) dimensions")
 end
