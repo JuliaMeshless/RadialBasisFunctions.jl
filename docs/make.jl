@@ -12,10 +12,9 @@ makedocs(;
     sitename = "RadialBasisFunctions.jl",
     repo = Documenter.Remotes.GitHub("JuliaMeshless", "RadialBasisFunctions.jl"),
     format = DocumenterVitepress.MarkdownVitepress(;
-        repo = "https://github.com/JuliaMeshless/RadialBasisFunctions.jl",
+        repo = "github.com/JuliaMeshless/RadialBasisFunctions.jl",
         devbranch = "main",
         devurl = "dev",
-        deploy_url = "https://juliameshless.github.io/RadialBasisFunctions.jl",
         build_vitepress = (!haskey(ENV, "VITEPRESS_DEV")),
     ),
     pages = [
