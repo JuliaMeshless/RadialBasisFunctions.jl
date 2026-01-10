@@ -18,8 +18,8 @@ jobs:
         name: Documentation
         runs-on: ubuntu-latest
         concurrency:
-            group: docs-${{ github.workflow }}-${{ github.ref }}
-            cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+            group: docs
+            cancel-in-progress: false
         steps:
             - uses: actions/checkout@v5
             - uses: julia-actions/setup-julia@v2
