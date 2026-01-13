@@ -1,0 +1,77 @@
+# RadialBasisFunctions.jl
+
+> High-performance radial basis function interpolation and differential operators for Julia.
+
+## Alternative Names / Keywords
+
+- RBF interpolation
+- RBF-FD (Radial Basis Function Finite Differences)
+- Meshfree methods / Meshless methods
+- Scattered data interpolation
+- Kernel methods
+- Polyharmonic splines
+- Inverse multiquadric
+- Gaussian RBF
+- Collocation methods
+- Local RBF methods
+
+## Quick Start
+
+```julia
+using RadialBasisFunctions, StaticArrays
+
+# Create scattered 2D points (MUST be Vector{AbstractVector}, not Matrix)
+points = [SVector{2}(rand(2)) for _ in 1:500]
+f(x) = sin(4x[1]) * cos(3x[2])
+values = f.(points)
+
+# Interpolation
+interp = Interpolator(points, values)
+interp(SVector(0.5, 0.5))  # Evaluate at any point
+
+# Differential operators
+lap = laplacian(points)       # Laplacian (∇²f)
+grad = gradient(points)       # Gradient (∇f)
+∂x = partial(points, 1, 1)    # ∂f/∂x₁
+
+lap_values = lap(values)      # Apply to data
+```
+
+## Key Types
+
+- `Interpolator` - Global RBF interpolation
+- `RadialBasisOperator` - Differential operators with lazy weight computation
+- `PHS(n)` - Polyharmonic spline basis (n = 1, 3, 5, 7)
+- `IMQ(ε)` - Inverse multiquadric basis
+- `Gaussian(ε)` - Gaussian basis
+
+## Main Functions
+
+### Interpolation
+- `Interpolator(points, values)` - Create global interpolator
+- `regrid(source, target)` - Interpolate between point sets
+
+### Differential Operators
+- `laplacian(points)` - Laplacian (∇²f)
+- `gradient(points)` - Gradient (∇f)
+- `partial(points, order, dim)` - Partial derivative
+- `directional(points, v)` - Directional derivative
+- `custom(points, op_func)` - User-defined operator
+
+## Common Pitfalls
+
+1. **Data format**: Use `Vector{AbstractVector}` not Matrix
+   - Wrong: `rand(100, 2)`
+   - Right: `[SVector{2}(rand(2)) for _ in 1:100]`
+
+2. **PHS order**: Must be odd (1, 3, 5, or 7)
+
+3. **Shape parameter**: Must be positive for IMQ/Gaussian
+
+4. **Stencil size**: Default is auto-selected; increase `k` for better accuracy
+
+## Documentation
+
+- Stable: https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable
+- Dev: https://JuliaMeshless.github.io/RadialBasisFunctions.jl/dev
+- Source: https://github.com/JuliaMeshless/RadialBasisFunctions.jl

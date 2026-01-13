@@ -36,6 +36,8 @@ Build a `RadialBasisOperator` for the directional derivative (∇f⋅v).
 normals = [normalize(p) for p in data]
 ∂_n = directional(data, normals)
 ```
+
+See also: [`gradient`](@ref), [`partial`](@ref), [`laplacian`](@ref)
 """
 function directional(data::AbstractVector, v::AbstractVector; kw...)
     Dim = length(first(data))

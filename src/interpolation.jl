@@ -16,6 +16,8 @@ end
     function Interpolator(x, y, basis::B=PHS())
 
 Construct a radial basis interpolator.
+
+See also: [`regrid`](@ref) for local stencil-based interpolation between point sets.
 """
 function Interpolator(x, y, basis::B = PHS()) where {B <: AbstractRadialBasis}
     dim = length(first(x))

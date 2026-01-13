@@ -19,6 +19,10 @@
 
 ---
 
+*Also known as: meshfree methods, meshless methods, RBF-FD (Radial Basis Function Finite Differences), scattered data interpolation, kernel methods, polyharmonic splines, collocation methods*
+
+---
+
 ## Why RadialBasisFunctions.jl?
 
 - **Truly Meshless** - Work directly with scattered points, no mesh generation required

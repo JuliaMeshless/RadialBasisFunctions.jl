@@ -33,6 +33,8 @@ op = laplacian(data; basis=PHS(5; poly_deg=3))
 # With different evaluation points
 op = laplacian(data; eval_points=eval_pts)
 ```
+
+See also: [`partial`](@ref), [`gradient`](@ref), [`directional`](@ref)
 """
 laplacian(data::AbstractVector; kw...) = RadialBasisOperator(Laplacian(), data; kw...)
 
