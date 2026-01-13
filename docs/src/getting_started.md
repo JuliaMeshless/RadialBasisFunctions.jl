@@ -47,13 +47,16 @@ abs.(y_true .- y_new)
 
 ## Operators
 
-This package also provides an API for operators. There is support for several built-in operators along with support for user-defined operators. Currently, we have implementations for
+This package also provides an API for operators. There is support for several built-in operators along with support for user-defined operators:
 
 - partial derivative (1st and 2nd order)
 - laplacian
-- gradient
+- gradient / jacobian
+- directional derivative
+- custom (user-defined) operators
+- regridding (interpolation between point sets)
 
-but we plan to add more in the future. Please make and issue or pull request for additional operators.
+Please make an issue or pull request for additional operators.
 
 ### Partial Derivative
 
@@ -102,6 +105,116 @@ all(df_x.(x) .≈ result[:, 1])
 
 ```@example overview
 all(df_y.(x) .≈ result[:, 2])
+```
+
+### Directional Derivative
+
+Compute derivatives in any direction using `directional`. The direction can be constant or vary spatially:
+
+```@example overview
+using LinearAlgebra: normalize
+
+# Constant direction (same for all points)
+v = normalize([1.0, 1.0])
+dir_op = directional(x, v)
+result = dir_op(y)
+typeof(result)
+```
+
+The direction can also vary per-point, useful for computing normal derivatives:
+
+```@example overview
+# Spatially-varying direction (e.g., radial directions)
+normals = [normalize(collect(p)) for p in x]
+normal_deriv = directional(x, normals)
+typeof(normal_deriv(y))
+```
+
+### Custom Operators
+
+Define your own differential operators using `custom`. The function should accept a basis and return a callable `(x, xc) -> value`. Here's an example that creates an interpolation-like operator:
+
+```@example overview
+# Custom operator that evaluates the basis function
+op = custom(x, basis -> (x, xc) -> basis(x, xc))
+typeof(op)
+```
+
+For more complex differential operators, use `operator algebra` (see below) to combine built-in operators.
+
+### Regridding
+
+Interpolate field values from one set of points to another using `regrid`:
+
+```@example overview
+# Target points (fine grid, different from original x)
+x_fine = [SVector{2}(rand(2)) for _ in 1:500]
+
+# Build regridding operator from x to x_fine
+rg = regrid(x, x_fine)
+y_fine = rg(y)
+length(y_fine)
+```
+
+### Operator Algebra
+
+Operators can be combined using `+` and `-`:
+
+```@example overview
+# Create individual operators
+∂x = partial(x, 1, 1)
+∂y = partial(x, 1, 2)
+
+# Combine them: ∂f/∂x + ∂f/∂y
+combined = ∂x + ∂y
+result = combined(y)
+typeof(result)
+```
+
+## Boundary Conditions (Hermite Interpolation)
+
+For PDE applications, operators support Hermite interpolation with boundary conditions. This is useful when you need to enforce Dirichlet, Neumann, or Robin conditions at boundary nodes.
+
+### Boundary Condition Types
+
+- `Dirichlet()` - Value specified: ``u = g``
+- `Neumann()` - Normal derivative specified: ``\partial u/\partial n = g``
+- `Robin(α, β)` - Mixed condition: ``\alpha u + \beta \partial u/\partial n = g``
+- `Internal()` - Interior point (no boundary condition)
+
+### Example with Hermite Interpolation
+
+```@example overview
+using LinearAlgebra: norm
+
+# Define boundary information
+is_boundary = [norm(p) > 0.9 for p in x]  # Points near unit circle boundary
+boundary_indices = findall(is_boundary)
+
+# Create boundary conditions (Dirichlet on boundary)
+bcs = [Dirichlet() for _ in boundary_indices]
+
+# Normal vectors at boundary points
+normals = [normalize(collect(x[i])) for i in boundary_indices]
+
+# Build operator with Hermite interpolation
+lap_hermite = laplacian(x; hermite=(
+    is_boundary=is_boundary,
+    bc=bcs,
+    normals=normals
+))
+typeof(lap_hermite)
+```
+
+## Advanced: Virtual Operators
+
+Virtual operators (`∂virtual`) use finite difference formulas on interpolated values at offset points. This can be useful for certain numerical schemes:
+
+```@example overview
+# Virtual partial derivative in x-direction with spacing Δ=0.01
+virtual_dx = ∂virtual(x, 1, 0.01)
+result = virtual_dx(y)
+typeof(result)
 ```
 
 ## Current Limitations

@@ -67,10 +67,6 @@ julia --project=benchmark benchmark/benchmarks.jl
 
 5. **Utilities** (`src/utils.jl`):
    - `find_neighbors()` - k-nearest neighbor search using NearestNeighbors.jl
-   - `find_neighbors_pn()` - k-nearest neighbor search using PointNeighbors.jl (alternative)
-     - Uses multiple dispatch to automatically select optimal backend
-     - GPU arrays (CuArray): FullGridCellList with DynamicVectorOfVectors (via CUDA extension)
-     - CPU arrays: DictionaryCellList (default)
    - `reorder_points!()` - Point ordering utilities
 
 ### Key Design Patterns
@@ -80,9 +76,6 @@ julia --project=benchmark benchmark/benchmarks.jl
 - **Modular Design**: Basis functions, operators, and solvers are decoupled
 - **Type System**: Heavy use of parametric types for performance
 - **Neighbor Search**: Local support domains via k-nearest neighbors for efficiency
-  - Two implementations available: NearestNeighbors.jl (default) and PointNeighbors.jl
-  - Use `use_pointneighbors=true` in operator constructors to enable PointNeighbors.jl
-  - PointNeighbors.jl automatically detects GPU arrays (CuArray) and uses GPU-compatible backends
 
 ### Data Requirements
 
@@ -107,8 +100,6 @@ The package requires `Vector{AbstractVector}` input format (not matrices). Each 
 
 ## Important Development Notes
 
-- The package requires Julia 1.8+ (see Project.toml compatibility)
+- The package requires Julia 1.10+ (see Project.toml compatibility)
 - Uses KernelAbstractions.jl for GPU/CPU parallelization
 - Data must be in `Vector{AbstractVector}` format (not matrices) - each point needs inferrable dimension (e.g., `SVector{2,Float64}`)
-- Two neighbor search backends available: NearestNeighbors.jl (default) and PointNeighbors.jl (`use_pointneighbors=true`)
-- PointNeighbors.jl automatically handles GPU arrays with appropriate backends
