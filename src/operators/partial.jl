@@ -35,6 +35,8 @@ Build a `RadialBasisOperator` for a partial derivative.
 # Second derivative in y-direction
 ∂²y = partial(data, 2, 2; basis=PHS(5; poly_deg=4))
 ```
+
+See also: [`laplacian`](@ref), [`gradient`](@ref), [`directional`](@ref)
 """
 function partial(data::AbstractVector, order::Int, dim::Int; kw...)
     return RadialBasisOperator(Partial(order, dim), data; kw...)

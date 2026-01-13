@@ -11,11 +11,21 @@ abstract type AbstractPHS <: AbstractRadialBasis end
     function PHS(n::T=3; poly_deg::T=2) where {T<:Int}
 
 Convienience contructor for polyharmonic splines.
+
+# Arguments
+- `n`: Order of the spline (1, 3, 5, or 7). Higher = smoother.
+- `poly_deg`: Polynomial augmentation degree (default: 2 for quadratic).
+
+See also: [`IMQ`](@ref), [`Gaussian`](@ref)
 """
 function PHS(n::T = 3; poly_deg::T = 2) where {T <: Int}
     check_poly_deg(poly_deg)
     if iseven(n) || n > 7
-        throw(ArgumentError("n must be 1, 3, 5, or 7. (n = $n)"))
+        throw(
+            ArgumentError(
+                "n must be 1, 3, 5, or 7 (got n=$n). Use PHS(3) for cubic or PHS(5) for quintic.",
+            ),
+        )
     end
     n == 1 && return PHS1(poly_deg)
     n == 3 && return PHS3(poly_deg)

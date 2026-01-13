@@ -44,7 +44,11 @@ end
 
 function check_poly_deg(poly_deg)
     if poly_deg < -1
-        throw(ArgumentError("Augmented Monomial degree must be at least 0 (constant)."))
+        throw(
+            ArgumentError(
+                "poly_deg must be >= -1 (got $poly_deg). Use poly_deg=2 (default) for quadratic, poly_deg=0 for constant, or poly_deg=-1 to disable polynomial augmentation.",
+            ),
+        )
     end
     return nothing
 end

@@ -23,8 +23,8 @@ interp = Interpolator(points, values, PHS(3))
 
 # Create evaluation grid
 nx, ny = 100, 100
-xs = range(0, 1, length=nx)
-ys = range(0, 1, length=ny)
+xs = range(0, 1, length = nx)
+ys = range(0, 1, length = ny)
 grid_points = [SVector(x, y) for y in ys, x in xs]
 z_interp = [interp(p) for p in grid_points]
 
@@ -32,33 +32,41 @@ z_interp = [interp(p) for p in grid_points]
 z_true = [f(p) for p in grid_points]
 
 # Create figure
-fig = Figure(size=(1000, 400), fontsize=14)
+fig = Figure(size = (1000, 400), fontsize = 14)
 
 # Panel 1: Scattered data points
-ax1 = Axis3(fig[1, 1],
-    title="Scattered Data (300 points)",
-    xlabel="x", ylabel="y", zlabel="f(x,y)",
-    azimuth=0.4π,
-    elevation=0.15π)
-scatter!(ax1,
+ax1 = Axis3(
+    fig[1, 1],
+    title = "Scattered Data (300 points)",
+    xlabel = "x", ylabel = "y", zlabel = "f(x,y)",
+    azimuth = 0.4π,
+    elevation = 0.15π
+)
+scatter!(
+    ax1,
     [p[1] for p in points],
     [p[2] for p in points],
     values,
-    color=values,
-    colormap=:viridis,
-    markersize=8)
+    color = values,
+    colormap = :viridis,
+    markersize = 8
+)
 
 # Panel 2: RBF Interpolated surface
-ax2 = Axis3(fig[1, 2],
-    title="RBF Interpolation",
-    xlabel="x", ylabel="y", zlabel="f(x,y)",
-    azimuth=0.4π,
-    elevation=0.15π)
-surface!(ax2, xs, ys, z_interp,
-    colormap=:viridis,
-    shading=true)
+ax2 = Axis3(
+    fig[1, 2],
+    title = "RBF Interpolation",
+    xlabel = "x", ylabel = "y", zlabel = "f(x,y)",
+    azimuth = 0.4π,
+    elevation = 0.15π
+)
+surface!(
+    ax2, xs, ys, z_interp,
+    colormap = :viridis,
+    shading = true
+)
 
 # Save the figure
-save(joinpath(@__DIR__, "interpolation_demo.png"), fig, px_per_unit=2)
+save(joinpath(@__DIR__, "interpolation_demo.png"), fig, px_per_unit = 2)
 
 println("Saved interpolation_demo.png")

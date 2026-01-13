@@ -1,11 +1,27 @@
 ########################################################################################
 # Inverse Multiquadrics
+
+"""
+    IMQ(ε=1; poly_deg=2)
+
+Inverse Multiquadric radial basis function: `ϕ(r) = 1/√((εr)² + 1)`
+
+# Arguments
+- `ε`: Shape parameter (must be > 0). Smaller values = flatter basis.
+- `poly_deg`: Polynomial augmentation degree (default: 2).
+
+See also: [`PHS`](@ref), [`Gaussian`](@ref)
+"""
 struct IMQ{T, D <: Int} <: AbstractRadialBasis
     ε::T
     poly_deg::D
     function IMQ(ε::T = 1; poly_deg::D = 2) where {T, D <: Int}
         if all(ε .< 0)
-            throw(ArgumentError("Shape parameter should be > 0. (ε=$ε)"))
+            throw(
+                ArgumentError(
+                    "Shape parameter ε must be > 0 (got ε=$ε). Typical values range from 0.1 to 10.0.",
+                ),
+            )
         end
         return new{T, D}(ε, poly_deg)
     end

@@ -35,6 +35,8 @@ op = regrid(coarse, fine)
 u_coarse = sin.(getindex.(coarse, 1))
 u_fine = op(u_coarse)
 ```
+
+See also: [`Interpolator`](@ref)
 """
 function regrid(data::AbstractVector, eval_points::AbstractVector; kw...)
     return RadialBasisOperator(Regrid(), data; eval_points = eval_points, kw...)
