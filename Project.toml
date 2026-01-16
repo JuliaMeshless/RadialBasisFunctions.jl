@@ -4,7 +4,6 @@ version = "0.3.0"
 authors = ["Kyle Beggs"]
 
 [deps]
-CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 ChunkSplitters = "ae650224-84b6-46f8-82ea-d812ca08434e"
 Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
@@ -27,7 +26,6 @@ RadialBasisFunctionsChainRulesCoreExt = "ChainRulesCore"
 RadialBasisFunctionsMooncakeExt = ["ChainRulesCore", "Mooncake"]
 
 [compat]
-CairoMakie = "0.15.8"
 ChainRulesCore = "1.20"
 ChunkSplitters = "3"
 Combinatorics = "1"
