@@ -135,7 +135,7 @@ function plot_descent_path!(ax, start_point; color = :black)
     path = gradient_descent(start_point)
     lines!(ax, [p[1] for p in path], [p[2] for p in path]; color = color, linewidth = 2)
     scatter!(ax, [start_point[1]], [start_point[2]]; color = color, markersize = 10, marker = :circle)
-    scatter!(ax, [path[end][1]], [path[end][2]]; color = color, markersize = 12, marker = :star5)
+    return scatter!(ax, [path[end][1]], [path[end][2]]; color = color, markersize = 12, marker = :star5)
 end
 
 starting_points = [(0.3 + 0.4 * rand(), 0.2 + 0.4 * rand()) for _ in 1:20]
