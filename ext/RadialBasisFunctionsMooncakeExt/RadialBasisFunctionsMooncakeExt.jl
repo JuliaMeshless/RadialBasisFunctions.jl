@@ -62,6 +62,13 @@ Mooncake.@from_rrule(
     Tuple{typeof(_eval_op), RadialBasisOperator{<:VectorValuedOperator}, Vector{Float64}}
 )
 
+# Operator call syntax: op(x) - bypasses cache check issues
+Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{RadialBasisOperator, Vector{Float64}})
+
+Mooncake.@from_rrule(
+    Mooncake.DefaultCtx, Tuple{RadialBasisOperator{<:VectorValuedOperator}, Vector{Float64}}
+)
+
 # Basis function rules for common types (Float64 vectors)
 # These enable differentiating through weight computation if needed
 
