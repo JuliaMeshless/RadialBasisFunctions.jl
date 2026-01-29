@@ -31,7 +31,7 @@ if ENZYME_SUPPORTED_JULIA
 
             fd_grad = FD.grad(FD.central_fdm(5, 1), loss_lap, values)[1]
             @test !all(iszero, dv)
-            @test isapprox(dv, fd_grad; rtol=1e-4)
+            @test isapprox(dv, fd_grad; rtol = 1.0e-4)
         end
 
         @testset "Gradient Operator" begin
@@ -47,7 +47,7 @@ if ENZYME_SUPPORTED_JULIA
 
             fd_grad = FD.grad(FD.central_fdm(5, 1), loss_grad, values)[1]
             @test !all(iszero, dv)
-            @test isapprox(dv, fd_grad; rtol=1e-4)
+            @test isapprox(dv, fd_grad; rtol = 1.0e-4)
         end
 
         @testset "Partial Derivative Operator" begin
@@ -63,7 +63,7 @@ if ENZYME_SUPPORTED_JULIA
 
             fd_grad = FD.grad(FD.central_fdm(5, 1), loss_partial, values)[1]
             @test !all(iszero, dv)
-            @test isapprox(dv, fd_grad; rtol=1e-4)
+            @test isapprox(dv, fd_grad; rtol = 1.0e-4)
         end
     end
 
@@ -86,7 +86,7 @@ if ENZYME_SUPPORTED_JULIA
 
         fd_grad = FD.grad(FD.central_fdm(5, 1), loss_interp, values)[1]
         @test !all(iszero, dv)
-        @test isapprox(dv, fd_grad; rtol=1e-3)
+        @test isapprox(dv, fd_grad; rtol = 1.0e-3)
     end
 
     @testset "Enzyme Extension - Basis Function Differentiation" begin
@@ -104,7 +104,7 @@ if ENZYME_SUPPORTED_JULIA
 
                 fd_grad = FD.grad(FD.central_fdm(5, 1), loss_phs, x)[1]
                 @test !all(iszero, dx)
-                @test isapprox(dx, fd_grad; rtol=1e-4)
+                @test isapprox(dx, fd_grad; rtol = 1.0e-4)
             end
         end
 
@@ -120,7 +120,7 @@ if ENZYME_SUPPORTED_JULIA
 
             fd_grad = FD.grad(FD.central_fdm(5, 1), loss_imq, x)[1]
             @test !all(iszero, dx)
-            @test isapprox(dx, fd_grad; rtol=1e-4)
+            @test isapprox(dx, fd_grad; rtol = 1.0e-4)
         end
 
         @testset "Gaussian Basis Function" begin
@@ -135,7 +135,71 @@ if ENZYME_SUPPORTED_JULIA
 
             fd_grad = FD.grad(FD.central_fdm(5, 1), loss_gauss, x)[1]
             @test !all(iszero, dx)
-            @test isapprox(dx, fd_grad; rtol=1e-4)
+            @test isapprox(dx, fd_grad; rtol = 1.0e-4)
+        end
+    end
+    @testset "Enzyme Extension - Native Rules for _build_weights" begin
+        N = 25
+        points = [SVector{2}(0.1 + 0.8 * i / 5, 0.1 + 0.8 * j / 5) for i in 1:5 for j in 1:5]
+        adjl = RadialBasisFunctions.find_neighbors(points, 10)
+
+        @testset "Partial operator with PHS3" begin
+            basis = PHS(3; poly_deg = 2)
+            ℒ = Partial(1, 1)
+
+            function loss_partial_weights(pts)
+                pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
+                W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
+                return sum(W.nzval .^ 2)
+            end
+
+            pts_flat = vcat([collect(p) for p in points]...)
+            dpts = zeros(length(pts_flat))
+            Enzyme.autodiff(Reverse, loss_partial_weights, Active, Duplicated(pts_flat, dpts))
+
+            fd_grad = FD.grad(FD.central_fdm(5, 1), loss_partial_weights, pts_flat)[1]
+            @test !all(iszero, dpts)
+            @test isapprox(dpts, fd_grad; rtol = 1.0e-3)
+        end
+
+        @testset "Laplacian operator with PHS3" begin
+            basis = PHS(3; poly_deg = 2)
+            ℒ = Laplacian()
+
+            function loss_laplacian_weights(pts)
+                pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
+                W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
+                return sum(W.nzval .^ 2)
+            end
+
+            pts_flat = vcat([collect(p) for p in points]...)
+            dpts = zeros(length(pts_flat))
+            Enzyme.autodiff(Reverse, loss_laplacian_weights, Active, Duplicated(pts_flat, dpts))
+
+            fd_grad = FD.grad(FD.central_fdm(5, 1), loss_laplacian_weights, pts_flat)[1]
+            @test !all(iszero, dpts)
+            @test isapprox(dpts, fd_grad; rtol = 1.0e-3)
+        end
+
+        @testset "Different PHS orders" begin
+            for n in [1, 3, 5, 7]
+                basis = PHS(n; poly_deg = 1)
+                ℒ = Partial(1, 1)
+
+                function loss_phs_order(pts)
+                    pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
+                    W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
+                    return sum(W.nzval .^ 2)
+                end
+
+                pts_flat = vcat([collect(p) for p in points]...)
+                dpts = zeros(length(pts_flat))
+                Enzyme.autodiff(Reverse, loss_phs_order, Active, Duplicated(pts_flat, dpts))
+
+                fd_grad = FD.grad(FD.central_fdm(5, 1), loss_phs_order, pts_flat)[1]
+                @test !all(iszero, dpts) || n == 1  # PHS1 may have zero gradient for some configurations
+                @test isapprox(dpts, fd_grad; rtol = 1.0e-2)
+            end
         end
     end
 else

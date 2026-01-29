@@ -11,8 +11,6 @@ These are effectively Hessian-like terms of the basis function.
 
 using Distances: euclidean
 
-const AVOID_INF = RadialBasisFunctions.AVOID_INF
-
 # ============================================================================
 # PHS3: φ(r) = r³
 # First derivative: ∂φ/∂x[dim] = 3 * (x[dim] - xi[dim]) * r
@@ -330,65 +328,6 @@ end
 # ============================================================================
 # Dispatch functions to get correct second derivative based on operator/basis
 # ============================================================================
-
-"""
-    get_grad_Lrbf_wrt_x(ℒrbf, basis)
-
-Get the function that computes ∂/∂x[ℒφ(x, xi)] for the given operator and basis.
-"""
-function get_grad_Lrbf_wrt_x(ℒrbf, basis::PHS1)
-    # Detect operator type from the applied operator
-    # For now, we support Partial and Laplacian
-    return _get_grad_Lrbf_wrt_x_impl(ℒrbf, basis)
-end
-
-function get_grad_Lrbf_wrt_x(ℒrbf, basis::PHS3)
-    return _get_grad_Lrbf_wrt_x_impl(ℒrbf, basis)
-end
-
-function get_grad_Lrbf_wrt_x(ℒrbf, basis::PHS5)
-    return _get_grad_Lrbf_wrt_x_impl(ℒrbf, basis)
-end
-
-function get_grad_Lrbf_wrt_x(ℒrbf, basis::PHS7)
-    return _get_grad_Lrbf_wrt_x_impl(ℒrbf, basis)
-end
-
-function get_grad_Lrbf_wrt_xi(ℒrbf, basis::PHS1)
-    return _get_grad_Lrbf_wrt_xi_impl(ℒrbf, basis)
-end
-
-function get_grad_Lrbf_wrt_xi(ℒrbf, basis::PHS3)
-    return _get_grad_Lrbf_wrt_xi_impl(ℒrbf, basis)
-end
-
-function get_grad_Lrbf_wrt_xi(ℒrbf, basis::PHS5)
-    return _get_grad_Lrbf_wrt_xi_impl(ℒrbf, basis)
-end
-
-function get_grad_Lrbf_wrt_xi(ℒrbf, basis::PHS7)
-    return _get_grad_Lrbf_wrt_xi_impl(ℒrbf, basis)
-end
-
-# Implementation using operator traits
-# The applied operator ℒrbf is a closure - we detect type via inspection
-
-function _get_grad_Lrbf_wrt_x_impl(ℒrbf, basis::PHS1)
-    # Try to detect if it's a partial or laplacian
-    # This is a simplified approach - in practice you may need to store operator info
-    return error(
-        "Operator type detection not yet implemented for PHS1. Pass operator info explicitly.",
-    )
-end
-
-function _get_grad_Lrbf_wrt_xi_impl(ℒrbf, basis::PHS1)
-    return error(
-        "Operator type detection not yet implemented for PHS1. Pass operator info explicitly.",
-    )
-end
-
-# For now, provide explicit dispatch on operator types
-# These will be called from the backward pass with known operator types
 
 """
     grad_applied_partial_wrt_x(basis, dim)

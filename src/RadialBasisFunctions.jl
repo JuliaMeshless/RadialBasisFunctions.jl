@@ -32,6 +32,12 @@ include("solve/assembly.jl")
 include("solve/execution.jl")
 include("solve/api.jl")
 
+# Backward pass support for AD (used by ChainRulesCore and Enzyme extensions)
+include("solve/backward_cache.jl")
+include("solve/operator_second_derivatives.jl")
+include("solve/backward.jl")
+include("solve/forward_cache.jl")
+
 include("operators/operators.jl")
 export RadialBasisOperator, ScalarValuedOperator, VectorValuedOperator
 export update_weights!, is_cache_valid

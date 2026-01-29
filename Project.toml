@@ -20,11 +20,12 @@ SymRCM = "286e6d88-80af-4590-acc9-0001b223b9bd"
 
 [weakdeps]
 Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+EnzymeCore = "f151be2c-9161-43d2-8f72-0ddc2e39def7"
 Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
 
 [extensions]
 RadialBasisFunctionsChainRulesCoreExt = "ChainRulesCore"
-RadialBasisFunctionsEnzymeExt = ["ChainRulesCore", "Enzyme"]
+RadialBasisFunctionsEnzymeExt = ["Enzyme", "EnzymeCore"]
 RadialBasisFunctionsMooncakeExt = ["ChainRulesCore", "Mooncake"]
 
 [compat]
@@ -33,6 +34,7 @@ ChunkSplitters = "3"
 Combinatorics = "1"
 Distances = "0.9, 0.10"
 Enzyme = "0.13"
+EnzymeCore = "0.8"
 FiniteDifferences = "0.12.33"
 KernelAbstractions = "0.9.34"
 LinearAlgebra = "1"

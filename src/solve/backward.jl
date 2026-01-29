@@ -1,5 +1,5 @@
 #=
-Backward pass functions for _build_weights rrule.
+Backward pass functions for _build_weights differentiation rules.
 
 The backward pass computes:
   Given Δw (cotangent of weights), compute Δdata and Δeval_points
@@ -12,7 +12,7 @@ Key steps per stencil:
 5. Chain through collocation: accumulate to Δdata[neighbors]
 =#
 
-using LinearAlgebra: dot
+using LinearAlgebra: dot, mul!, axpy!
 
 """
     backward_linear_solve!(ΔA, Δb, Δw, cache)
@@ -48,16 +48,13 @@ function backward_linear_solve!(
     η = cache.A_mat \ Δλ
 
     # ΔA = -η * λᵀ (outer product, accumulated across operators)
-    # For symmetric A, we need to account for the structure
+    # Use BLAS mul! for O(n²) instead of scalar triple loop
     fill!(ΔA, zero(T))
     for op_idx in 1:num_ops
         η_vec = view(η, :, op_idx)
         λ_vec = view(cache.lambda, :, op_idx)
-        for j in 1:n
-            for i in 1:n
-                ΔA[i, j] -= η_vec[i] * λ_vec[j]
-            end
-        end
+        # Rank-1 update: ΔA -= η_vec * λ_vec' (outer product)
+        mul!(ΔA, η_vec, λ_vec', -one(T), one(T))
     end
 
     # Δb = η
@@ -100,8 +97,10 @@ function backward_collocation!(
     # Only upper triangle stored, but gradients flow both ways
     @inbounds for j in 1:k
         xj = data[neighbors[j]]
+        Δdata_j = Δdata[neighbors[j]]
         for i in 1:(j - 1)  # Skip diagonal (i == j) since φ(x,x) = 0 always, no gradient contribution
             xi = data[neighbors[i]]
+            Δdata_i = Δdata[neighbors[i]]
 
             # Get gradient of basis function
             ∇φ_ij = grad_φ(xi, xj)
@@ -111,10 +110,12 @@ function backward_collocation!(
             # We need to sum contributions from both triangles
             scale = ΔA[i, j] + ΔA[j, i]
 
-            # φ depends on xi - xj, so:
-            # ∂φ/∂xi = ∇φ, ∂φ/∂xj = -∇φ
-            Δdata[neighbors[i]] .+= scale .* ∇φ_ij
-            Δdata[neighbors[j]] .-= scale .* ∇φ_ij
+            # φ depends on xi - xj, so: ∂φ/∂xi = ∇φ, ∂φ/∂xj = -∇φ
+            # In-place accumulation avoids broadcast allocation
+            for d in eachindex(∇φ_ij)
+                Δdata_i[d] += scale * ∇φ_ij[d]
+                Δdata_j[d] -= scale * ∇φ_ij[d]
+            end
         end
     end
 
@@ -123,20 +124,23 @@ function backward_collocation!(
     if Deg > -1
         nmon = binomial(Dim + Deg, Deg)
         ∇p = zeros(T, nmon, Dim)
+        # Hoist functor construction outside loop
+        ∇mon = ∇(mon)
 
         @inbounds for i in 1:k
             xi = data[neighbors[i]]
-
-            # Compute gradient of all monomials at xi
-            ∇mon = RadialBasisFunctions.∇(mon)
             ∇mon(∇p, xi)
+            Δdata_i = Δdata[neighbors[i]]
 
             # Accumulate gradient from polynomial block
             for j in 1:nmon
                 # ΔA[i, k+j] contributes to Δxi via ∇pⱼ
                 # Also ΔA[k+j, i] from transpose block
                 scale = ΔA[i, k + j] + ΔA[k + j, i]
-                Δdata[neighbors[i]] .+= scale .* view(∇p, j, :)
+                # Use axpy! pattern for in-place accumulation without broadcast allocation
+                for d in 1:Dim
+                    Δdata_i[d] += scale * ∇p[j, d]
+                end
             end
         end
     end
@@ -145,7 +149,7 @@ function backward_collocation!(
 end
 
 """
-    backward_rhs!(Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, ℒ, k, dim)
+    backward_rhs_partial!(Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, dim, k, grad_Lφ_x, grad_Lφ_xi)
 
 Chain rule through RHS vector construction for Partial operator.
 
@@ -170,41 +174,35 @@ function backward_rhs_partial!(
         basis::AbstractRadialBasis,
         dim::Int,
         k::Int,
+        grad_Lφ_x,
+        grad_Lφ_xi,
     ) where {T}
     num_ops = size(Δb, 2)
-
-    # Get gradient functions for the applied partial operator
-    grad_Lφ_x = grad_applied_partial_wrt_x(basis, dim)
-    grad_Lφ_xi = grad_applied_partial_wrt_xi(basis, dim)
 
     # RBF section: b[i] = ∂φ/∂x[dim](eval_point, xi)
     @inbounds for i in 1:k
         xi = data[neighbors[i]]
+        Δdata_i = Δdata[neighbors[i]]
 
-        # Gradient w.r.t. eval_point
+        # Gradient w.r.t. eval_point and xi
         ∇Lφ_x = grad_Lφ_x(eval_point, xi)
-        # Gradient w.r.t. xi
         ∇Lφ_xi = grad_Lφ_xi(eval_point, xi)
 
-        # Accumulate across operators
+        # Accumulate across operators with in-place scalar ops
         for op_idx in 1:num_ops
             Δb_val = Δb[i, op_idx]
-            Δeval_point .+= Δb_val .* ∇Lφ_x
-            Δdata[neighbors[i]] .+= Δb_val .* ∇Lφ_xi
+            for d in eachindex(∇Lφ_x)
+                Δeval_point[d] += Δb_val * ∇Lφ_x[d]
+                Δdata_i[d] += Δb_val * ∇Lφ_xi[d]
+            end
         end
     end
-
-    # Polynomial section: b[k+j] = ∂pⱼ/∂x[dim](eval_point)
-    # The gradient of ∂pⱼ/∂x[dim] w.r.t. eval_point is the second derivative of pⱼ
-    # This is non-trivial and depends on polynomial degree
-    # For now, we skip this contribution (it's typically small for low-degree polynomials)
-    # TODO: Implement polynomial second derivatives if needed
 
     return nothing
 end
 
 """
-    backward_rhs_laplacian!(...)
+    backward_rhs_laplacian!(Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, k, grad_Lφ_x, grad_Lφ_xi)
 
 Chain rule through RHS for Laplacian operator.
 """
@@ -217,27 +215,27 @@ function backward_rhs_laplacian!(
         data::AbstractVector,
         basis::AbstractRadialBasis,
         k::Int,
+        grad_Lφ_x,
+        grad_Lφ_xi,
     ) where {T}
     num_ops = size(Δb, 2)
-
-    # Get gradient functions for the applied Laplacian operator
-    grad_Lφ_x = grad_applied_laplacian_wrt_x(basis)
-    grad_Lφ_xi = grad_applied_laplacian_wrt_xi(basis)
 
     # RBF section: b[i] = ∇²φ(eval_point, xi)
     @inbounds for i in 1:k
         xi = data[neighbors[i]]
+        Δdata_i = Δdata[neighbors[i]]
 
-        # Gradient w.r.t. eval_point
+        # Gradient w.r.t. eval_point and xi
         ∇Lφ_x = grad_Lφ_x(eval_point, xi)
-        # Gradient w.r.t. xi
         ∇Lφ_xi = grad_Lφ_xi(eval_point, xi)
 
-        # Accumulate across operators
+        # Accumulate across operators with in-place scalar ops
         for op_idx in 1:num_ops
             Δb_val = Δb[i, op_idx]
-            Δeval_point .+= Δb_val .* ∇Lφ_x
-            Δdata[neighbors[i]] .+= Δb_val .* ∇Lφ_xi
+            for d in eachindex(∇Lφ_x)
+                Δeval_point[d] += Δb_val * ∇Lφ_x[d]
+                Δdata_i[d] += Δb_val * ∇Lφ_xi[d]
+            end
         end
     end
 
@@ -245,14 +243,14 @@ function backward_rhs_laplacian!(
 end
 
 """
-    backward_stencil!(Δdata, Δeval_point, Δw, cache, neighbors, eval_point, data, basis, ℒ, mon, k, op_info)
+    backward_stencil_partial!(Δdata, Δeval_point, Δw, cache, neighbors, eval_point, data, basis, mon, k, dim, grad_Lφ_x, grad_Lφ_xi)
 
-Complete backward pass for a single stencil.
+Complete backward pass for a single stencil with Partial operator.
 
 Combines:
 1. backward_linear_solve! - compute ΔA, Δb from Δw
 2. backward_collocation! - chain ΔA to Δdata
-3. backward_rhs! - chain Δb to Δdata and Δeval_point
+3. backward_rhs_partial! - chain Δb to Δdata and Δeval_point
 """
 function backward_stencil_partial!(
         Δdata::Vector{Vector{T}},
@@ -265,7 +263,9 @@ function backward_stencil_partial!(
         basis::AbstractRadialBasis,
         mon::MonomialBasis{Dim, Deg},
         k::Int,
-        dim::Int,  # Partial derivative dimension
+        dim::Int,
+        grad_Lφ_x,
+        grad_Lφ_xi,
     ) where {T, Dim, Deg}
     n = k + cache.nmon
 
@@ -281,12 +281,17 @@ function backward_stencil_partial!(
 
     # Step 3: Backprop through RHS
     backward_rhs_partial!(
-        Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, dim, k
+        Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, dim, k, grad_Lφ_x, grad_Lφ_xi
     )
 
     return nothing
 end
 
+"""
+    backward_stencil_laplacian!(Δdata, Δeval_point, Δw, cache, neighbors, eval_point, data, basis, mon, k, grad_Lφ_x, grad_Lφ_xi)
+
+Complete backward pass for a single stencil with Laplacian operator.
+"""
 function backward_stencil_laplacian!(
         Δdata::Vector{Vector{T}},
         Δeval_point::Vector{T},
@@ -298,6 +303,8 @@ function backward_stencil_laplacian!(
         basis::AbstractRadialBasis,
         mon::MonomialBasis{Dim, Deg},
         k::Int,
+        grad_Lφ_x,
+        grad_Lφ_xi,
     ) where {T, Dim, Deg}
     n = k + cache.nmon
 
@@ -312,7 +319,9 @@ function backward_stencil_laplacian!(
     backward_collocation!(Δdata, ΔA, neighbors, data, basis, mon, k)
 
     # Step 3: Backprop through RHS
-    backward_rhs_laplacian!(Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, k)
+    backward_rhs_laplacian!(
+        Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, k, grad_Lφ_x, grad_Lφ_xi
+    )
 
     return nothing
 end
