@@ -35,6 +35,7 @@ include("solve/api.jl")
 # Backward pass support for AD (used by ChainRulesCore and Enzyme extensions)
 include("solve/backward_cache.jl")
 include("solve/operator_second_derivatives.jl")
+include("solve/shape_parameter_derivatives.jl")
 include("solve/backward.jl")
 include("solve/forward_cache.jl")
 

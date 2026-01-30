@@ -39,9 +39,13 @@ import RadialBasisFunctions: StencilForwardCache, WeightsBuildForwardCache
 import RadialBasisFunctions: backward_linear_solve!, backward_collocation!
 import RadialBasisFunctions: backward_rhs_partial!, backward_rhs_laplacian!
 import RadialBasisFunctions: backward_stencil_partial!, backward_stencil_laplacian!
+import RadialBasisFunctions: backward_stencil_partial_with_ε!, backward_stencil_laplacian_with_ε!
 import RadialBasisFunctions: _forward_with_cache
 import RadialBasisFunctions: grad_applied_partial_wrt_x, grad_applied_partial_wrt_xi
 import RadialBasisFunctions: grad_applied_laplacian_wrt_x, grad_applied_laplacian_wrt_xi
+
+# Import shape parameter derivative functions
+import RadialBasisFunctions: ∂φ_∂ε, ∂Laplacian_φ_∂ε, ∂Partial_φ_∂ε
 
 # Import the gradient function for basis functions (not exported from main module)
 const ∇ = RadialBasisFunctions.∇

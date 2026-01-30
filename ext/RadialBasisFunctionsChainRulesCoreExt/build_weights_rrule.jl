@@ -84,6 +84,7 @@ function ChainRulesCore.rrule(
         # Initialize gradient accumulators (use mutable vectors for accumulation)
         Δdata_raw = [zeros(TD, length(first(data))) for _ in 1:N_data]
         Δeval_points_raw = [zeros(TD, length(first(eval_points))) for _ in 1:N_eval]
+        Δε_acc = Ref(zero(TD))  # Shape parameter gradient accumulator
 
         # Process each stencil
         for eval_idx in 1:N_eval
@@ -103,10 +104,11 @@ function ChainRulesCore.rrule(
                 Δlocal_data = [zeros(TD, length(first(data))) for _ in 1:k]
                 Δeval_pt = zeros(TD, length(eval_point))
 
-                # Run backward pass for this stencil
-                backward_stencil_partial!(
+                # Run backward pass for this stencil (with ε gradient)
+                backward_stencil_partial_with_ε!(
                     Δlocal_data,
                     Δeval_pt,
+                    Δε_acc,
                     Δw,
                     stencil_cache,
                     collect(1:k),  # Local indices
@@ -128,6 +130,9 @@ function ChainRulesCore.rrule(
             end
         end
 
+        # Build basis tangent (only for bases with shape parameter)
+        Δbasis = _make_basis_tangent(basis, Δε_acc[])
+
         # Convert to match input types (required for Mooncake compatibility)
         return (
             NoTangent(),      # function
@@ -135,7 +140,7 @@ function ChainRulesCore.rrule(
             [PT(Δdata_raw[i]) for i in 1:N_data],            # data
             [PT(Δeval_points_raw[i]) for i in 1:N_eval],     # eval_points
             NoTangent(),      # adjl (discrete, non-differentiable)
-            NoTangent(),      # basis
+            Δbasis,           # basis
         )
     end
 
@@ -179,6 +184,7 @@ function ChainRulesCore.rrule(
         # Initialize gradient accumulators (use mutable vectors for accumulation)
         Δdata_raw = [zeros(TD, length(first(data))) for _ in 1:N_data]
         Δeval_points_raw = [zeros(TD, length(first(eval_points))) for _ in 1:N_eval]
+        Δε_acc = Ref(zero(TD))  # Shape parameter gradient accumulator
 
         # Process each stencil
         for eval_idx in 1:N_eval
@@ -198,10 +204,11 @@ function ChainRulesCore.rrule(
                 Δlocal_data = [zeros(TD, length(first(data))) for _ in 1:k]
                 Δeval_pt = zeros(TD, length(eval_point))
 
-                # Run backward pass for this stencil
-                backward_stencil_laplacian!(
+                # Run backward pass for this stencil (with ε gradient)
+                backward_stencil_laplacian_with_ε!(
                     Δlocal_data,
                     Δeval_pt,
+                    Δε_acc,
                     Δw,
                     stencil_cache,
                     collect(1:k),
@@ -222,6 +229,9 @@ function ChainRulesCore.rrule(
             end
         end
 
+        # Build basis tangent (only for bases with shape parameter)
+        Δbasis = _make_basis_tangent(basis, Δε_acc[])
+
         # Convert to match input types (required for Mooncake compatibility)
         return (
             NoTangent(),      # function
@@ -229,9 +239,14 @@ function ChainRulesCore.rrule(
             [PT(Δdata_raw[i]) for i in 1:N_data],            # data
             [PT(Δeval_points_raw[i]) for i in 1:N_eval],     # eval_points
             NoTangent(),      # adjl
-            NoTangent(),      # basis
+            Δbasis,           # basis
         )
     end
 
     return W, _build_weights_laplacian_pullback
 end
+
+# Helper to construct appropriate tangent for different basis types
+_make_basis_tangent(::AbstractRadialBasis, Δε) = NoTangent()  # Default for PHS
+_make_basis_tangent(::Gaussian, Δε) = Tangent{Gaussian}(; ε = Δε, poly_deg = NoTangent())
+_make_basis_tangent(::IMQ, Δε) = Tangent{IMQ}(; ε = Δε, poly_deg = NoTangent())

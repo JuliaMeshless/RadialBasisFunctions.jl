@@ -243,14 +243,53 @@ function backward_rhs_laplacian!(
 end
 
 """
-    backward_stencil_partial!(Δdata, Δeval_point, Δw, cache, neighbors, eval_point, data, basis, mon, k, dim, grad_Lφ_x, grad_Lφ_xi)
+    backward_stencil!(Δdata, Δeval_point, Δw, cache, neighbors, eval_point, data, basis, mon, k, grad_Lφ_x, grad_Lφ_xi, backward_rhs!)
 
-Complete backward pass for a single stencil with Partial operator.
+Generic backward pass for a single stencil, parameterized by RHS backward function.
 
 Combines:
 1. backward_linear_solve! - compute ΔA, Δb from Δw
 2. backward_collocation! - chain ΔA to Δdata
-3. backward_rhs_partial! - chain Δb to Δdata and Δeval_point
+3. backward_rhs! - chain Δb to Δdata and Δeval_point (operator-specific)
+"""
+function backward_stencil!(
+        Δdata::Vector{Vector{T}},
+        Δeval_point::Vector{T},
+        Δw::AbstractVecOrMat{T},
+        cache::StencilForwardCache{T},
+        neighbors::Vector{Int},
+        eval_point,
+        data::AbstractVector,
+        basis::AbstractRadialBasis,
+        mon::MonomialBasis{Dim, Deg},
+        k::Int,
+        grad_Lφ_x,
+        grad_Lφ_xi,
+        backward_rhs!::F,
+    ) where {T, Dim, Deg, F}
+    n = k + cache.nmon
+
+    # Allocate workspace for ΔA and Δb
+    ΔA = zeros(T, n, n)
+    Δb = zeros(T, n, size(Δw, 2))
+
+    # Step 1: Backprop through linear solve
+    backward_linear_solve!(ΔA, Δb, Δw, cache)
+
+    # Step 2: Backprop through collocation matrix
+    backward_collocation!(Δdata, ΔA, neighbors, data, basis, mon, k)
+
+    # Step 3: Backprop through RHS (operator-specific)
+    backward_rhs!(Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, k, grad_Lφ_x, grad_Lφ_xi)
+
+    return nothing
+end
+
+"""
+    backward_stencil_partial!(Δdata, Δeval_point, Δw, cache, neighbors, eval_point, data, basis, mon, k, dim, grad_Lφ_x, grad_Lφ_xi)
+
+Complete backward pass for a single stencil with Partial operator.
+Dispatches to generic backward_stencil! with partial-specific RHS backward.
 """
 function backward_stencil_partial!(
         Δdata::Vector{Vector{T}},
@@ -267,30 +306,19 @@ function backward_stencil_partial!(
         grad_Lφ_x,
         grad_Lφ_xi,
     ) where {T, Dim, Deg}
-    n = k + cache.nmon
-
-    # Allocate workspace for ΔA and Δb
-    ΔA = zeros(T, n, n)
-    Δb = zeros(T, n, size(Δw, 2))
-
-    # Step 1: Backprop through linear solve
-    backward_linear_solve!(ΔA, Δb, Δw, cache)
-
-    # Step 2: Backprop through collocation matrix
-    backward_collocation!(Δdata, ΔA, neighbors, data, basis, mon, k)
-
-    # Step 3: Backprop through RHS
-    backward_rhs_partial!(
-        Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, dim, k, grad_Lφ_x, grad_Lφ_xi
+    backward_stencil!(
+        Δdata, Δeval_point, Δw, cache, neighbors, eval_point, data, basis, mon, k,
+        grad_Lφ_x, grad_Lφ_xi,
+        (Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, k, grad_Lφ_x, grad_Lφ_xi) ->
+            backward_rhs_partial!(Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, dim, k, grad_Lφ_x, grad_Lφ_xi)
     )
-
-    return nothing
 end
 
 """
     backward_stencil_laplacian!(Δdata, Δeval_point, Δw, cache, neighbors, eval_point, data, basis, mon, k, grad_Lφ_x, grad_Lφ_xi)
 
 Complete backward pass for a single stencil with Laplacian operator.
+Dispatches to generic backward_stencil! with laplacian-specific RHS backward.
 """
 function backward_stencil_laplacian!(
         Δdata::Vector{Vector{T}},
@@ -306,6 +334,127 @@ function backward_stencil_laplacian!(
         grad_Lφ_x,
         grad_Lφ_xi,
     ) where {T, Dim, Deg}
+    backward_stencil!(
+        Δdata, Δeval_point, Δw, cache, neighbors, eval_point, data, basis, mon, k,
+        grad_Lφ_x, grad_Lφ_xi, backward_rhs_laplacian!
+    )
+end
+
+# =============================================================================
+# Shape parameter (ε) gradient computation
+# =============================================================================
+
+"""
+    backward_collocation_ε!(Δε_acc, ΔA, neighbors, data, basis, k)
+
+Compute gradient contribution to shape parameter ε from collocation matrix.
+
+Uses implicit differentiation: Δε += Σᵢⱼ ΔA[i,j] * ∂A[i,j]/∂ε
+where A[i,j] = φ(xi, xj) for the RBF block.
+"""
+function backward_collocation_ε!(
+        Δε_acc::Base.RefValue{T},
+        ΔA::AbstractMatrix{T},
+        neighbors::Vector{Int},
+        data::AbstractVector,
+        basis::AbstractRadialBasis,
+        k::Int,
+    ) where {T}
+    # RBF block: A[i,j] = φ(xi, xj)
+    # Accumulate gradient from upper triangle (matrix is symmetric)
+    @inbounds for j in 1:k
+        xj = data[neighbors[j]]
+        for i in 1:(j - 1)
+            xi = data[neighbors[i]]
+            # ∂φ/∂ε at this pair
+            ∂φ_∂ε_val = ∂φ_∂ε(basis, xi, xj)
+            # For symmetric matrix: ΔA[i,j] + ΔA[j,i]
+            Δε_acc[] += (ΔA[i, j] + ΔA[j, i]) * ∂φ_∂ε_val
+        end
+    end
+    return nothing
+end
+
+"""
+    backward_rhs_laplacian_ε!(Δε_acc, Δb, neighbors, eval_point, data, basis, k)
+
+Compute gradient contribution to shape parameter ε from Laplacian RHS.
+
+Uses: Δε += Σᵢ Δb[i] * ∂(∇²φ)/∂ε
+"""
+function backward_rhs_laplacian_ε!(
+        Δε_acc::Base.RefValue{T},
+        Δb::AbstractVecOrMat{T},
+        neighbors::Vector{Int},
+        eval_point,
+        data::AbstractVector,
+        basis::AbstractRadialBasis,
+        k::Int,
+    ) where {T}
+    num_ops = size(Δb, 2)
+
+    @inbounds for i in 1:k
+        xi = data[neighbors[i]]
+        ∂Lφ_∂ε_val = ∂Laplacian_φ_∂ε(basis, eval_point, xi)
+        for op_idx in 1:num_ops
+            Δε_acc[] += Δb[i, op_idx] * ∂Lφ_∂ε_val
+        end
+    end
+    return nothing
+end
+
+"""
+    backward_rhs_partial_ε!(Δε_acc, Δb, neighbors, eval_point, data, basis, dim, k)
+
+Compute gradient contribution to shape parameter ε from Partial RHS.
+
+Uses: Δε += Σᵢ Δb[i] * ∂(∂φ/∂x_dim)/∂ε
+"""
+function backward_rhs_partial_ε!(
+        Δε_acc::Base.RefValue{T},
+        Δb::AbstractVecOrMat{T},
+        neighbors::Vector{Int},
+        eval_point,
+        data::AbstractVector,
+        basis::AbstractRadialBasis,
+        dim::Int,
+        k::Int,
+    ) where {T}
+    num_ops = size(Δb, 2)
+
+    @inbounds for i in 1:k
+        xi = data[neighbors[i]]
+        ∂Lφ_∂ε_val = ∂Partial_φ_∂ε(basis, dim, eval_point, xi)
+        for op_idx in 1:num_ops
+            Δε_acc[] += Δb[i, op_idx] * ∂Lφ_∂ε_val
+        end
+    end
+    return nothing
+end
+
+"""
+    backward_stencil_with_ε!(Δdata, Δeval_point, Δε_acc, Δw, cache, neighbors, eval_point, data, basis, mon, k, grad_Lφ_x, grad_Lφ_xi, backward_rhs!, backward_rhs_ε!)
+
+Generic backward pass for a single stencil including shape parameter gradient.
+Parameterized by RHS backward functions for both point and ε gradients.
+"""
+function backward_stencil_with_ε!(
+        Δdata::Vector{Vector{T}},
+        Δeval_point::Vector{T},
+        Δε_acc::Base.RefValue{T},
+        Δw::AbstractVecOrMat{T},
+        cache::StencilForwardCache{T},
+        neighbors::Vector{Int},
+        eval_point,
+        data::AbstractVector,
+        basis::AbstractRadialBasis,
+        mon::MonomialBasis{Dim, Deg},
+        k::Int,
+        grad_Lφ_x,
+        grad_Lφ_xi,
+        backward_rhs!::F1,
+        backward_rhs_ε!::F2,
+    ) where {T, Dim, Deg, F1, F2}
     n = k + cache.nmon
 
     # Allocate workspace for ΔA and Δb
@@ -315,13 +464,78 @@ function backward_stencil_laplacian!(
     # Step 1: Backprop through linear solve
     backward_linear_solve!(ΔA, Δb, Δw, cache)
 
-    # Step 2: Backprop through collocation matrix
+    # Step 2: Backprop through collocation matrix (point gradients)
     backward_collocation!(Δdata, ΔA, neighbors, data, basis, mon, k)
 
-    # Step 3: Backprop through RHS
-    backward_rhs_laplacian!(
-        Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, k, grad_Lφ_x, grad_Lφ_xi
-    )
+    # Step 3: Backprop through collocation matrix (ε gradient)
+    backward_collocation_ε!(Δε_acc, ΔA, neighbors, data, basis, k)
+
+    # Step 4: Backprop through RHS (point gradients, operator-specific)
+    backward_rhs!(Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, k, grad_Lφ_x, grad_Lφ_xi)
+
+    # Step 5: Backprop through RHS (ε gradient, operator-specific)
+    backward_rhs_ε!(Δε_acc, Δb, neighbors, eval_point, data, basis, k)
 
     return nothing
+end
+
+"""
+    backward_stencil_laplacian_with_ε!(Δdata, Δeval_point, Δε_acc, Δw, cache, ...)
+
+Complete backward pass for Laplacian including shape parameter gradient.
+Dispatches to generic backward_stencil_with_ε!.
+"""
+function backward_stencil_laplacian_with_ε!(
+        Δdata::Vector{Vector{T}},
+        Δeval_point::Vector{T},
+        Δε_acc::Base.RefValue{T},
+        Δw::AbstractVecOrMat{T},
+        cache::StencilForwardCache{T},
+        neighbors::Vector{Int},
+        eval_point,
+        data::AbstractVector,
+        basis::AbstractRadialBasis,
+        mon::MonomialBasis{Dim, Deg},
+        k::Int,
+        grad_Lφ_x,
+        grad_Lφ_xi,
+    ) where {T, Dim, Deg}
+    backward_stencil_with_ε!(
+        Δdata, Δeval_point, Δε_acc, Δw, cache, neighbors, eval_point, data, basis, mon, k,
+        grad_Lφ_x, grad_Lφ_xi,
+        backward_rhs_laplacian!,
+        backward_rhs_laplacian_ε!
+    )
+end
+
+"""
+    backward_stencil_partial_with_ε!(Δdata, Δeval_point, Δε_acc, Δw, cache, ...)
+
+Complete backward pass for Partial operator including shape parameter gradient.
+Dispatches to generic backward_stencil_with_ε!.
+"""
+function backward_stencil_partial_with_ε!(
+        Δdata::Vector{Vector{T}},
+        Δeval_point::Vector{T},
+        Δε_acc::Base.RefValue{T},
+        Δw::AbstractVecOrMat{T},
+        cache::StencilForwardCache{T},
+        neighbors::Vector{Int},
+        eval_point,
+        data::AbstractVector,
+        basis::AbstractRadialBasis,
+        mon::MonomialBasis{Dim, Deg},
+        k::Int,
+        dim::Int,
+        grad_Lφ_x,
+        grad_Lφ_xi,
+    ) where {T, Dim, Deg}
+    backward_stencil_with_ε!(
+        Δdata, Δeval_point, Δε_acc, Δw, cache, neighbors, eval_point, data, basis, mon, k,
+        grad_Lφ_x, grad_Lφ_xi,
+        (Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, k, grad_Lφ_x, grad_Lφ_xi) ->
+            backward_rhs_partial!(Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, dim, k, grad_Lφ_x, grad_Lφ_xi),
+        (Δε_acc, Δb, neighbors, eval_point, data, basis, k) ->
+            backward_rhs_partial_ε!(Δε_acc, Δb, neighbors, eval_point, data, basis, dim, k)
+    )
 end
