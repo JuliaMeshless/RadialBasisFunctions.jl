@@ -163,6 +163,10 @@ For RBF section, we need:
 
 For polynomial section, we need:
   ∂/∂eval_point [ℒpⱼ(eval_point)]
+
+Note: Unlike Laplacian where ∇²p gives constants, Partial operator ∂p/∂x[dim]
+produces terms that depend on eval_point (e.g., ∂(x²)/∂x = 2x, ∂(xy)/∂x = y),
+so the polynomial section gradient is NON-ZERO and must be computed.
 """
 function backward_rhs_partial!(
         Δdata::Vector{Vector{T}},
@@ -178,6 +182,8 @@ function backward_rhs_partial!(
         grad_Lφ_xi,
     ) where {T}
     num_ops = size(Δb, 2)
+    n = size(Δb, 1)
+    nmon = n - k
 
     # RBF section: b[i] = ∂φ/∂x[dim](eval_point, xi)
     @inbounds for i in 1:k
@@ -195,6 +201,168 @@ function backward_rhs_partial!(
                 Δeval_point[d] += Δb_val * ∇Lφ_x[d]
                 Δdata_i[d] += Δb_val * ∇Lφ_xi[d]
             end
+        end
+    end
+
+    # Polynomial section: b[k+j] = ∂pⱼ/∂x[dim](eval_point)
+    # The gradient is ∂²pⱼ/∂x[dim]∂x[d] which is non-zero for some monomials
+    if nmon > 0
+        _backward_partial_polynomial_section!(Δeval_point, Δb, k, nmon, dim, eval_point, num_ops)
+    end
+
+    return nothing
+end
+
+"""
+    _backward_partial_polynomial_section!(Δeval_point, Δb, k, nmon, dim, eval_point, num_ops)
+
+Backward pass through the polynomial section of the RHS for Partial operator.
+
+For monomials in 2D with poly_deg=2 (1, x, y, xy, x², y²):
+  ∂/∂x gives: 0, 1, 0, y, 2x, 0
+
+The gradients of these w.r.t. eval_point are:
+  ∂(0)/∂(x,y) = (0, 0)
+  ∂(1)/∂(x,y) = (0, 0)
+  ∂(0)/∂(x,y) = (0, 0)
+  ∂(y)/∂(x,y) = (0, 1)  -> b[4] contributes to Δeval_point[2]
+  ∂(2x)/∂(x,y) = (2, 0) -> b[5] contributes 2 to Δeval_point[1]
+  ∂(0)/∂(x,y) = (0, 0)
+
+This is equivalent to computing the mixed second derivatives ∂²pⱼ/∂x[dim]∂x[d].
+"""
+function _backward_partial_polynomial_section!(
+        Δeval_point::Vector{T},
+        Δb::AbstractVecOrMat{T},
+        k::Int,
+        nmon::Int,
+        dim::Int,
+        eval_point,
+        num_ops::Int,
+    ) where {T}
+    D = length(eval_point)
+
+    # The contribution depends on spatial dimension and polynomial degree
+    # For poly_deg=2, we have known patterns of non-zero second derivatives
+    if D == 2
+        _backward_partial_poly_2d!(Δeval_point, Δb, k, nmon, dim, num_ops)
+    elseif D == 3
+        _backward_partial_poly_3d!(Δeval_point, Δb, k, nmon, dim, num_ops)
+    elseif D == 1
+        _backward_partial_poly_1d!(Δeval_point, Δb, k, nmon, dim, num_ops)
+    end
+    # For higher dimensions, would need additional implementations
+    return nothing
+end
+
+"""Backward pass for polynomial section in 1D."""
+function _backward_partial_poly_1d!(
+        Δeval_point::Vector{T},
+        Δb::AbstractVecOrMat{T},
+        k::Int,
+        nmon::Int,
+        dim::Int,
+        num_ops::Int,
+    ) where {T}
+    # 1D monomials up to degree 2: 1, x, x²
+    # ∂/∂x gives: 0, 1, 2x
+    # Second derivatives ∂²/∂x²: 0, 0, 2
+    # Only x² term contributes, at index k+3 (if nmon >= 3)
+    if nmon >= 3
+        @inbounds for op_idx in 1:num_ops
+            Δeval_point[1] += Δb[k + 3, op_idx] * 2
+        end
+    end
+    return nothing
+end
+
+"""Backward pass for polynomial section in 2D."""
+function _backward_partial_poly_2d!(
+        Δeval_point::Vector{T},
+        Δb::AbstractVecOrMat{T},
+        k::Int,
+        nmon::Int,
+        dim::Int,
+        num_ops::Int,
+    ) where {T}
+    # 2D monomials with poly_deg=2: 1, x, y, xy, x², y² (nmon=6)
+    # 2D monomials with poly_deg=1: 1, x, y (nmon=3)
+    # 2D monomials with poly_deg=0: 1 (nmon=1)
+
+    if nmon < 4
+        # poly_deg <= 1: all second derivatives are zero
+        return nothing
+    end
+
+    # For poly_deg=2 (nmon=6):
+    # ∂/∂x gives: 0, 1, 0, y, 2x, 0
+    # ∂/∂y gives: 0, 0, 1, x, 0, 2y
+    #
+    # Second derivatives for ∂/∂x (dim=1):
+    #   ∂(y)/∂y = 1 at index k+4, contributes to Δeval_point[2]
+    #   ∂(2x)/∂x = 2 at index k+5, contributes to Δeval_point[1]
+    #
+    # Second derivatives for ∂/∂y (dim=2):
+    #   ∂(x)/∂x = 1 at index k+4, contributes to Δeval_point[1]
+    #   ∂(2y)/∂y = 2 at index k+6, contributes to Δeval_point[2]
+
+    if dim == 1  # ∂/∂x operator
+        @inbounds for op_idx in 1:num_ops
+            Δeval_point[2] += Δb[k + 4, op_idx]  # from xy term: ∂(y)/∂y = 1
+            Δeval_point[1] += Δb[k + 5, op_idx] * 2  # from x² term: ∂(2x)/∂x = 2
+        end
+    elseif dim == 2  # ∂/∂y operator
+        @inbounds for op_idx in 1:num_ops
+            Δeval_point[1] += Δb[k + 4, op_idx]  # from xy term: ∂(x)/∂x = 1
+            Δeval_point[2] += Δb[k + 6, op_idx] * 2  # from y² term: ∂(2y)/∂y = 2
+        end
+    end
+
+    return nothing
+end
+
+"""Backward pass for polynomial section in 3D."""
+function _backward_partial_poly_3d!(
+        Δeval_point::Vector{T},
+        Δb::AbstractVecOrMat{T},
+        k::Int,
+        nmon::Int,
+        dim::Int,
+        num_ops::Int,
+    ) where {T}
+    # 3D monomials with poly_deg=2: 1, x, y, z, xy, xz, yz, x², y², z² (nmon=10)
+    # 3D monomials with poly_deg=1: 1, x, y, z (nmon=4)
+
+    if nmon < 5
+        # poly_deg <= 1: all second derivatives are zero
+        return nothing
+    end
+
+    # For poly_deg=2 (nmon=10):
+    # Monomial order: 1, x, y, z, xy, xz, yz, x², y², z²
+    #                 1  2  3  4  5   6   7   8   9   10
+    #
+    # ∂/∂x gives: 0, 1, 0, 0, y, z, 0, 2x, 0, 0
+    # ∂/∂y gives: 0, 0, 1, 0, x, 0, z, 0, 2y, 0
+    # ∂/∂z gives: 0, 0, 0, 1, 0, x, y, 0, 0, 2z
+
+    if dim == 1  # ∂/∂x operator
+        @inbounds for op_idx in 1:num_ops
+            Δeval_point[2] += Δb[k + 5, op_idx]  # from xy: ∂(y)/∂y = 1
+            Δeval_point[3] += Δb[k + 6, op_idx]  # from xz: ∂(z)/∂z = 1
+            Δeval_point[1] += Δb[k + 8, op_idx] * 2  # from x²: ∂(2x)/∂x = 2
+        end
+    elseif dim == 2  # ∂/∂y operator
+        @inbounds for op_idx in 1:num_ops
+            Δeval_point[1] += Δb[k + 5, op_idx]  # from xy: ∂(x)/∂x = 1
+            Δeval_point[3] += Δb[k + 7, op_idx]  # from yz: ∂(z)/∂z = 1
+            Δeval_point[2] += Δb[k + 9, op_idx] * 2  # from y²: ∂(2y)/∂y = 2
+        end
+    elseif dim == 3  # ∂/∂z operator
+        @inbounds for op_idx in 1:num_ops
+            Δeval_point[1] += Δb[k + 6, op_idx]  # from xz: ∂(x)/∂x = 1
+            Δeval_point[2] += Δb[k + 7, op_idx]  # from yz: ∂(y)/∂y = 1
+            Δeval_point[3] += Δb[k + 10, op_idx] * 2  # from z²: ∂(2z)/∂z = 2
         end
     end
 

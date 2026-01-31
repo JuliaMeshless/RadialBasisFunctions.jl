@@ -397,19 +397,19 @@ macro define_build_weights_rule(OpType, data_activity, basis_activity)
 
     if basis_activity == :Const
         basis_type = :(EnzymeCore.Const{<:AbstractRadialBasis})
-        basis_type_param = :()
+        basis_type_param = nothing
     elseif basis_activity == :Active
         basis_type = :(EnzymeCore.Active{B})
-        basis_type_param = :(where {B <: AbstractRadialBasis})
+        basis_type_param = :(where{B<:AbstractRadialBasis})
     else  # :Duplicated
         basis_type = :(EnzymeCore.Duplicated{B})
-        basis_type_param = :(where {B <: AbstractRadialBasis})
+        basis_type_param = :(where{B<:AbstractRadialBasis})
     end
 
     # Determine if we need RT type parameter for shadow allocation
     needs_rt = basis_activity != :Const || data_activity == :Const
     rt_param = needs_rt ? :(::Type{RT}) : :(::Type{<:EnzymeCore.Active})
-    rt_where = needs_rt ? :(where {RT}) : :()
+    rt_where = needs_rt ? :(where{RT}) : nothing
 
     # Build augmented_primal signature
     aug_sig = if basis_activity == :Const && !needs_rt
@@ -454,11 +454,11 @@ macro define_build_weights_rule(OpType, data_activity, basis_activity)
                 eval_points::$(esc(eval_type)),
                 adjl::EnzymeCore.Const,
                 basis::$(esc(basis_type)),
-            ) $(needs_rt && basis_activity != :Const ? :(where {RT, B <: AbstractRadialBasis}) :
-                needs_rt ? :(where {RT}) :
-                basis_activity != :Const ? :(where {B <: AbstractRadialBasis}) : nothing)
+            ) $(needs_rt && basis_activity != :Const ? :(where{RT,B<:AbstractRadialBasis}) :
+                needs_rt ? :(where{RT}) :
+                basis_activity != :Const ? :(where{B<:AbstractRadialBasis}) : nothing)
 
-            ℒ = ℒ_arg.val
+            op_val = ℒ_arg.val
             data_val = data.val
             eval_points_val = eval_points.val
             adjl_val = adjl.val
@@ -466,27 +466,27 @@ macro define_build_weights_rule(OpType, data_activity, basis_activity)
 
             dim_space = length(first(data_val))
             mon = MonomialBasis(dim_space, basis_val.poly_deg)
-            ℒmon = ℒ(mon)
-            ℒrbf = ℒ(basis_val)
+            op_mon = op_val(mon)
+            op_rbf = op_val(basis_val)
 
             W, cache = _forward_with_cache(
-                data_val, eval_points_val, adjl_val, basis_val, ℒrbf, ℒmon, mon, $(esc(OpType))
+                data_val, eval_points_val, adjl_val, basis_val, op_rbf, op_mon, mon, $(esc(OpType))
             )
 
             $(if basis_activity == :Active
                 quote
                     shadow = _make_shadow_for_return(RT, W)
-                    tape = (ℒ, cache, adjl_val, basis_val, mon, data_val, eval_points_val, shadow)
+                    tape = (op_val, cache, adjl_val, basis_val, mon, data_val, eval_points_val, shadow)
                     return EnzymeRules.AugmentedReturn(W, shadow, tape)
                 end
             elseif data_activity == :Duplicated
                 quote
-                    tape = (ℒ, cache, adjl_val, basis_val, mon, deepcopy(data_val), deepcopy(eval_points_val))
+                    tape = (op_val, cache, adjl_val, basis_val, mon, deepcopy(data_val), deepcopy(eval_points_val))
                     return EnzymeRules.AugmentedReturn(W, nothing, tape)
                 end
             else  # Const data, Const or Duplicated basis
                 quote
-                    tape = (ℒ, cache, adjl_val, basis_val, mon, data_val, eval_points_val)
+                    tape = (op_val, cache, adjl_val, basis_val, mon, data_val, eval_points_val)
                     return EnzymeRules.AugmentedReturn(W, nothing, tape)
                 end
             end)
@@ -503,12 +503,12 @@ macro define_build_weights_rule(OpType, data_activity, basis_activity)
                 eval_points::$(esc(eval_type)),
                 adjl::EnzymeCore.Const,
                 basis::$(esc(basis_type)),
-            ) $(basis_activity != :Const ? :(where {B <: AbstractRadialBasis}) : nothing)
+            ) $(basis_activity != :Const ? :(where{B<:AbstractRadialBasis}) : nothing)
 
             $(if basis_activity == :Active
-                :(ℒ, cache, adjl_val, basis_val, mon, data_val, eval_points_val, shadow = tape)
+                :((op_cached, cache, adjl_val, basis_val, mon, data_val, eval_points_val, shadow) = tape)
             else
-                :(ℒ, cache, adjl_val, basis_val, mon, data_val, eval_points_val = tape)
+                :((op_cached, cache, adjl_val, basis_val, mon, data_val, eval_points_val) = tape)
             end)
 
             $(if basis_activity == :Active
@@ -521,12 +521,12 @@ macro define_build_weights_rule(OpType, data_activity, basis_activity)
             N_eval = length(eval_points_val)
             k = cache.k
 
-            grad_Lφ_x, grad_Lφ_xi = _get_grad_funcs($(esc(OpType)), basis_val, ℒ)
+            grad_Lφ_x, grad_Lφ_xi = _get_grad_funcs($(esc(OpType)), basis_val, op_cached)
 
             $(if basis_activity != :Const
                 :(Δε_acc = Ref(zero(TD)))
             else
-                :()
+                nothing
             end)
 
             for eval_idx in 1:N_eval
@@ -545,14 +545,14 @@ macro define_build_weights_rule(OpType, data_activity, basis_activity)
                         quote
                             _call_backward_stencil!(
                                 $(esc(OpType)), Δlocal_data, Δeval_pt, Δw, stencil_cache, collect(1:k),
-                                eval_point, local_data, basis_val, mon, k, ℒ, grad_Lφ_x, grad_Lφ_xi
+                                eval_point, local_data, basis_val, mon, k, op_cached, grad_Lφ_x, grad_Lφ_xi
                             )
                         end
                     else
                         quote
                             _call_backward_stencil_with_ε!(
                                 $(esc(OpType)), Δlocal_data, Δeval_pt, Δε_acc, Δw, stencil_cache, collect(1:k),
-                                eval_point, local_data, basis_val, mon, k, ℒ, grad_Lφ_x, grad_Lφ_xi
+                                eval_point, local_data, basis_val, mon, k, op_cached, grad_Lφ_x, grad_Lφ_xi
                             )
                         end
                     end)
@@ -565,7 +565,7 @@ macro define_build_weights_rule(OpType, data_activity, basis_activity)
                             eval_points.dval[eval_idx] .+= Δeval_pt
                         end
                     else
-                        :()
+                        nothing
                     end)
                 end
             end
@@ -630,13 +630,313 @@ end
 _accumulate_basis_gradient!(_shadow, _Δε) = nothing
 
 # =============================================================================
-# Generate all 6 rule pairs using the macro
+# Explicit rules (replacing macro due to Julia version compatibility issues)
 # =============================================================================
-@define_build_weights_rule Partial Duplicated Const
-@define_build_weights_rule Laplacian Duplicated Const
-@define_build_weights_rule Partial Const Active
-@define_build_weights_rule Laplacian Const Active
-@define_build_weights_rule Partial Const Duplicated
-@define_build_weights_rule Laplacian Const Duplicated
+
+# Partial with Duplicated data, Const basis
+function EnzymeRules.augmented_primal(
+        config::EnzymeRules.RevConfigWidth{1},
+        func::EnzymeCore.Const{typeof(_build_weights)},
+        ::Type{RT},
+        ℒ_arg::EnzymeCore.Const{<:Partial},
+        data::EnzymeCore.Duplicated,
+        eval_points::EnzymeCore.Duplicated,
+        adjl::EnzymeCore.Const,
+        basis::EnzymeCore.Const{<:AbstractRadialBasis},
+    ) where {RT}
+    op_val = ℒ_arg.val
+    data_val = data.val
+    eval_points_val = eval_points.val
+    adjl_val = adjl.val
+    basis_val = basis.val
+
+    dim_space = length(first(data_val))
+    mon = MonomialBasis(dim_space, basis_val.poly_deg)
+    op_mon = op_val(mon)
+    op_rbf = op_val(basis_val)
+
+    W, cache = _forward_with_cache(
+        data_val, eval_points_val, adjl_val, basis_val, op_rbf, op_mon, mon, Partial
+    )
+
+    shadow = _make_shadow_for_return(RT, W)
+    tape = (op_val, cache, adjl_val, basis_val, mon, deepcopy(data_val), deepcopy(eval_points_val), shadow)
+    return EnzymeRules.AugmentedReturn(W, shadow, tape)
+end
+
+function EnzymeRules.reverse(
+        config::EnzymeRules.RevConfigWidth{1},
+        func::EnzymeCore.Const{typeof(_build_weights)},
+        dret,
+        tape,
+        ℒ_arg::EnzymeCore.Const{<:Partial},
+        data::EnzymeCore.Duplicated,
+        eval_points::EnzymeCore.Duplicated,
+        adjl::EnzymeCore.Const,
+        basis::EnzymeCore.Const{<:AbstractRadialBasis},
+    )
+    op_cached, cache, adjl_val, basis_val, mon, data_val, eval_points_val, shadow = tape
+    ΔW = _extract_dret_with_shadow(dret, shadow)
+
+    TD = eltype(first(data_val))
+    N_eval = length(eval_points_val)
+    k = cache.k
+
+    grad_Lφ_x, grad_Lφ_xi = _get_grad_funcs(Partial, basis_val, op_cached)
+
+    for eval_idx in 1:N_eval
+        neighbors = adjl_val[eval_idx]
+        eval_point = eval_points_val[eval_idx]
+        stencil_cache = cache.stencil_caches[eval_idx]
+
+        Δw = extract_stencil_cotangent_enzyme(ΔW, eval_idx, neighbors, k, cache.num_ops)
+
+        if sum(abs, Δw) > 0
+            local_data = [data_val[i] for i in neighbors]
+            Δlocal_data = [zeros(TD, length(first(data_val))) for _ in 1:k]
+            Δeval_pt = zeros(TD, length(eval_point))
+
+            _call_backward_stencil!(
+                Partial, Δlocal_data, Δeval_pt, Δw, stencil_cache, collect(1:k),
+                eval_point, local_data, basis_val, mon, k, op_cached, grad_Lφ_x, grad_Lφ_xi
+            )
+
+            for (local_idx, global_idx) in enumerate(neighbors)
+                data.dval[global_idx] .+= Δlocal_data[local_idx]
+            end
+            eval_points.dval[eval_idx] .+= Δeval_pt
+        end
+    end
+
+    return (nothing, nothing, nothing, nothing, nothing)
+end
+
+# Laplacian with Duplicated data, Const basis
+function EnzymeRules.augmented_primal(
+        config::EnzymeRules.RevConfigWidth{1},
+        func::EnzymeCore.Const{typeof(_build_weights)},
+        ::Type{RT},
+        ℒ_arg::EnzymeCore.Const{<:Laplacian},
+        data::EnzymeCore.Duplicated,
+        eval_points::EnzymeCore.Duplicated,
+        adjl::EnzymeCore.Const,
+        basis::EnzymeCore.Const{<:AbstractRadialBasis},
+    ) where {RT}
+    op_val = ℒ_arg.val
+    data_val = data.val
+    eval_points_val = eval_points.val
+    adjl_val = adjl.val
+    basis_val = basis.val
+
+    dim_space = length(first(data_val))
+    mon = MonomialBasis(dim_space, basis_val.poly_deg)
+    op_mon = op_val(mon)
+    op_rbf = op_val(basis_val)
+
+    W, cache = _forward_with_cache(
+        data_val, eval_points_val, adjl_val, basis_val, op_rbf, op_mon, mon, Laplacian
+    )
+
+    shadow = _make_shadow_for_return(RT, W)
+    tape = (op_val, cache, adjl_val, basis_val, mon, deepcopy(data_val), deepcopy(eval_points_val), shadow)
+    return EnzymeRules.AugmentedReturn(W, shadow, tape)
+end
+
+function EnzymeRules.reverse(
+        config::EnzymeRules.RevConfigWidth{1},
+        func::EnzymeCore.Const{typeof(_build_weights)},
+        dret,
+        tape,
+        ℒ_arg::EnzymeCore.Const{<:Laplacian},
+        data::EnzymeCore.Duplicated,
+        eval_points::EnzymeCore.Duplicated,
+        adjl::EnzymeCore.Const,
+        basis::EnzymeCore.Const{<:AbstractRadialBasis},
+    )
+    op_cached, cache, adjl_val, basis_val, mon, data_val, eval_points_val, shadow = tape
+    ΔW = _extract_dret_with_shadow(dret, shadow)
+
+    TD = eltype(first(data_val))
+    N_eval = length(eval_points_val)
+    k = cache.k
+
+    grad_Lφ_x, grad_Lφ_xi = _get_grad_funcs(Laplacian, basis_val, op_cached)
+
+    for eval_idx in 1:N_eval
+        neighbors = adjl_val[eval_idx]
+        eval_point = eval_points_val[eval_idx]
+        stencil_cache = cache.stencil_caches[eval_idx]
+
+        Δw = extract_stencil_cotangent_enzyme(ΔW, eval_idx, neighbors, k, cache.num_ops)
+
+        if sum(abs, Δw) > 0
+            local_data = [data_val[i] for i in neighbors]
+            Δlocal_data = [zeros(TD, length(first(data_val))) for _ in 1:k]
+            Δeval_pt = zeros(TD, length(eval_point))
+
+            _call_backward_stencil!(
+                Laplacian, Δlocal_data, Δeval_pt, Δw, stencil_cache, collect(1:k),
+                eval_point, local_data, basis_val, mon, k, op_cached, grad_Lφ_x, grad_Lφ_xi
+            )
+
+            for (local_idx, global_idx) in enumerate(neighbors)
+                data.dval[global_idx] .+= Δlocal_data[local_idx]
+            end
+            eval_points.dval[eval_idx] .+= Δeval_pt
+        end
+    end
+
+    return (nothing, nothing, nothing, nothing, nothing)
+end
+
+# Partial with Const data, Active basis (for shape parameter)
+function EnzymeRules.augmented_primal(
+        config::EnzymeRules.RevConfigWidth{1},
+        func::EnzymeCore.Const{typeof(_build_weights)},
+        ::Type{RT},
+        ℒ_arg::EnzymeCore.Const{<:Partial},
+        data::EnzymeCore.Const,
+        eval_points::EnzymeCore.Const,
+        adjl::EnzymeCore.Const,
+        basis::EnzymeCore.Active{B},
+    ) where {RT, B<:AbstractRadialBasis}
+    op_val = ℒ_arg.val
+    data_val = data.val
+    eval_points_val = eval_points.val
+    adjl_val = adjl.val
+    basis_val = basis.val
+
+    dim_space = length(first(data_val))
+    mon = MonomialBasis(dim_space, basis_val.poly_deg)
+    op_mon = op_val(mon)
+    op_rbf = op_val(basis_val)
+
+    W, cache = _forward_with_cache(
+        data_val, eval_points_val, adjl_val, basis_val, op_rbf, op_mon, mon, Partial
+    )
+
+    shadow = _make_shadow_for_return(RT, W)
+    tape = (op_val, cache, adjl_val, basis_val, mon, data_val, eval_points_val, shadow)
+    return EnzymeRules.AugmentedReturn(W, shadow, tape)
+end
+
+function EnzymeRules.reverse(
+        config::EnzymeRules.RevConfigWidth{1},
+        func::EnzymeCore.Const{typeof(_build_weights)},
+        dret,
+        tape,
+        ℒ_arg::EnzymeCore.Const{<:Partial},
+        data::EnzymeCore.Const,
+        eval_points::EnzymeCore.Const,
+        adjl::EnzymeCore.Const,
+        basis::EnzymeCore.Active{B},
+    ) where {B<:AbstractRadialBasis}
+    op_cached, cache, adjl_val, basis_val, mon, data_val, eval_points_val, shadow = tape
+    ΔW = _extract_dret_with_shadow(dret, shadow)
+
+    TD = eltype(first(data_val))
+    N_eval = length(eval_points_val)
+    k = cache.k
+
+    grad_Lφ_x, grad_Lφ_xi = _get_grad_funcs(Partial, basis_val, op_cached)
+    Δε_acc = Ref(zero(TD))
+
+    for eval_idx in 1:N_eval
+        neighbors = adjl_val[eval_idx]
+        eval_point = eval_points_val[eval_idx]
+        stencil_cache = cache.stencil_caches[eval_idx]
+
+        Δw = extract_stencil_cotangent_enzyme(ΔW, eval_idx, neighbors, k, cache.num_ops)
+
+        if sum(abs, Δw) > 0
+            local_data = [data_val[i] for i in neighbors]
+            Δlocal_data = [zeros(TD, length(first(data_val))) for _ in 1:k]
+            Δeval_pt = zeros(TD, length(eval_point))
+
+            _call_backward_stencil_with_ε!(
+                Partial, Δlocal_data, Δeval_pt, Δε_acc, Δw, stencil_cache, collect(1:k),
+                eval_point, local_data, basis_val, mon, k, op_cached, grad_Lφ_x, grad_Lφ_xi
+            )
+        end
+    end
+
+    Δbasis = _make_enzyme_tangent(B, basis_val, Δε_acc[])
+    return (nothing, nothing, nothing, nothing, Δbasis)
+end
+
+# Laplacian with Const data, Active basis (for shape parameter)
+function EnzymeRules.augmented_primal(
+        config::EnzymeRules.RevConfigWidth{1},
+        func::EnzymeCore.Const{typeof(_build_weights)},
+        ::Type{RT},
+        ℒ_arg::EnzymeCore.Const{<:Laplacian},
+        data::EnzymeCore.Const,
+        eval_points::EnzymeCore.Const,
+        adjl::EnzymeCore.Const,
+        basis::EnzymeCore.Active{B},
+    ) where {RT, B<:AbstractRadialBasis}
+    op_val = ℒ_arg.val
+    data_val = data.val
+    eval_points_val = eval_points.val
+    adjl_val = adjl.val
+    basis_val = basis.val
+
+    dim_space = length(first(data_val))
+    mon = MonomialBasis(dim_space, basis_val.poly_deg)
+    op_mon = op_val(mon)
+    op_rbf = op_val(basis_val)
+
+    W, cache = _forward_with_cache(
+        data_val, eval_points_val, adjl_val, basis_val, op_rbf, op_mon, mon, Laplacian
+    )
+
+    shadow = _make_shadow_for_return(RT, W)
+    tape = (op_val, cache, adjl_val, basis_val, mon, data_val, eval_points_val, shadow)
+    return EnzymeRules.AugmentedReturn(W, shadow, tape)
+end
+
+function EnzymeRules.reverse(
+        config::EnzymeRules.RevConfigWidth{1},
+        func::EnzymeCore.Const{typeof(_build_weights)},
+        dret,
+        tape,
+        ℒ_arg::EnzymeCore.Const{<:Laplacian},
+        data::EnzymeCore.Const,
+        eval_points::EnzymeCore.Const,
+        adjl::EnzymeCore.Const,
+        basis::EnzymeCore.Active{B},
+    ) where {B<:AbstractRadialBasis}
+    op_cached, cache, adjl_val, basis_val, mon, data_val, eval_points_val, shadow = tape
+    ΔW = _extract_dret_with_shadow(dret, shadow)
+
+    TD = eltype(first(data_val))
+    N_eval = length(eval_points_val)
+    k = cache.k
+
+    grad_Lφ_x, grad_Lφ_xi = _get_grad_funcs(Laplacian, basis_val, op_cached)
+    Δε_acc = Ref(zero(TD))
+
+    for eval_idx in 1:N_eval
+        neighbors = adjl_val[eval_idx]
+        eval_point = eval_points_val[eval_idx]
+        stencil_cache = cache.stencil_caches[eval_idx]
+
+        Δw = extract_stencil_cotangent_enzyme(ΔW, eval_idx, neighbors, k, cache.num_ops)
+
+        if sum(abs, Δw) > 0
+            local_data = [data_val[i] for i in neighbors]
+            Δlocal_data = [zeros(TD, length(first(data_val))) for _ in 1:k]
+            Δeval_pt = zeros(TD, length(eval_point))
+
+            _call_backward_stencil_with_ε!(
+                Laplacian, Δlocal_data, Δeval_pt, Δε_acc, Δw, stencil_cache, collect(1:k),
+                eval_point, local_data, basis_val, mon, k, op_cached, grad_Lφ_x, grad_Lφ_xi
+            )
+        end
+    end
+
+    Δbasis = _make_enzyme_tangent(B, basis_val, Δε_acc[])
+    return (nothing, nothing, nothing, nothing, Δbasis)
+end
 
 end # module
