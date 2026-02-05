@@ -119,8 +119,14 @@ Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{IMQ, Vector{Float64}, Vector{Flo
 
 Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{Gaussian, Vector{Float64}, Vector{Float64}})
 
-# Interpolator rules
+# Interpolator evaluation rules
 Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{Interpolator, Vector{Float64}})
+
+# Interpolator construction rules (for differentiating through construction)
+Mooncake.@from_rrule(
+    Mooncake.DefaultCtx,
+    Tuple{Type{Interpolator}, AbstractVector, AbstractVector, AbstractRadialBasis}
+)
 
 # _build_weights rules for shape optimization
 # These enable differentiating through operator construction w.r.t. point positions

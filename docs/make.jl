@@ -21,6 +21,7 @@ makedocs(;
     pages = [
         "Home" => "index.md",
         "Getting Started" => "getting_started.md",
+        "Automatic Differentiation" => "autodiff.md",
         "Quick Reference" => "quickref.md",
         "Theory" => "theory.md",
         "Internals" => "internals.md",

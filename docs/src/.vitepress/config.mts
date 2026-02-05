@@ -18,6 +18,8 @@ const navTemp = {
   nav: [
     { text: 'Home', link: '/index' },
     { text: 'Getting Started', link: '/getting_started' },
+    { text: 'Autodiff', link: '/autodiff' },
+    { text: 'Quick Reference', link: '/quickref' },
     { text: 'Theory', link: '/theory' },
     { text: 'Internals', link: '/internals' },
     { text: 'API', link: '/api' }
@@ -92,6 +94,8 @@ export default defineConfig({
       sidebar: [
         { text: 'Home', link: '/index' },
         { text: 'Getting Started', link: '/getting_started' },
+        { text: 'Autodiff', link: '/autodiff' },
+        { text: 'Quick Reference', link: '/quickref' },
         { text: 'Theory', link: '/theory' },
         { text: 'Internals', link: '/internals' },
         { text: 'API', link: '/api' }

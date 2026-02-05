@@ -103,6 +103,7 @@ The package requires `Vector{AbstractVector}` input format (not matrices). Each 
 - The package requires Julia 1.10+ (see Project.toml compatibility)
 - Uses KernelAbstractions.jl for GPU/CPU parallelization
 - Data must be in `Vector{AbstractVector}` format (not matrices) - each point needs inferrable dimension (e.g., `SVector{2,Float64}`)
+- **Autodiff examples**: Always use DifferentiationInterface.jl for AD examples in docs and tests. This provides a unified interface over Enzyme.jl and Mooncake.jl backends.
 
 ---
 

@@ -29,7 +29,7 @@ import RadialBasisFunctions: _build_collocation_matrix!, _build_rhs!
 
 # Import types we need
 import RadialBasisFunctions: RadialBasisOperator, Interpolator
-import RadialBasisFunctions: AbstractRadialBasis, PHS1, PHS3, PHS5, PHS7, IMQ, Gaussian
+import RadialBasisFunctions: AbstractRadialBasis, PHS, PHS1, PHS3, PHS5, PHS7, IMQ, Gaussian
 import RadialBasisFunctions: VectorValuedOperator, ScalarValuedOperator
 import RadialBasisFunctions: MonomialBasis, BoundaryData
 import RadialBasisFunctions: Partial, Laplacian
