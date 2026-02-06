@@ -18,7 +18,7 @@ const ENZYME_BACKEND = DI.AutoEnzyme(; function_annotation = Enzyme.Duplicated)
 const MOONCAKE_BACKEND = DI.AutoMooncake(; config = nothing)
 
 # Build backend registry (only include supported backends)
-const AD_BACKENDS = Pair{String,Any}[]
+const AD_BACKENDS = Pair{String, Any}[]
 ENZYME_SUPPORTED && push!(AD_BACKENDS, "Enzyme" => ENZYME_BACKEND)
 push!(AD_BACKENDS, "Mooncake" => MOONCAKE_BACKEND)
 
@@ -31,7 +31,7 @@ function test_gradient_vs_fd(f, x, backend; rtol = 1.0e-4, name = "")
     di_grad = DI.gradient(f, backend, x)
     fd_grad = FD.grad(FD.central_fdm(5, 1), f, x)[1]
     @test !all(iszero, di_grad)
-    @test isapprox(di_grad, fd_grad; rtol = rtol)
+    return @test isapprox(di_grad, fd_grad; rtol = rtol)
 end
 
 @testset "Autodiff via DifferentiationInterface" begin
@@ -39,7 +39,7 @@ end
         N = 50
         points = [
             SVector{2}(0.1 + 0.8 * i / N, 0.1 + 0.8 * j / N) for i in 1:isqrt(N)
-            for j in 1:isqrt(N)
+                for j in 1:isqrt(N)
         ]
         N = length(points)
         values = sin.(getindex.(points, 1)) .+ cos.(getindex.(points, 2))

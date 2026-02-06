@@ -474,11 +474,11 @@ function backward_stencil_partial!(
         grad_Lφ_x,
         grad_Lφ_xi,
     ) where {T, Dim, Deg}
-    backward_stencil!(
+    return backward_stencil!(
         Δdata, Δeval_point, Δw, cache, neighbors, eval_point, data, basis, mon, k,
         grad_Lφ_x, grad_Lφ_xi,
         (Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, k, grad_Lφ_x, grad_Lφ_xi) ->
-            backward_rhs_partial!(Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, dim, k, grad_Lφ_x, grad_Lφ_xi)
+        backward_rhs_partial!(Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, dim, k, grad_Lφ_x, grad_Lφ_xi)
     )
 end
 
@@ -502,7 +502,7 @@ function backward_stencil_laplacian!(
         grad_Lφ_x,
         grad_Lφ_xi,
     ) where {T, Dim, Deg}
-    backward_stencil!(
+    return backward_stencil!(
         Δdata, Δeval_point, Δw, cache, neighbors, eval_point, data, basis, mon, k,
         grad_Lφ_x, grad_Lφ_xi, backward_rhs_laplacian!
     )
@@ -668,7 +668,7 @@ function backward_stencil_laplacian_with_ε!(
         grad_Lφ_x,
         grad_Lφ_xi,
     ) where {T, Dim, Deg}
-    backward_stencil_with_ε!(
+    return backward_stencil_with_ε!(
         Δdata, Δeval_point, Δε_acc, Δw, cache, neighbors, eval_point, data, basis, mon, k,
         grad_Lφ_x, grad_Lφ_xi,
         backward_rhs_laplacian!,
@@ -698,12 +698,12 @@ function backward_stencil_partial_with_ε!(
         grad_Lφ_x,
         grad_Lφ_xi,
     ) where {T, Dim, Deg}
-    backward_stencil_with_ε!(
+    return backward_stencil_with_ε!(
         Δdata, Δeval_point, Δε_acc, Δw, cache, neighbors, eval_point, data, basis, mon, k,
         grad_Lφ_x, grad_Lφ_xi,
         (Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, k, grad_Lφ_x, grad_Lφ_xi) ->
-            backward_rhs_partial!(Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, dim, k, grad_Lφ_x, grad_Lφ_xi),
+        backward_rhs_partial!(Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, dim, k, grad_Lφ_x, grad_Lφ_xi),
         (Δε_acc, Δb, neighbors, eval_point, data, basis, k) ->
-            backward_rhs_partial_ε!(Δε_acc, Δb, neighbors, eval_point, data, basis, dim, k)
+        backward_rhs_partial_ε!(Δε_acc, Δb, neighbors, eval_point, data, basis, dim, k)
     )
 end
