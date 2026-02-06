@@ -47,6 +47,7 @@ const ∇ = RadialBasisFunctions.∇
 # Helper macro to define basis function rules for a given type
 macro define_basis_rule(BasisType)
     return quote
+        # Both x and xi are Duplicated (both being differentiated)
         function EnzymeRules.augmented_primal(
                 config::EnzymeRules.RevConfigWidth{1},
                 func::EnzymeCore.Const{<:$(esc(BasisType))},
@@ -56,7 +57,6 @@ macro define_basis_rule(BasisType)
             )
             basis = func.val
             y = basis(x.val, xi.val)
-            # Tape stores copies of x and xi for the reverse pass
             tape = (copy(x.val), copy(xi.val))
             return EnzymeRules.AugmentedReturn(y, nothing, tape)
         end
@@ -73,9 +73,38 @@ macro define_basis_rule(BasisType)
             x_val, xi_val = tape
             grad_fn = ∇(basis)
             ∇φ = grad_fn(x_val, xi_val)
-            # d/dx[φ(x, xi)] = ∇φ, d/dxi[φ(x, xi)] = -∇φ
             x.dval .+= dret.val .* ∇φ
             xi.dval .-= dret.val .* ∇φ
+            return (nothing, nothing)
+        end
+
+        # x is Duplicated, xi is Const (xi captured in closure)
+        function EnzymeRules.augmented_primal(
+                config::EnzymeRules.RevConfigWidth{1},
+                func::EnzymeCore.Const{<:$(esc(BasisType))},
+                ::Type{<:EnzymeCore.Active},
+                x::EnzymeCore.Duplicated,
+                xi::EnzymeCore.Const,
+            )
+            basis = func.val
+            y = basis(x.val, xi.val)
+            tape = (copy(x.val), copy(xi.val))
+            return EnzymeRules.AugmentedReturn(y, nothing, tape)
+        end
+
+        function EnzymeRules.reverse(
+                config::EnzymeRules.RevConfigWidth{1},
+                func::EnzymeCore.Const{<:$(esc(BasisType))},
+                dret::EnzymeCore.Active,
+                tape,
+                x::EnzymeCore.Duplicated,
+                xi::EnzymeCore.Const,
+            )
+            basis = func.val
+            x_val, xi_val = tape
+            grad_fn = ∇(basis)
+            ∇φ = grad_fn(x_val, xi_val)
+            x.dval .+= dret.val .* ∇φ
             return (nothing, nothing)
         end
     end
@@ -96,26 +125,29 @@ end
 function EnzymeRules.augmented_primal(
         config::EnzymeRules.RevConfigWidth{1},
         func::EnzymeCore.Const{typeof(_eval_op)},
-        ::Type{<:EnzymeCore.Active},
+        ::Type{RT},
         op::EnzymeCore.Const{<:RadialBasisOperator},
         x::EnzymeCore.Duplicated,
-    )
+    ) where {RT}
     y = _eval_op(op.val, x.val)
-    # Tape stores reference to op for the reverse pass
-    return EnzymeRules.AugmentedReturn(y, nothing, op.val)
+    shadow = RT <: EnzymeCore.Duplicated ? zero(y) : nothing
+    return EnzymeRules.AugmentedReturn(y, shadow, (op.val, shadow))
 end
 
 function EnzymeRules.reverse(
         config::EnzymeRules.RevConfigWidth{1},
         func::EnzymeCore.Const{typeof(_eval_op)},
-        dret::EnzymeCore.Active,
+        dret,
         tape,
         op::EnzymeCore.Const{<:RadialBasisOperator},
         x::EnzymeCore.Duplicated,
     )
-    operator = tape
-    # Pullback: Δx = W' * Δy
-    x.dval .+= operator.weights' * dret.val
+    operator, shadow = tape
+    dy = dret isa EnzymeCore.Active ? dret.val : shadow
+    if dy !== nothing
+        x.dval .+= operator.weights' * dy
+        shadow !== nothing && fill!(shadow, 0)
+    end
     return (nothing, nothing)
 end
 
@@ -123,26 +155,30 @@ end
 function EnzymeRules.augmented_primal(
         config::EnzymeRules.RevConfigWidth{1},
         func::EnzymeCore.Const{typeof(_eval_op)},
-        ::Type{<:EnzymeCore.Active},
+        ::Type{RT},
         op::EnzymeCore.Const{<:RadialBasisOperator{<:VectorValuedOperator{D}}},
         x::EnzymeCore.Duplicated,
-    ) where {D}
+    ) where {D, RT}
     y = _eval_op(op.val, x.val)
-    return EnzymeRules.AugmentedReturn(y, nothing, (op.val, D))
+    shadow = RT <: EnzymeCore.Duplicated ? zero(y) : nothing
+    return EnzymeRules.AugmentedReturn(y, shadow, (op.val, D, shadow))
 end
 
 function EnzymeRules.reverse(
         config::EnzymeRules.RevConfigWidth{1},
         func::EnzymeCore.Const{typeof(_eval_op)},
-        dret::EnzymeCore.Active,
+        dret,
         tape,
         op::EnzymeCore.Const{<:RadialBasisOperator{<:VectorValuedOperator}},
         x::EnzymeCore.Duplicated,
     )
-    operator, D = tape
-    # Pullback: Δx = Σ_d W[d]' * Δy[:,d]
-    for d in 1:D
-        x.dval .+= operator.weights[d]' * view(dret.val, :, d)
+    operator, D, shadow = tape
+    dy = dret isa EnzymeCore.Active ? dret.val : shadow
+    if dy !== nothing
+        for d in 1:D
+            x.dval .+= operator.weights[d]' * view(dy, :, d)
+        end
+        shadow !== nothing && fill!(shadow, 0)
     end
     return (nothing, nothing)
 end
@@ -155,25 +191,28 @@ end
 function EnzymeRules.augmented_primal(
         config::EnzymeRules.RevConfigWidth{1},
         op::EnzymeCore.Const{<:RadialBasisOperator},
-        ::Type{<:EnzymeCore.Active},
+        ::Type{RT},
         x::EnzymeCore.Duplicated,
-    )
+    ) where {RT}
     operator = op.val
-    # Ensure weights are computed
-    !RadialBasisFunctions.is_cache_valid(operator) && RadialBasisFunctions.update_weights!(operator)
-    y = _eval_op(operator, x.val)
-    return EnzymeRules.AugmentedReturn(y, nothing, operator)
+    y = operator.weights * x.val
+    shadow = RT <: EnzymeCore.Duplicated ? zero(y) : nothing
+    return EnzymeRules.AugmentedReturn(y, shadow, (operator, shadow))
 end
 
 function EnzymeRules.reverse(
         config::EnzymeRules.RevConfigWidth{1},
         op::EnzymeCore.Const{<:RadialBasisOperator},
-        dret::EnzymeCore.Active,
+        dret,
         tape,
         x::EnzymeCore.Duplicated,
     )
-    operator = tape
-    x.dval .+= operator.weights' * dret.val
+    operator, shadow = tape
+    dy = dret isa EnzymeCore.Active ? dret.val : shadow
+    if dy !== nothing
+        x.dval .+= operator.weights' * dy
+        shadow !== nothing && fill!(shadow, 0)
+    end
     return (nothing,)
 end
 
@@ -181,25 +220,29 @@ end
 function EnzymeRules.augmented_primal(
         config::EnzymeRules.RevConfigWidth{1},
         op::EnzymeCore.Const{<:RadialBasisOperator{<:VectorValuedOperator{D}}},
-        ::Type{<:EnzymeCore.Active},
+        ::Type{RT},
         x::EnzymeCore.Duplicated,
-    ) where {D}
+    ) where {D, RT}
     operator = op.val
-    !RadialBasisFunctions.is_cache_valid(operator) && RadialBasisFunctions.update_weights!(operator)
     y = _eval_op(operator, x.val)
-    return EnzymeRules.AugmentedReturn(y, nothing, (operator, D))
+    shadow = RT <: EnzymeCore.Duplicated ? zero(y) : nothing
+    return EnzymeRules.AugmentedReturn(y, shadow, (operator, D, shadow))
 end
 
 function EnzymeRules.reverse(
         config::EnzymeRules.RevConfigWidth{1},
         op::EnzymeCore.Const{<:RadialBasisOperator{<:VectorValuedOperator}},
-        dret::EnzymeCore.Active,
+        dret,
         tape,
         x::EnzymeCore.Duplicated,
     )
-    operator, D = tape
-    for d in 1:D
-        x.dval .+= operator.weights[d]' * view(dret.val, :, d)
+    operator, D, shadow = tape
+    dy = dret isa EnzymeCore.Active ? dret.val : shadow
+    if dy !== nothing
+        for d in 1:D
+            x.dval .+= operator.weights[d]' * view(dy, :, d)
+        end
+        shadow !== nothing && fill!(shadow, 0)
     end
     return (nothing,)
 end
@@ -282,7 +325,7 @@ function EnzymeRules.reverse(
         grad_fn = ∇(interp.rbf_basis)
         for j in eachindex(interp.rbf_weights)
             ∇φ = grad_fn(x_val, interp.x[j])
-            xs.dval[i] .+= (interp.rbf_weights[j] * Δy) .* ∇φ
+            xs.dval[i] = xs.dval[i] + (interp.rbf_weights[j] * Δy) .* ∇φ
         end
 
         # Polynomial contribution
@@ -294,7 +337,7 @@ function EnzymeRules.reverse(
             ∇mon(∇p, x_val)
 
             for k in eachindex(interp.monomial_weights)
-                xs.dval[i] .+= (interp.monomial_weights[k] * Δy) .* view(∇p, k, :)
+                xs.dval[i] = xs.dval[i] + (interp.monomial_weights[k] * Δy) .* view(∇p, k, :)
             end
         end
     end
@@ -576,9 +619,9 @@ macro define_build_weights_rule(OpType, data_activity, basis_activity)
                         if data_activity == :Duplicated
                             quote
                                 for (local_idx, global_idx) in enumerate(neighbors)
-                                    data.dval[global_idx] .+= Δlocal_data[local_idx]
+                                    data.dval[global_idx] = data.dval[global_idx] + Δlocal_data[local_idx]
                                 end
-                                eval_points.dval[eval_idx] .+= Δeval_pt
+                                eval_points.dval[eval_idx] = eval_points.dval[eval_idx] + Δeval_pt
                             end
                         else
                             nothing
@@ -721,9 +764,9 @@ function EnzymeRules.reverse(
             )
 
             for (local_idx, global_idx) in enumerate(neighbors)
-                data.dval[global_idx] .+= Δlocal_data[local_idx]
+                data.dval[global_idx] = data.dval[global_idx] + Δlocal_data[local_idx]
             end
-            eval_points.dval[eval_idx] .+= Δeval_pt
+            eval_points.dval[eval_idx] = eval_points.dval[eval_idx] + Δeval_pt
         end
     end
 
@@ -799,9 +842,9 @@ function EnzymeRules.reverse(
             )
 
             for (local_idx, global_idx) in enumerate(neighbors)
-                data.dval[global_idx] .+= Δlocal_data[local_idx]
+                data.dval[global_idx] = data.dval[global_idx] + Δlocal_data[local_idx]
             end
-            eval_points.dval[eval_idx] .+= Δeval_pt
+            eval_points.dval[eval_idx] = eval_points.dval[eval_idx] + Δeval_pt
         end
     end
 
