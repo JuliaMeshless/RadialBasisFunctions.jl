@@ -100,6 +100,11 @@ grad[1:5]
 For low-level control, you can differentiate basis function evaluations directly. This is useful for custom applications or understanding the underlying derivatives.
 
 ```@example autodiff
+import Mooncake
+backend_mooncake = DI.AutoMooncake(; config=nothing)
+```
+
+```@example autodiff
 x = [0.5, 0.5]
 xi = [0.3, 0.4]
 
@@ -115,23 +120,23 @@ grad = DI.gradient(loss_phs, backend, x)
 All basis types are supported:
 
 ```@example autodiff
-# IMQ basis
+# IMQ basis - using Mooncake (also works with Enzyme on Julia ≤ 1.11)
 imq = IMQ(1.0)
 function loss_imq(xv)
     return imq(xv, xi)^2
 end
 
-grad = DI.gradient(loss_imq, backend, x)
+grad = DI.gradient(loss_imq, backend_mooncake, x)
 ```
 
 ```@example autodiff
-# Gaussian basis
+# Gaussian basis - using Mooncake (also works with Enzyme on Julia ≤ 1.11)
 gauss = Gaussian(1.0)
 function loss_gauss(xv)
     return gauss(xv, xi)^2
 end
 
-grad = DI.gradient(loss_gauss, backend, x)
+grad = DI.gradient(loss_gauss, backend_mooncake, x)
 ```
 
 ## Differentiating Weight Construction
@@ -139,6 +144,7 @@ grad = DI.gradient(loss_gauss, backend, x)
 For advanced use cases like mesh optimization or shape parameter tuning, you can differentiate through the weight construction process using the internal `_build_weights` function.
 
 ```@example autodiff
+# Using Mooncake for weight construction (also works with Enzyme on Julia ≤ 1.11)
 N_weights = 25
 points_weights = [SVector{2}(0.1 + 0.8 * i / 5, 0.1 + 0.8 * j / 5) for i in 1:5 for j in 1:5]
 adjl = RadialBasisFunctions.find_neighbors(points_weights, 10)
@@ -153,7 +159,7 @@ function loss_weights(pts)
 end
 
 pts_flat = vcat([collect(p) for p in points_weights]...)
-grad = DI.gradient(loss_weights, backend, pts_flat)
+grad = DI.gradient(loss_weights, backend_mooncake, pts_flat)
 grad[1:6]  # Gradients for first 3 points (x,y pairs)
 ```
 
@@ -169,7 +175,7 @@ function loss_weights_lap(pts)
     return sum(W.nzval .^ 2)
 end
 
-grad = DI.gradient(loss_weights_lap, backend, pts_flat)
+grad = DI.gradient(loss_weights_lap, backend_mooncake, pts_flat)
 grad[1:6]
 ```
 

@@ -7,5 +7,5 @@ StaticArraysCore = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
 
 [compat]
 BenchmarkTools = "1.5"
-RadialBasisFunctions = "0.2.5"
+RadialBasisFunctions = "0.3"
 julia = "1.9"

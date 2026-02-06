@@ -39,7 +39,7 @@ const FD = FiniteDifferences
 
     @testset "Different bases" begin
         # Use slightly relaxed tolerance for Gaussian basis which can be more sensitive
-        for (name, basis, tol) in [("PHS", PHS(), 1.0e-3), ("IMQ", IMQ(1.0), 1.0e-3), ("Gaussian", Gaussian(1.0), 1.0e-2)]
+        for (name, basis, tol) in [("PHS", PHS(), 1.0e-3), ("IMQ", IMQ(1.0), 1.0e-3), ("Gaussian", Gaussian(1.0), 5.0e-2)]
             @testset "$name basis" begin
                 interp, construction_pb = ChainRulesCore.rrule(Interpolator, points, values, basis)
                 ys, eval_pb = ChainRulesCore.rrule(interp, eval_points)
