@@ -2,8 +2,8 @@
 
 RadialBasisFunctions.jl supports automatic differentiation (AD) through two package extensions:
 
-- **Enzyme.jl** - Native EnzymeRules for high-performance reverse-mode AD
 - **Mooncake.jl** - Reverse-mode AD with support for mutation
+- **Enzyme.jl** - Native EnzymeRules for high-performance reverse-mode AD
 
 All examples use [DifferentiationInterface.jl](https://github.com/gdalle/DifferentiationInterface.jl) which provides a unified API over different AD backends.
 
@@ -25,7 +25,7 @@ The most common use case is differentiating a loss function with respect to fiel
 using RadialBasisFunctions
 using StaticArrays
 import DifferentiationInterface as DI
-import Enzyme
+import Mooncake
 
 # Create points and operator (outside loss function)
 N = 49
@@ -41,7 +41,7 @@ function loss(v)
 end
 
 # Compute gradient using DifferentiationInterface
-backend = DI.AutoEnzyme()
+backend = DI.AutoMooncake(; config=nothing)  # also supports DI.AutoEnzyme()
 grad = DI.gradient(loss, backend, values)
 grad[1:5]  # Show first 5 gradient values
 ```
@@ -100,11 +100,6 @@ grad[1:5]
 For low-level control, you can differentiate basis function evaluations directly. This is useful for custom applications or understanding the underlying derivatives.
 
 ```@example autodiff
-import Mooncake
-backend_mooncake = DI.AutoMooncake(; config=nothing)
-```
-
-```@example autodiff
 x = [0.5, 0.5]
 xi = [0.3, 0.4]
 
@@ -120,23 +115,23 @@ grad = DI.gradient(loss_phs, backend, x)
 All basis types are supported:
 
 ```@example autodiff
-# IMQ basis - using Mooncake (also works with Enzyme on Julia ≤ 1.11)
+# IMQ basis
 imq = IMQ(1.0)
 function loss_imq(xv)
     return imq(xv, xi)^2
 end
 
-grad = DI.gradient(loss_imq, backend_mooncake, x)
+grad = DI.gradient(loss_imq, backend, x)
 ```
 
 ```@example autodiff
-# Gaussian basis - using Mooncake (also works with Enzyme on Julia ≤ 1.11)
+# Gaussian basis
 gauss = Gaussian(1.0)
 function loss_gauss(xv)
     return gauss(xv, xi)^2
 end
 
-grad = DI.gradient(loss_gauss, backend_mooncake, x)
+grad = DI.gradient(loss_gauss, backend, x)
 ```
 
 ## Differentiating Weight Construction
@@ -144,7 +139,7 @@ grad = DI.gradient(loss_gauss, backend_mooncake, x)
 For advanced use cases like mesh optimization or shape parameter tuning, you can differentiate through the weight construction process using the internal `_build_weights` function.
 
 ```@example autodiff
-# Using Mooncake for weight construction (also works with Enzyme on Julia ≤ 1.11)
+# Using Mooncake for weight construction
 N_weights = 25
 points_weights = [SVector{2}(0.1 + 0.8 * i / 5, 0.1 + 0.8 * j / 5) for i in 1:5 for j in 1:5]
 adjl = RadialBasisFunctions.find_neighbors(points_weights, 10)
@@ -159,7 +154,7 @@ function loss_weights(pts)
 end
 
 pts_flat = vcat([collect(p) for p in points_weights]...)
-grad = DI.gradient(loss_weights, backend_mooncake, pts_flat)
+grad = DI.gradient(loss_weights, backend, pts_flat)
 grad[1:6]  # Gradients for first 3 points (x,y pairs)
 ```
 
@@ -175,7 +170,7 @@ function loss_weights_lap(pts)
     return sum(W.nzval .^ 2)
 end
 
-grad = DI.gradient(loss_weights_lap, backend_mooncake, pts_flat)
+grad = DI.gradient(loss_weights_lap, backend, pts_flat)
 grad[1:6]
 ```
 
@@ -189,14 +184,14 @@ grad[1:6]
 | Weight construction (`_build_weights`) | ✓ | ✓ |
 | Shape parameter (ε) differentiation | ✓ | ✓ |
 
-## Using Mooncake Backend
+## Using Enzyme Backend
 
-Switch to Mooncake by changing the backend:
+Switch to Enzyme by changing the backend (requires Julia < 1.12):
 
 ```julia
 import DifferentiationInterface as DI
-import Mooncake
+import Enzyme
 
-backend = DI.AutoMooncake(; config=nothing)
+backend = DI.AutoEnzyme()
 grad = DI.gradient(loss, backend, values)
 ```
