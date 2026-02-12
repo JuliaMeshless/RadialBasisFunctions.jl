@@ -302,10 +302,10 @@ end
             N_3d = 64
             points_3d = [
                 SVector{3}(
-                    0.1 + 0.8 * ((i * 7 + 3) % N_3d) / N_3d,
-                    0.1 + 0.8 * ((i * 11 + 5) % N_3d) / N_3d,
-                    0.1 + 0.8 * ((i * 13 + 7) % N_3d) / N_3d,
-                ) for i in 1:N_3d
+                        0.1 + 0.8 * ((i * 7 + 3) % N_3d) / N_3d,
+                        0.1 + 0.8 * ((i * 11 + 5) % N_3d) / N_3d,
+                        0.1 + 0.8 * ((i * 13 + 7) % N_3d) / N_3d,
+                    ) for i in 1:N_3d
             ]
             adjl_3d = RadialBasisFunctions.find_neighbors(points_3d, 20)
             basis_3d = PHS(3; poly_deg = 2)
@@ -336,10 +336,10 @@ end
             N_3d_y = 64
             points_3d_y = [
                 SVector{3}(
-                    0.1 + 0.8 * ((i * 7 + 3) % N_3d_y) / N_3d_y,
-                    0.1 + 0.8 * ((i * 11 + 5) % N_3d_y) / N_3d_y,
-                    0.1 + 0.8 * ((i * 13 + 7) % N_3d_y) / N_3d_y,
-                ) for i in 1:N_3d_y
+                        0.1 + 0.8 * ((i * 7 + 3) % N_3d_y) / N_3d_y,
+                        0.1 + 0.8 * ((i * 11 + 5) % N_3d_y) / N_3d_y,
+                        0.1 + 0.8 * ((i * 13 + 7) % N_3d_y) / N_3d_y,
+                    ) for i in 1:N_3d_y
             ]
             adjl_3d_y = RadialBasisFunctions.find_neighbors(points_3d_y, 20)
             basis_3d_y = PHS(3; poly_deg = 2)
@@ -348,7 +348,7 @@ end
             function loss_partial_weights_3d_y(pts)
                 pts_vec = [
                     SVector{3}(pts[3 * i - 2], pts[3 * i - 1], pts[3 * i]) for
-                    i in 1:N_3d_y
+                        i in 1:N_3d_y
                 ]
                 W = RadialBasisFunctions._build_weights(
                     ℒ_3d_y, pts_vec, pts_vec, adjl_3d_y, basis_3d_y
@@ -371,10 +371,10 @@ end
             N_3d_z = 64
             points_3d_z = [
                 SVector{3}(
-                    0.1 + 0.8 * ((i * 7 + 3) % N_3d_z) / N_3d_z,
-                    0.1 + 0.8 * ((i * 11 + 5) % N_3d_z) / N_3d_z,
-                    0.1 + 0.8 * ((i * 13 + 7) % N_3d_z) / N_3d_z,
-                ) for i in 1:N_3d_z
+                        0.1 + 0.8 * ((i * 7 + 3) % N_3d_z) / N_3d_z,
+                        0.1 + 0.8 * ((i * 11 + 5) % N_3d_z) / N_3d_z,
+                        0.1 + 0.8 * ((i * 13 + 7) % N_3d_z) / N_3d_z,
+                    ) for i in 1:N_3d_z
             ]
             adjl_3d_z = RadialBasisFunctions.find_neighbors(points_3d_z, 20)
             basis_3d_z = PHS(3; poly_deg = 2)
@@ -383,7 +383,7 @@ end
             function loss_partial_weights_3d_z(pts)
                 pts_vec = [
                     SVector{3}(pts[3 * i - 2], pts[3 * i - 1], pts[3 * i]) for
-                    i in 1:N_3d_z
+                        i in 1:N_3d_z
                 ]
                 W = RadialBasisFunctions._build_weights(
                     ℒ_3d_z, pts_vec, pts_vec, adjl_3d_z, basis_3d_z
