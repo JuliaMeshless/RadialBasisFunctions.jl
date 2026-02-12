@@ -2,6 +2,7 @@ using RadialBasisFunctions
 using ChainRulesCore
 using StaticArraysCore
 using FiniteDifferences
+using LinearAlgebra: Symmetric, dot
 using Test
 
 const FD = FiniteDifferences
@@ -140,5 +141,160 @@ end
         @test hasproperty(Δinterp, :rbf_weights)
         @test hasproperty(Δinterp, :monomial_weights)
         @test !all(iszero, Δinterp.rbf_weights)
+    end
+end
+
+@testset "Direct backward stencil functions" begin
+    # Test backward_stencil_partial! and backward_stencil_laplacian! directly.
+    # These are the non-ε variants used by the Enzyme extension, which is skipped
+    # on Julia 1.12+ so they need direct coverage.
+
+    N = 25
+    points = [SVector{2}(0.1 + 0.8 * i / 5, 0.1 + 0.8 * j / 5) for i in 1:5 for j in 1:5]
+    adjl = RadialBasisFunctions.find_neighbors(points, 10)
+    k = 10
+
+    # Helper: compute stencil weights from flat local_data + eval_point vector
+    function _compute_stencil_weights(flat_data, dim_space, k, basis, mon, ℒrbf, ℒmon)
+        nmon = binomial(dim_space + basis.poly_deg, basis.poly_deg)
+        n = k + nmon
+        ld = [SVector{dim_space}(flat_data[(dim_space * (i - 1) + 1):(dim_space * i)]...) for i in 1:k]
+        ep_start = dim_space * k + 1
+        ep = SVector{dim_space}(flat_data[ep_start:(ep_start + dim_space - 1)]...)
+        A_full = zeros(Float64, n, n)
+        A = Symmetric(A_full, :U)
+        RadialBasisFunctions._build_collocation_matrix!(A, ld, basis, mon, k)
+        b = zeros(Float64, n)
+        RadialBasisFunctions._build_rhs!(b, ℒrbf, ℒmon, ld, ep, basis, mon, k)
+        λ = Symmetric(A_full, :U) \ b
+        return λ[1:k]
+    end
+
+    @testset "backward_stencil_partial!" begin
+        basis = PHS(3; poly_deg = 2)
+        ℒ = Partial(1, 1)
+        mon = MonomialBasis(2, basis.poly_deg)
+        ℒmon = ℒ(mon)
+        ℒrbf = ℒ(basis)
+
+        W, cache = RadialBasisFunctions._forward_with_cache(
+            points, points, adjl, basis, ℒrbf, ℒmon, mon, Partial
+        )
+
+        eval_idx = 13
+        neighbors = adjl[eval_idx]
+        eval_point = points[eval_idx]
+        stencil_cache = cache.stencil_caches[eval_idx]
+
+        Δw = randn(k, 1)
+
+        local_data = [points[i] for i in neighbors]
+        Δlocal_data = [zeros(Float64, 2) for _ in 1:k]
+        Δeval_pt = zeros(Float64, 2)
+
+        grad_Lφ_x = RadialBasisFunctions.grad_applied_partial_wrt_x(basis, ℒ.dim)
+        grad_Lφ_xi = RadialBasisFunctions.grad_applied_partial_wrt_xi(basis, ℒ.dim)
+
+        RadialBasisFunctions.backward_stencil_partial!(
+            Δlocal_data, Δeval_pt, Δw, stencil_cache, collect(1:k),
+            eval_point, local_data, basis, mon, k, ℒ.dim, grad_Lφ_x, grad_Lφ_xi
+        )
+
+        # Compare with with-ε version (should give identical results for PHS)
+        Δlocal_data_ε = [zeros(Float64, 2) for _ in 1:k]
+        Δeval_pt_ε = zeros(Float64, 2)
+        Δε_acc = Ref(0.0)
+
+        RadialBasisFunctions.backward_stencil_partial_with_ε!(
+            Δlocal_data_ε, Δeval_pt_ε, Δε_acc, Δw, stencil_cache, collect(1:k),
+            eval_point, local_data, basis, mon, k, ℒ.dim, grad_Lφ_x, grad_Lφ_xi
+        )
+
+        for i in 1:k
+            @test isapprox(Δlocal_data[i], Δlocal_data_ε[i]; atol = 1.0e-12)
+        end
+        @test isapprox(Δeval_pt, Δeval_pt_ε; atol = 1.0e-12)
+
+        # Verify against finite differences
+        flat_data = vcat([collect(d) for d in local_data]..., collect(eval_point))
+        loss_stencil(x) = dot(
+            Δw[:, 1], _compute_stencil_weights(x, 2, k, basis, mon, ℒrbf, ℒmon)
+        )
+        fd_grad = FD.grad(FD.central_fdm(5, 1), loss_stencil, flat_data)[1]
+
+        backward_grad = zeros(2 * k + 2)
+        for i in 1:k
+            backward_grad[2 * i - 1] = Δlocal_data[i][1]
+            backward_grad[2 * i] = Δlocal_data[i][2]
+        end
+        backward_grad[2 * k + 1] = Δeval_pt[1]
+        backward_grad[2 * k + 2] = Δeval_pt[2]
+
+        @test !all(iszero, backward_grad)
+        @test isapprox(backward_grad, fd_grad; rtol = 1.0e-4)
+    end
+
+    @testset "backward_stencil_laplacian!" begin
+        basis = PHS(3; poly_deg = 2)
+        ℒ = Laplacian()
+        mon = MonomialBasis(2, basis.poly_deg)
+        ℒmon = ℒ(mon)
+        ℒrbf = ℒ(basis)
+
+        W, cache = RadialBasisFunctions._forward_with_cache(
+            points, points, adjl, basis, ℒrbf, ℒmon, mon, Laplacian
+        )
+
+        eval_idx = 13
+        neighbors = adjl[eval_idx]
+        eval_point = points[eval_idx]
+        stencil_cache = cache.stencil_caches[eval_idx]
+
+        Δw = randn(k, 1)
+
+        local_data = [points[i] for i in neighbors]
+        Δlocal_data = [zeros(Float64, 2) for _ in 1:k]
+        Δeval_pt = zeros(Float64, 2)
+
+        grad_Lφ_x = RadialBasisFunctions.grad_applied_laplacian_wrt_x(basis)
+        grad_Lφ_xi = RadialBasisFunctions.grad_applied_laplacian_wrt_xi(basis)
+
+        RadialBasisFunctions.backward_stencil_laplacian!(
+            Δlocal_data, Δeval_pt, Δw, stencil_cache, collect(1:k),
+            eval_point, local_data, basis, mon, k, grad_Lφ_x, grad_Lφ_xi
+        )
+
+        # Compare with with-ε version (should give identical results for PHS)
+        Δlocal_data_ε = [zeros(Float64, 2) for _ in 1:k]
+        Δeval_pt_ε = zeros(Float64, 2)
+        Δε_acc = Ref(0.0)
+
+        RadialBasisFunctions.backward_stencil_laplacian_with_ε!(
+            Δlocal_data_ε, Δeval_pt_ε, Δε_acc, Δw, stencil_cache, collect(1:k),
+            eval_point, local_data, basis, mon, k, grad_Lφ_x, grad_Lφ_xi
+        )
+
+        for i in 1:k
+            @test isapprox(Δlocal_data[i], Δlocal_data_ε[i]; atol = 1.0e-12)
+        end
+        @test isapprox(Δeval_pt, Δeval_pt_ε; atol = 1.0e-12)
+
+        # Verify against finite differences
+        flat_data = vcat([collect(d) for d in local_data]..., collect(eval_point))
+        loss_stencil(x) = dot(
+            Δw[:, 1], _compute_stencil_weights(x, 2, k, basis, mon, ℒrbf, ℒmon)
+        )
+        fd_grad = FD.grad(FD.central_fdm(5, 1), loss_stencil, flat_data)[1]
+
+        backward_grad = zeros(2 * k + 2)
+        for i in 1:k
+            backward_grad[2 * i - 1] = Δlocal_data[i][1]
+            backward_grad[2 * i] = Δlocal_data[i][2]
+        end
+        backward_grad[2 * k + 1] = Δeval_pt[1]
+        backward_grad[2 * k + 2] = Δeval_pt[2]
+
+        @test !all(iszero, backward_grad)
+        @test isapprox(backward_grad, fd_grad; rtol = 1.0e-4)
     end
 end
