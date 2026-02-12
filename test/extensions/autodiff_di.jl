@@ -6,6 +6,7 @@ using Test
 import DifferentiationInterface as DI
 using Enzyme: Enzyme
 using Mooncake: Mooncake
+using Random: MersenneTwister
 
 const FD = FiniteDifferences
 
@@ -84,10 +85,11 @@ end
     end
 
     @testset "Interpolator Differentiation" begin
+        rng = MersenneTwister(789)
         N = 30
-        points = [SVector{2}(rand(), rand()) for _ in 1:N]
+        points = [SVector{2}(rand(rng), rand(rng)) for _ in 1:N]
         values = sin.(getindex.(points, 1))
-        eval_points = [SVector{2}(rand(), rand()) for _ in 1:10]
+        eval_points = [SVector{2}(rand(rng), rand(rng)) for _ in 1:10]
 
         @testset "Construction w.r.t. values (PHS default)" begin
             function loss_interp(v)

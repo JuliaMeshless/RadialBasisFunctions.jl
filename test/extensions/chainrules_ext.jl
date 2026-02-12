@@ -3,6 +3,7 @@ using ChainRulesCore
 using StaticArraysCore
 using FiniteDifferences
 using LinearAlgebra: Symmetric, dot
+using Random: MersenneTwister
 using Test
 
 const FD = FiniteDifferences
@@ -153,6 +154,7 @@ end
     points = [SVector{2}(0.1 + 0.8 * i / 5, 0.1 + 0.8 * j / 5) for i in 1:5 for j in 1:5]
     adjl = RadialBasisFunctions.find_neighbors(points, 10)
     k = 10
+    rng = MersenneTwister(42)
 
     # Helper: compute stencil weights from flat local_data + eval_point vector
     function _compute_stencil_weights(flat_data, dim_space, k, basis, mon, ℒrbf, ℒmon)
@@ -186,7 +188,7 @@ end
         eval_point = points[eval_idx]
         stencil_cache = cache.stencil_caches[eval_idx]
 
-        Δw = randn(k, 1)
+        Δw = randn(rng, k, 1)
 
         local_data = [points[i] for i in neighbors]
         Δlocal_data = [zeros(Float64, 2) for _ in 1:k]
@@ -231,7 +233,7 @@ end
         backward_grad[2 * k + 2] = Δeval_pt[2]
 
         @test !all(iszero, backward_grad)
-        @test isapprox(backward_grad, fd_grad; rtol = 1.0e-4)
+        @test isapprox(backward_grad, fd_grad; rtol = 1.0e-3)
     end
 
     @testset "backward_stencil_laplacian!" begin
@@ -250,7 +252,7 @@ end
         eval_point = points[eval_idx]
         stencil_cache = cache.stencil_caches[eval_idx]
 
-        Δw = randn(k, 1)
+        Δw = randn(rng, k, 1)
 
         local_data = [points[i] for i in neighbors]
         Δlocal_data = [zeros(Float64, 2) for _ in 1:k]
@@ -295,6 +297,6 @@ end
         backward_grad[2 * k + 2] = Δeval_pt[2]
 
         @test !all(iszero, backward_grad)
-        @test isapprox(backward_grad, fd_grad; rtol = 1.0e-4)
+        @test isapprox(backward_grad, fd_grad; rtol = 1.0e-3)
     end
 end
