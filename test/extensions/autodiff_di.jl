@@ -246,6 +246,31 @@ end
             end
         end
 
+        @testset "Different PHS orders for Laplacian" begin
+            for n in [1, 3, 5, 7]
+                basis = PHS(n; poly_deg = 1)
+                ℒ = Laplacian()
+
+                function loss_laplacian_phs_order(pts)
+                    pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
+                    W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
+                    return sum(W.nzval .^ 2)
+                end
+
+                pts_flat = vcat([collect(p) for p in points]...)
+
+                for (name, backend) in AD_BACKENDS
+                    @testset "PHS($n) - $name" begin
+                        di_grad = DI.gradient(loss_laplacian_phs_order, backend, pts_flat)
+                        fd_grad = FD.grad(FD.central_fdm(5, 1), loss_laplacian_phs_order, pts_flat)[1]
+                        # PHS1 may have zero gradient for some configurations
+                        @test !all(iszero, di_grad) || n == 1
+                        @test isapprox(di_grad, fd_grad; rtol = 1.0e-2)
+                    end
+                end
+            end
+        end
+
         @testset "1D Partial operator with PHS3" begin
             N_1d = 10
             points_1d = [SVector{1}(0.1 + 0.8 * i / N_1d) for i in 1:N_1d]
@@ -302,6 +327,76 @@ end
                 @testset "$name" begin
                     test_gradient_vs_fd(
                         loss_partial_weights_3d, pts_flat_3d, backend; rtol = 1.0e-3
+                    )
+                end
+            end
+        end
+
+        @testset "3D Partial(1,2) operator with PHS3" begin
+            N_3d_y = 64
+            points_3d_y = [
+                SVector{3}(
+                    0.1 + 0.8 * ((i * 7 + 3) % N_3d_y) / N_3d_y,
+                    0.1 + 0.8 * ((i * 11 + 5) % N_3d_y) / N_3d_y,
+                    0.1 + 0.8 * ((i * 13 + 7) % N_3d_y) / N_3d_y,
+                ) for i in 1:N_3d_y
+            ]
+            adjl_3d_y = RadialBasisFunctions.find_neighbors(points_3d_y, 20)
+            basis_3d_y = PHS(3; poly_deg = 2)
+            ℒ_3d_y = Partial(1, 2)
+
+            function loss_partial_weights_3d_y(pts)
+                pts_vec = [
+                    SVector{3}(pts[3 * i - 2], pts[3 * i - 1], pts[3 * i]) for
+                    i in 1:N_3d_y
+                ]
+                W = RadialBasisFunctions._build_weights(
+                    ℒ_3d_y, pts_vec, pts_vec, adjl_3d_y, basis_3d_y
+                )
+                return sum(W.nzval .^ 2)
+            end
+
+            pts_flat_3d_y = vcat([collect(p) for p in points_3d_y]...)
+
+            for (name, backend) in AD_BACKENDS
+                @testset "$name" begin
+                    test_gradient_vs_fd(
+                        loss_partial_weights_3d_y, pts_flat_3d_y, backend; rtol = 1.0e-3
+                    )
+                end
+            end
+        end
+
+        @testset "3D Partial(1,3) operator with PHS3" begin
+            N_3d_z = 64
+            points_3d_z = [
+                SVector{3}(
+                    0.1 + 0.8 * ((i * 7 + 3) % N_3d_z) / N_3d_z,
+                    0.1 + 0.8 * ((i * 11 + 5) % N_3d_z) / N_3d_z,
+                    0.1 + 0.8 * ((i * 13 + 7) % N_3d_z) / N_3d_z,
+                ) for i in 1:N_3d_z
+            ]
+            adjl_3d_z = RadialBasisFunctions.find_neighbors(points_3d_z, 20)
+            basis_3d_z = PHS(3; poly_deg = 2)
+            ℒ_3d_z = Partial(1, 3)
+
+            function loss_partial_weights_3d_z(pts)
+                pts_vec = [
+                    SVector{3}(pts[3 * i - 2], pts[3 * i - 1], pts[3 * i]) for
+                    i in 1:N_3d_z
+                ]
+                W = RadialBasisFunctions._build_weights(
+                    ℒ_3d_z, pts_vec, pts_vec, adjl_3d_z, basis_3d_z
+                )
+                return sum(W.nzval .^ 2)
+            end
+
+            pts_flat_3d_z = vcat([collect(p) for p in points_3d_z]...)
+
+            for (name, backend) in AD_BACKENDS
+                @testset "$name" begin
+                    test_gradient_vs_fd(
+                        loss_partial_weights_3d_z, pts_flat_3d_z, backend; rtol = 1.0e-3
                     )
                 end
             end
