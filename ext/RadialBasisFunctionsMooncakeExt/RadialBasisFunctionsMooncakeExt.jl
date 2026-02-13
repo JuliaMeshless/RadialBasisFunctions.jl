@@ -44,6 +44,41 @@ function Mooncake.increment_and_get_rdata!(
     return Mooncake.NoRData()
 end
 
+# =============================================================================
+# increment_and_get_rdata! for Gaussian/IMQ Tangent types from ChainRulesCore
+# =============================================================================
+# When rrules return ChainRulesCore.Tangent{Gaussian/IMQ,...}, Mooncake needs to
+# know how to accumulate these into its internal RData representation.
+
+# Gaussian tangent: extract ε from ChainRulesCore.Tangent and add to RData
+function Mooncake.increment_and_get_rdata!(
+        ::Mooncake.NoFData,
+        r::Mooncake.RData{@NamedTuple{ε::T, poly_deg::Mooncake.NoRData}},
+        t::ChainRulesCore.Tangent{<:Gaussian},
+    ) where {T}
+    # Extract ε from ChainRulesCore tangent and add to Mooncake RData
+    Δε = t.ε
+    if !(Δε isa ChainRulesCore.NoTangent) && !(Δε isa ChainRulesCore.ZeroTangent)
+        new_ε = r.data.ε + T(Δε)
+        return Mooncake.RData{@NamedTuple{ε::T, poly_deg::Mooncake.NoRData}}((ε = new_ε, poly_deg = Mooncake.NoRData()))
+    end
+    return r
+end
+
+# IMQ tangent: same pattern as Gaussian
+function Mooncake.increment_and_get_rdata!(
+        ::Mooncake.NoFData,
+        r::Mooncake.RData{@NamedTuple{ε::T, poly_deg::Mooncake.NoRData}},
+        t::ChainRulesCore.Tangent{<:IMQ},
+    ) where {T}
+    Δε = t.ε
+    if !(Δε isa ChainRulesCore.NoTangent) && !(Δε isa ChainRulesCore.ZeroTangent)
+        new_ε = r.data.ε + T(Δε)
+        return Mooncake.RData{@NamedTuple{ε::T, poly_deg::Mooncake.NoRData}}((ε = new_ε, poly_deg = Mooncake.NoRData()))
+    end
+    return r
+end
+
 # Import ChainRulesCore rules into Mooncake using @from_rrule
 # The DefaultCtx is used for standard (non-debug) differentiation
 
@@ -62,6 +97,13 @@ Mooncake.@from_rrule(
     Tuple{typeof(_eval_op), RadialBasisOperator{<:VectorValuedOperator}, Vector{Float64}}
 )
 
+# Operator call syntax: op(x) - bypasses cache check issues
+Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{RadialBasisOperator, Vector{Float64}})
+
+Mooncake.@from_rrule(
+    Mooncake.DefaultCtx, Tuple{RadialBasisOperator{<:VectorValuedOperator}, Vector{Float64}}
+)
+
 # Basis function rules for common types (Float64 vectors)
 # These enable differentiating through weight computation if needed
 
@@ -77,8 +119,14 @@ Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{IMQ, Vector{Float64}, Vector{Flo
 
 Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{Gaussian, Vector{Float64}, Vector{Float64}})
 
-# Interpolator rules
+# Interpolator evaluation rules
 Mooncake.@from_rrule(Mooncake.DefaultCtx, Tuple{Interpolator, Vector{Float64}})
+
+# Interpolator construction rules (for differentiating through construction)
+Mooncake.@from_rrule(
+    Mooncake.DefaultCtx,
+    Tuple{Type{Interpolator}, AbstractVector, AbstractVector, AbstractRadialBasis}
+)
 
 # _build_weights rules for shape optimization
 # These enable differentiating through operator construction w.r.t. point positions
@@ -130,6 +178,34 @@ Mooncake.@from_rrule(
     Mooncake.DefaultCtx,
     Tuple{
         typeof(_build_weights), Laplacian, AbstractVector, AbstractVector, AbstractVector, PHS7,
+    }
+)
+
+# IMQ basis with Partial and Laplacian operators
+Mooncake.@from_rrule(
+    Mooncake.DefaultCtx,
+    Tuple{typeof(_build_weights), Partial, AbstractVector, AbstractVector, AbstractVector, IMQ}
+)
+
+Mooncake.@from_rrule(
+    Mooncake.DefaultCtx,
+    Tuple{
+        typeof(_build_weights), Laplacian, AbstractVector, AbstractVector, AbstractVector, IMQ,
+    }
+)
+
+# Gaussian basis with Partial and Laplacian operators
+Mooncake.@from_rrule(
+    Mooncake.DefaultCtx,
+    Tuple{
+        typeof(_build_weights), Partial, AbstractVector, AbstractVector, AbstractVector, Gaussian,
+    }
+)
+
+Mooncake.@from_rrule(
+    Mooncake.DefaultCtx,
+    Tuple{
+        typeof(_build_weights), Laplacian, AbstractVector, AbstractVector, AbstractVector, Gaussian,
     }
 )
 

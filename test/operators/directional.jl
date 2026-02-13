@@ -3,6 +3,9 @@ using StaticArraysCore
 using Statistics
 using HaltonSequences
 using LinearAlgebra
+using Random: MersenneTwister
+
+rng = MersenneTwister(456)
 
 include("../test_utils.jl")
 
@@ -26,7 +29,7 @@ end
 
 @testset "Direction Vector for Each Data Center" begin
     v = map(1:length(x)) do i
-        v = SVector{2}(rand(2))
+        v = SVector{2}(rand(rng, 2))
         return v /= norm(v)
     end
     ∇v = directional(x, v, PHS3(2))
@@ -37,7 +40,7 @@ end
 @testset "Different Evaluation Points" begin
     x2 = SVector{2}.(HaltonPoint(2)[1:N])
     v = map(1:length(x2)) do i
-        v = SVector{2}(rand(2))
+        v = SVector{2}(rand(rng, 2))
         return v /= norm(v)
     end
     ∇v = directional(x, x2, v, PHS3(2))
@@ -54,7 +57,7 @@ end
     # number of geometrical vectors don't match number of points when using a different
     # geometrical vector for each point
     v = map(1:(length(x) - 1)) do i
-        v = SVector{2}(rand(2))
+        v = SVector{2}(rand(rng, 2))
         return v /= norm(v)
     end
     @test_throws DomainError directional(x, v)

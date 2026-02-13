@@ -32,7 +32,7 @@ jobs:
             - uses: julia-actions/cache@v2
             - uses: julia-actions/julia-downgrade-compat@v1
               with:
-                  skip: LinearAlgebra, Random, Statistics
+                  skip: LinearAlgebra, Random, Statistics, Enzyme, EnzymeCore, Mooncake, ChainRulesCore, FiniteDifferences
                   projects: ., test, docs
             - uses: julia-actions/julia-buildpkg@v1
               env:

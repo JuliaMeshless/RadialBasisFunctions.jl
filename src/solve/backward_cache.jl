@@ -1,6 +1,6 @@
 #=
 Cache types for storing forward pass results needed by the backward pass
-of _build_weights rrule.
+of _build_weights differentiation rules.
 
 The key data needed:
 - lambda: Full solution vector for each stencil (k+nmon size)
@@ -10,8 +10,6 @@ Note: We store the matrix directly rather than a factorization because
 the RBF collocation matrix with polynomial augmentation is symmetric but
 NOT positive definite (has zero blocks), so Cholesky doesn't work.
 =#
-
-using LinearAlgebra: lu, LU
 
 """
     StencilForwardCache{T}
@@ -31,7 +29,7 @@ struct StencilForwardCache{T, M <: AbstractMatrix{T}}
 end
 
 """
-    WeightsBuildForwardCache{T, TD}
+    WeightsBuildForwardCache{T}
 
 Global cache storing all stencil results and references to inputs.
 

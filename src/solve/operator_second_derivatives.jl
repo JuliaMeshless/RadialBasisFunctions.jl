@@ -11,8 +11,6 @@ These are effectively Hessian-like terms of the basis function.
 
 using Distances: euclidean
 
-const AVOID_INF = RadialBasisFunctions.AVOID_INF
-
 # ============================================================================
 # PHS3: φ(r) = r³
 # First derivative: ∂φ/∂x[dim] = 3 * (x[dim] - xi[dim]) * r
@@ -332,65 +330,6 @@ end
 # ============================================================================
 
 """
-    get_grad_Lrbf_wrt_x(ℒrbf, basis)
-
-Get the function that computes ∂/∂x[ℒφ(x, xi)] for the given operator and basis.
-"""
-function get_grad_Lrbf_wrt_x(ℒrbf, basis::PHS1)
-    # Detect operator type from the applied operator
-    # For now, we support Partial and Laplacian
-    return _get_grad_Lrbf_wrt_x_impl(ℒrbf, basis)
-end
-
-function get_grad_Lrbf_wrt_x(ℒrbf, basis::PHS3)
-    return _get_grad_Lrbf_wrt_x_impl(ℒrbf, basis)
-end
-
-function get_grad_Lrbf_wrt_x(ℒrbf, basis::PHS5)
-    return _get_grad_Lrbf_wrt_x_impl(ℒrbf, basis)
-end
-
-function get_grad_Lrbf_wrt_x(ℒrbf, basis::PHS7)
-    return _get_grad_Lrbf_wrt_x_impl(ℒrbf, basis)
-end
-
-function get_grad_Lrbf_wrt_xi(ℒrbf, basis::PHS1)
-    return _get_grad_Lrbf_wrt_xi_impl(ℒrbf, basis)
-end
-
-function get_grad_Lrbf_wrt_xi(ℒrbf, basis::PHS3)
-    return _get_grad_Lrbf_wrt_xi_impl(ℒrbf, basis)
-end
-
-function get_grad_Lrbf_wrt_xi(ℒrbf, basis::PHS5)
-    return _get_grad_Lrbf_wrt_xi_impl(ℒrbf, basis)
-end
-
-function get_grad_Lrbf_wrt_xi(ℒrbf, basis::PHS7)
-    return _get_grad_Lrbf_wrt_xi_impl(ℒrbf, basis)
-end
-
-# Implementation using operator traits
-# The applied operator ℒrbf is a closure - we detect type via inspection
-
-function _get_grad_Lrbf_wrt_x_impl(ℒrbf, basis::PHS1)
-    # Try to detect if it's a partial or laplacian
-    # This is a simplified approach - in practice you may need to store operator info
-    return error(
-        "Operator type detection not yet implemented for PHS1. Pass operator info explicitly.",
-    )
-end
-
-function _get_grad_Lrbf_wrt_xi_impl(ℒrbf, basis::PHS1)
-    return error(
-        "Operator type detection not yet implemented for PHS1. Pass operator info explicitly.",
-    )
-end
-
-# For now, provide explicit dispatch on operator types
-# These will be called from the backward pass with known operator types
-
-"""
     grad_applied_partial_wrt_x(basis, dim)
 
 Get gradient of applied partial derivative operator w.r.t. evaluation point.
@@ -462,4 +401,265 @@ end
 
 function grad_applied_laplacian_wrt_xi(::PHS7)
     return grad_laplacian_phs7_wrt_xi()
+end
+
+# ============================================================================
+# IMQ: φ(r) = 1/√(1 + (εr)²)
+# Let s = ε²r² + 1, then φ = 1/√s = s^(-1/2)
+# First derivative: ∂φ/∂x[dim] = -ε² * δ_d / s^(3/2)
+# ============================================================================
+
+"""
+    grad_partial_imq_wrt_x(ε, dim)
+
+Returns a function computing ∂/∂x[j] of [∂φ/∂x[dim]] for IMQ.
+
+Mathematical derivation:
+  Let s = ε²r² + 1, δ_d = x[dim] - xi[dim]
+  ∂φ/∂x[dim] = -ε² * δ_d / s^(3/2)
+
+  ∂²φ/∂x[j]∂x[dim] = -ε² * [δ_{j,dim} / s^(3/2) - δ_d * (3/2) * s^(-5/2) * 2ε² * δ_j]
+                   = -ε² * δ_{j,dim} / s^(3/2) + 3ε⁴ * δ_d * δ_j / s^(5/2)
+
+  For j == dim: -ε² / s^(3/2) + 3ε⁴ * δ_d² / s^(5/2)
+  For j != dim: 3ε⁴ * δ_d * δ_j / s^(5/2)
+"""
+function grad_partial_imq_wrt_x(ε::T, dim::Int) where {T}
+    ε2 = ε^2
+    ε4 = ε^4
+    function grad_Lφ_x(x, xi)
+        r2 = sqeuclidean(x, xi)
+        s = ε2 * r2 + 1
+        s32 = sqrt(s^3)
+        s52 = sqrt(s^5)
+        δ = x .- xi
+        δ_d = δ[dim]
+
+        result = similar(x, eltype(x))
+        @inbounds for j in eachindex(x)
+            if j == dim
+                result[j] = -ε2 / s32 + 3 * ε4 * δ_d^2 / s52
+            else
+                result[j] = 3 * ε4 * δ_d * δ[j] / s52
+            end
+        end
+        return result
+    end
+    return grad_Lφ_x
+end
+
+"""
+    grad_partial_imq_wrt_xi(ε, dim)
+
+Returns a function computing ∂/∂xi[j] of [∂φ/∂x[dim]] for IMQ.
+
+By symmetry: ∂/∂xi = -∂/∂x for terms depending on (x - xi).
+"""
+function grad_partial_imq_wrt_xi(ε::T, dim::Int) where {T}
+    grad_x = grad_partial_imq_wrt_x(ε, dim)
+    function grad_Lφ_xi(x, xi)
+        return -grad_x(x, xi)
+    end
+    return grad_Lφ_xi
+end
+
+# ============================================================================
+# IMQ: Laplacian ∇²φ = 3ε⁴r²/s^(5/2) - D*ε²/s^(3/2)
+# where s = ε²r² + 1, D = dimension
+# ============================================================================
+
+"""
+    grad_laplacian_imq_wrt_x(ε)
+
+Returns a function computing ∂/∂x[j] of [∇²φ] for IMQ.
+
+Mathematical derivation:
+  ∇²φ = sum_i [∂²φ/∂x[i]²] = 3ε⁴r²/s^(5/2) - D*ε²/s^(3/2)
+
+  Let u = 3ε⁴r²/s^(5/2) and v = D*ε²/s^(3/2)
+
+  ∂u/∂x[j] = 3ε⁴ * [2δ_j / s^(5/2) - r² * (5/2) * s^(-7/2) * 2ε² * δ_j]
+           = 3ε⁴ * δ_j * [2/s^(5/2) - 5ε²r²/s^(7/2)]
+           = δ_j * [6ε⁴/s^(5/2) - 15ε⁶r²/s^(7/2)]
+
+  ∂v/∂x[j] = D*ε² * (-(3/2) * s^(-5/2) * 2ε² * δ_j)
+           = -3D*ε⁴ * δ_j / s^(5/2)
+
+  ∂(∇²φ)/∂x[j] = ∂u/∂x[j] - ∂v/∂x[j]
+               = δ_j * [6ε⁴/s^(5/2) - 15ε⁶r²/s^(7/2) + 3D*ε⁴/s^(5/2)]
+               = δ_j * [(6 + 3D)ε⁴/s^(5/2) - 15ε⁶r²/s^(7/2)]
+               = δ_j * [3(D+2)ε⁴/s^(5/2) - 15ε⁶r²/s^(7/2)]
+"""
+function grad_laplacian_imq_wrt_x(ε::T) where {T}
+    ε2 = ε^2
+    ε4 = ε^4
+    ε6 = ε^6
+    function grad_Lφ_x(x, xi)
+        D = length(x)
+        r2 = sqeuclidean(x, xi)
+        s = ε2 * r2 + 1
+        s52 = sqrt(s^5)
+        s72 = sqrt(s^7)
+        δ = x .- xi
+        coeff = 3 * (D + 2) * ε4 / s52 - 15 * ε6 * r2 / s72
+        return coeff .* δ
+    end
+    return grad_Lφ_x
+end
+
+"""
+    grad_laplacian_imq_wrt_xi(ε)
+
+Returns a function computing ∂/∂xi[j] of [∇²φ] for IMQ.
+"""
+function grad_laplacian_imq_wrt_xi(ε::T) where {T}
+    grad_x = grad_laplacian_imq_wrt_x(ε)
+    function grad_Lφ_xi(x, xi)
+        return -grad_x(x, xi)
+    end
+    return grad_Lφ_xi
+end
+
+# ============================================================================
+# Gaussian: φ(r) = exp(-(εr)²)
+# First derivative: ∂φ/∂x[dim] = -2ε² * δ_d * φ
+# ============================================================================
+
+"""
+    grad_partial_gaussian_wrt_x(ε, dim)
+
+Returns a function computing ∂/∂x[j] of [∂φ/∂x[dim]] for Gaussian.
+
+Mathematical derivation:
+  φ = exp(-ε²r²)
+  ∂φ/∂x[dim] = -2ε² * δ_d * φ
+
+  ∂²φ/∂x[j]∂x[dim] = -2ε² * [δ_{j,dim} * φ + δ_d * ∂φ/∂x[j]]
+                   = -2ε² * [δ_{j,dim} * φ + δ_d * (-2ε² * δ_j * φ)]
+                   = -2ε² * φ * [δ_{j,dim} - 2ε² * δ_d * δ_j]
+                   = φ * [-2ε² * δ_{j,dim} + 4ε⁴ * δ_d * δ_j]
+
+  For j == dim: φ * (4ε⁴ * δ_d² - 2ε²)
+  For j != dim: φ * 4ε⁴ * δ_d * δ_j
+"""
+function grad_partial_gaussian_wrt_x(ε::T, dim::Int) where {T}
+    ε2 = ε^2
+    ε4 = ε^4
+    function grad_Lφ_x(x, xi)
+        r2 = sqeuclidean(x, xi)
+        φ = exp(-ε2 * r2)
+        δ = x .- xi
+        δ_d = δ[dim]
+
+        result = similar(x, eltype(x))
+        @inbounds for j in eachindex(x)
+            if j == dim
+                result[j] = φ * (4 * ε4 * δ_d^2 - 2 * ε2)
+            else
+                result[j] = φ * 4 * ε4 * δ_d * δ[j]
+            end
+        end
+        return result
+    end
+    return grad_Lφ_x
+end
+
+"""
+    grad_partial_gaussian_wrt_xi(ε, dim)
+
+Returns a function computing ∂/∂xi[j] of [∂φ/∂x[dim]] for Gaussian.
+
+By symmetry: ∂/∂xi = -∂/∂x for terms depending on (x - xi).
+"""
+function grad_partial_gaussian_wrt_xi(ε::T, dim::Int) where {T}
+    grad_x = grad_partial_gaussian_wrt_x(ε, dim)
+    function grad_Lφ_xi(x, xi)
+        return -grad_x(x, xi)
+    end
+    return grad_Lφ_xi
+end
+
+# ============================================================================
+# Gaussian: Laplacian ∇²φ = (4ε⁴r² - 2ε²D) * φ
+# where D = dimension
+# ============================================================================
+
+"""
+    grad_laplacian_gaussian_wrt_x(ε)
+
+Returns a function computing ∂/∂x[j] of [∇²φ] for Gaussian.
+
+Mathematical derivation:
+  ∇²φ = (4ε⁴r² - 2ε²D) * φ
+
+  Let u = 4ε⁴r² - 2ε²D (coefficient)
+  ∂u/∂x[j] = 4ε⁴ * 2δ_j = 8ε⁴ * δ_j
+
+  ∂(∇²φ)/∂x[j] = ∂u/∂x[j] * φ + u * ∂φ/∂x[j]
+               = 8ε⁴ * δ_j * φ + (4ε⁴r² - 2ε²D) * (-2ε² * δ_j * φ)
+               = φ * δ_j * [8ε⁴ - 2ε² * (4ε⁴r² - 2ε²D)]
+               = φ * δ_j * [8ε⁴ - 8ε⁶r² + 4ε⁴D]
+               = φ * δ_j * 4ε⁴ * [2 + D - 2ε²r²]
+"""
+function grad_laplacian_gaussian_wrt_x(ε::T) where {T}
+    ε2 = ε^2
+    ε4 = ε^4
+    function grad_Lφ_x(x, xi)
+        D = length(x)
+        r2 = sqeuclidean(x, xi)
+        φ = exp(-ε2 * r2)
+        δ = x .- xi
+        coeff = 4 * ε4 * (2 + D - 2 * ε2 * r2)
+        return φ * coeff .* δ
+    end
+    return grad_Lφ_x
+end
+
+"""
+    grad_laplacian_gaussian_wrt_xi(ε)
+
+Returns a function computing ∂/∂xi[j] of [∇²φ] for Gaussian.
+"""
+function grad_laplacian_gaussian_wrt_xi(ε::T) where {T}
+    grad_x = grad_laplacian_gaussian_wrt_x(ε)
+    function grad_Lφ_xi(x, xi)
+        return -grad_x(x, xi)
+    end
+    return grad_Lφ_xi
+end
+
+# ============================================================================
+# Dispatch functions for IMQ and Gaussian
+# ============================================================================
+
+function grad_applied_partial_wrt_x(basis::IMQ, dim::Int)
+    return grad_partial_imq_wrt_x(basis.ε, dim)
+end
+
+function grad_applied_partial_wrt_xi(basis::IMQ, dim::Int)
+    return grad_partial_imq_wrt_xi(basis.ε, dim)
+end
+
+function grad_applied_laplacian_wrt_x(basis::IMQ)
+    return grad_laplacian_imq_wrt_x(basis.ε)
+end
+
+function grad_applied_laplacian_wrt_xi(basis::IMQ)
+    return grad_laplacian_imq_wrt_xi(basis.ε)
+end
+
+function grad_applied_partial_wrt_x(basis::Gaussian, dim::Int)
+    return grad_partial_gaussian_wrt_x(basis.ε, dim)
+end
+
+function grad_applied_partial_wrt_xi(basis::Gaussian, dim::Int)
+    return grad_partial_gaussian_wrt_xi(basis.ε, dim)
+end
+
+function grad_applied_laplacian_wrt_x(basis::Gaussian)
+    return grad_laplacian_gaussian_wrt_x(basis.ε)
+end
+
+function grad_applied_laplacian_wrt_xi(basis::Gaussian)
+    return grad_laplacian_gaussian_wrt_xi(basis.ε)
 end

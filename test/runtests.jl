@@ -94,3 +94,15 @@ end
     include("solve/integration/partial_x_end_to_end.jl")
     include("solve/integration/partial_y_end_to_end.jl")
 end
+
+if Base.find_package("ChainRulesCore") !== nothing
+    @safetestset "ChainRulesCore Extension" begin
+        include("extensions/chainrules_ext.jl")
+    end
+end
+
+if Base.find_package("DifferentiationInterface") !== nothing
+    @safetestset "Autodiff via DifferentiationInterface" begin
+        include("extensions/autodiff_di.jl")
+    end
+end

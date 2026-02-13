@@ -65,3 +65,46 @@ function ChainRulesCore.rrule(
 
     return result, _eval_op_inplace_pullback
 end
+
+# =============================================================================
+# rrules for operator call syntax: op(x)
+# =============================================================================
+# These rules handle the (op::RadialBasisOperator)(x) call directly,
+# bypassing the cache check which can cause issues with some AD backends.
+
+# Scalar-valued operator call: op(x)
+function ChainRulesCore.rrule(op::RadialBasisOperator, x::AbstractVector)
+    # Ensure weights are computed
+    !RadialBasisFunctions.is_cache_valid(op) && RadialBasisFunctions.update_weights!(op)
+    y = _eval_op(op, x)
+
+    function op_call_pullback(Δy)
+        Δy_unthunked = unthunk(Δy)
+        Δx = op.weights' * Δy_unthunked
+        return NoTangent(), Δx
+    end
+
+    return y, op_call_pullback
+end
+
+# Vector-valued operator call: op(x) for gradient/jacobian
+function ChainRulesCore.rrule(
+        op::RadialBasisOperator{<:VectorValuedOperator{D}},
+        x::AbstractVector,
+    ) where {D}
+    # Ensure weights are computed
+    !RadialBasisFunctions.is_cache_valid(op) && RadialBasisFunctions.update_weights!(op)
+    y = _eval_op(op, x)
+
+    function op_call_vector_pullback(Δy)
+        Δy_unthunked = unthunk(Δy)
+        Δx = similar(x)
+        fill!(Δx, zero(eltype(Δx)))
+        for d in 1:D
+            Δx .+= op.weights[d]' * view(Δy_unthunked, :, d)
+        end
+        return NoTangent(), Δx
+    end
+
+    return y, op_call_vector_pullback
+end

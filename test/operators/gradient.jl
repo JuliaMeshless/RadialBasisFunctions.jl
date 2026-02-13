@@ -2,6 +2,9 @@ using RadialBasisFunctions
 using StaticArraysCore
 using Statistics
 using HaltonSequences
+using Random: MersenneTwister
+
+rng = MersenneTwister(345)
 
 include("../test_utils.jl")
 
@@ -25,7 +28,7 @@ y = f.(x)
 end
 
 @testset "Different Evaluation Points" begin
-    x2 = map(x -> SVector{2}(rand(2)), 1:100)
+    x2 = map(x -> SVector{2}(rand(rng, 2)), 1:100)
     ∇ = gradient(x, x2, PHS(3; poly_deg = 2))
     ∇y = ∇(y)
     @test ∇y isa Matrix
