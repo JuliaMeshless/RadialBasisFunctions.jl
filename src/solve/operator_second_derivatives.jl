@@ -9,7 +9,13 @@ where ℒφ is the operator applied to the basis function (e.g., ∂φ/∂dim fo
 These are effectively Hessian-like terms of the basis function.
 =#
 
-using Distances: euclidean
+"""
+    negate_grad(grad_fn)
+
+Given a gradient function `grad_fn(x, xi)`, returns `(x, xi) -> -grad_fn(x, xi)`.
+All `_wrt_xi` functions are the negation of their `_wrt_x` counterparts by symmetry.
+"""
+negate_grad(grad_fn) = (x, xi) -> -grad_fn(x, xi)
 
 # ============================================================================
 # PHS3: φ(r) = r³
@@ -49,21 +55,6 @@ function grad_partial_phs3_wrt_x(dim::Int)
     return grad_Lφ_x
 end
 
-"""
-    grad_partial_phs3_wrt_xi(dim)
-
-Returns a function computing ∂/∂xi[j] of [∂φ/∂x[dim]] for PHS3.
-
-By symmetry: ∂/∂xi = -∂/∂x for terms depending on (x - xi).
-"""
-function grad_partial_phs3_wrt_xi(dim::Int)
-    grad_x = grad_partial_phs3_wrt_x(dim)
-    function grad_Lφ_xi(x, xi)
-        return -grad_x(x, xi)
-    end
-    return grad_Lφ_xi
-end
-
 # ============================================================================
 # PHS3: Laplacian ∇²φ = 12r
 # ============================================================================
@@ -85,19 +76,6 @@ function grad_laplacian_phs3_wrt_x()
         return 12 .* δ ./ r_safe
     end
     return grad_Lφ_x
-end
-
-"""
-    grad_laplacian_phs3_wrt_xi()
-
-Returns a function computing ∂/∂xi[j] of [∇²φ] for PHS3.
-"""
-function grad_laplacian_phs3_wrt_xi()
-    grad_x = grad_laplacian_phs3_wrt_x()
-    function grad_Lφ_xi(x, xi)
-        return -grad_x(x, xi)
-    end
-    return grad_Lφ_xi
 end
 
 # ============================================================================
@@ -143,14 +121,6 @@ function grad_partial_phs1_wrt_x(dim::Int)
     return grad_Lφ_x
 end
 
-function grad_partial_phs1_wrt_xi(dim::Int)
-    grad_x = grad_partial_phs1_wrt_x(dim)
-    function grad_Lφ_xi(x, xi)
-        return -grad_x(x, xi)
-    end
-    return grad_Lφ_xi
-end
-
 """
     grad_laplacian_phs1_wrt_x()
 
@@ -174,14 +144,6 @@ function grad_laplacian_phs1_wrt_x()
         return -2 .* δ ./ r3
     end
     return grad_Lφ_x
-end
-
-function grad_laplacian_phs1_wrt_xi()
-    grad_x = grad_laplacian_phs1_wrt_x()
-    function grad_Lφ_xi(x, xi)
-        return -grad_x(x, xi)
-    end
-    return grad_Lφ_xi
 end
 
 # ============================================================================
@@ -220,14 +182,6 @@ function grad_partial_phs5_wrt_x(dim::Int)
     return grad_Lφ_x
 end
 
-function grad_partial_phs5_wrt_xi(dim::Int)
-    grad_x = grad_partial_phs5_wrt_x(dim)
-    function grad_Lφ_xi(x, xi)
-        return -grad_x(x, xi)
-    end
-    return grad_Lφ_xi
-end
-
 """
     grad_laplacian_phs5_wrt_x()
 
@@ -244,14 +198,6 @@ function grad_laplacian_phs5_wrt_x()
         return 90 .* r .* δ
     end
     return grad_Lφ_x
-end
-
-function grad_laplacian_phs5_wrt_xi()
-    grad_x = grad_laplacian_phs5_wrt_x()
-    function grad_Lφ_xi(x, xi)
-        return -grad_x(x, xi)
-    end
-    return grad_Lφ_xi
 end
 
 # ============================================================================
@@ -290,14 +236,6 @@ function grad_partial_phs7_wrt_x(dim::Int)
     return grad_Lφ_x
 end
 
-function grad_partial_phs7_wrt_xi(dim::Int)
-    grad_x = grad_partial_phs7_wrt_x(dim)
-    function grad_Lφ_xi(x, xi)
-        return -grad_x(x, xi)
-    end
-    return grad_Lφ_xi
-end
-
 """
     grad_laplacian_phs7_wrt_x()
 
@@ -315,92 +253,6 @@ function grad_laplacian_phs7_wrt_x()
         return 280 .* r3 .* δ
     end
     return grad_Lφ_x
-end
-
-function grad_laplacian_phs7_wrt_xi()
-    grad_x = grad_laplacian_phs7_wrt_x()
-    function grad_Lφ_xi(x, xi)
-        return -grad_x(x, xi)
-    end
-    return grad_Lφ_xi
-end
-
-# ============================================================================
-# Dispatch functions to get correct second derivative based on operator/basis
-# ============================================================================
-
-"""
-    grad_applied_partial_wrt_x(basis, dim)
-
-Get gradient of applied partial derivative operator w.r.t. evaluation point.
-"""
-function grad_applied_partial_wrt_x(::PHS1, dim::Int)
-    return grad_partial_phs1_wrt_x(dim)
-end
-
-function grad_applied_partial_wrt_x(::PHS3, dim::Int)
-    return grad_partial_phs3_wrt_x(dim)
-end
-
-function grad_applied_partial_wrt_x(::PHS5, dim::Int)
-    return grad_partial_phs5_wrt_x(dim)
-end
-
-function grad_applied_partial_wrt_x(::PHS7, dim::Int)
-    return grad_partial_phs7_wrt_x(dim)
-end
-
-function grad_applied_partial_wrt_xi(::PHS1, dim::Int)
-    return grad_partial_phs1_wrt_xi(dim)
-end
-
-function grad_applied_partial_wrt_xi(::PHS3, dim::Int)
-    return grad_partial_phs3_wrt_xi(dim)
-end
-
-function grad_applied_partial_wrt_xi(::PHS5, dim::Int)
-    return grad_partial_phs5_wrt_xi(dim)
-end
-
-function grad_applied_partial_wrt_xi(::PHS7, dim::Int)
-    return grad_partial_phs7_wrt_xi(dim)
-end
-
-"""
-    grad_applied_laplacian_wrt_x(basis)
-
-Get gradient of applied Laplacian operator w.r.t. evaluation point.
-"""
-function grad_applied_laplacian_wrt_x(::PHS1)
-    return grad_laplacian_phs1_wrt_x()
-end
-
-function grad_applied_laplacian_wrt_x(::PHS3)
-    return grad_laplacian_phs3_wrt_x()
-end
-
-function grad_applied_laplacian_wrt_x(::PHS5)
-    return grad_laplacian_phs5_wrt_x()
-end
-
-function grad_applied_laplacian_wrt_x(::PHS7)
-    return grad_laplacian_phs7_wrt_x()
-end
-
-function grad_applied_laplacian_wrt_xi(::PHS1)
-    return grad_laplacian_phs1_wrt_xi()
-end
-
-function grad_applied_laplacian_wrt_xi(::PHS3)
-    return grad_laplacian_phs3_wrt_xi()
-end
-
-function grad_applied_laplacian_wrt_xi(::PHS5)
-    return grad_laplacian_phs5_wrt_xi()
-end
-
-function grad_applied_laplacian_wrt_xi(::PHS7)
-    return grad_laplacian_phs7_wrt_xi()
 end
 
 # ============================================================================
@@ -448,21 +300,6 @@ function grad_partial_imq_wrt_x(ε::T, dim::Int) where {T}
     return grad_Lφ_x
 end
 
-"""
-    grad_partial_imq_wrt_xi(ε, dim)
-
-Returns a function computing ∂/∂xi[j] of [∂φ/∂x[dim]] for IMQ.
-
-By symmetry: ∂/∂xi = -∂/∂x for terms depending on (x - xi).
-"""
-function grad_partial_imq_wrt_xi(ε::T, dim::Int) where {T}
-    grad_x = grad_partial_imq_wrt_x(ε, dim)
-    function grad_Lφ_xi(x, xi)
-        return -grad_x(x, xi)
-    end
-    return grad_Lφ_xi
-end
-
 # ============================================================================
 # IMQ: Laplacian ∇²φ = 3ε⁴r²/s^(5/2) - D*ε²/s^(3/2)
 # where s = ε²r² + 1, D = dimension
@@ -476,19 +313,7 @@ Returns a function computing ∂/∂x[j] of [∇²φ] for IMQ.
 Mathematical derivation:
   ∇²φ = sum_i [∂²φ/∂x[i]²] = 3ε⁴r²/s^(5/2) - D*ε²/s^(3/2)
 
-  Let u = 3ε⁴r²/s^(5/2) and v = D*ε²/s^(3/2)
-
-  ∂u/∂x[j] = 3ε⁴ * [2δ_j / s^(5/2) - r² * (5/2) * s^(-7/2) * 2ε² * δ_j]
-           = 3ε⁴ * δ_j * [2/s^(5/2) - 5ε²r²/s^(7/2)]
-           = δ_j * [6ε⁴/s^(5/2) - 15ε⁶r²/s^(7/2)]
-
-  ∂v/∂x[j] = D*ε² * (-(3/2) * s^(-5/2) * 2ε² * δ_j)
-           = -3D*ε⁴ * δ_j / s^(5/2)
-
-  ∂(∇²φ)/∂x[j] = ∂u/∂x[j] - ∂v/∂x[j]
-               = δ_j * [6ε⁴/s^(5/2) - 15ε⁶r²/s^(7/2) + 3D*ε⁴/s^(5/2)]
-               = δ_j * [(6 + 3D)ε⁴/s^(5/2) - 15ε⁶r²/s^(7/2)]
-               = δ_j * [3(D+2)ε⁴/s^(5/2) - 15ε⁶r²/s^(7/2)]
+  ∂(∇²φ)/∂x[j] = δ_j * [3(D+2)ε⁴/s^(5/2) - 15ε⁶r²/s^(7/2)]
 """
 function grad_laplacian_imq_wrt_x(ε::T) where {T}
     ε2 = ε^2
@@ -507,19 +332,6 @@ function grad_laplacian_imq_wrt_x(ε::T) where {T}
     return grad_Lφ_x
 end
 
-"""
-    grad_laplacian_imq_wrt_xi(ε)
-
-Returns a function computing ∂/∂xi[j] of [∇²φ] for IMQ.
-"""
-function grad_laplacian_imq_wrt_xi(ε::T) where {T}
-    grad_x = grad_laplacian_imq_wrt_x(ε)
-    function grad_Lφ_xi(x, xi)
-        return -grad_x(x, xi)
-    end
-    return grad_Lφ_xi
-end
-
 # ============================================================================
 # Gaussian: φ(r) = exp(-(εr)²)
 # First derivative: ∂φ/∂x[dim] = -2ε² * δ_d * φ
@@ -534,10 +346,7 @@ Mathematical derivation:
   φ = exp(-ε²r²)
   ∂φ/∂x[dim] = -2ε² * δ_d * φ
 
-  ∂²φ/∂x[j]∂x[dim] = -2ε² * [δ_{j,dim} * φ + δ_d * ∂φ/∂x[j]]
-                   = -2ε² * [δ_{j,dim} * φ + δ_d * (-2ε² * δ_j * φ)]
-                   = -2ε² * φ * [δ_{j,dim} - 2ε² * δ_d * δ_j]
-                   = φ * [-2ε² * δ_{j,dim} + 4ε⁴ * δ_d * δ_j]
+  ∂²φ/∂x[j]∂x[dim] = φ * [-2ε² * δ_{j,dim} + 4ε⁴ * δ_d * δ_j]
 
   For j == dim: φ * (4ε⁴ * δ_d² - 2ε²)
   For j != dim: φ * 4ε⁴ * δ_d * δ_j
@@ -564,21 +373,6 @@ function grad_partial_gaussian_wrt_x(ε::T, dim::Int) where {T}
     return grad_Lφ_x
 end
 
-"""
-    grad_partial_gaussian_wrt_xi(ε, dim)
-
-Returns a function computing ∂/∂xi[j] of [∂φ/∂x[dim]] for Gaussian.
-
-By symmetry: ∂/∂xi = -∂/∂x for terms depending on (x - xi).
-"""
-function grad_partial_gaussian_wrt_xi(ε::T, dim::Int) where {T}
-    grad_x = grad_partial_gaussian_wrt_x(ε, dim)
-    function grad_Lφ_xi(x, xi)
-        return -grad_x(x, xi)
-    end
-    return grad_Lφ_xi
-end
-
 # ============================================================================
 # Gaussian: Laplacian ∇²φ = (4ε⁴r² - 2ε²D) * φ
 # where D = dimension
@@ -592,14 +386,7 @@ Returns a function computing ∂/∂x[j] of [∇²φ] for Gaussian.
 Mathematical derivation:
   ∇²φ = (4ε⁴r² - 2ε²D) * φ
 
-  Let u = 4ε⁴r² - 2ε²D (coefficient)
-  ∂u/∂x[j] = 4ε⁴ * 2δ_j = 8ε⁴ * δ_j
-
-  ∂(∇²φ)/∂x[j] = ∂u/∂x[j] * φ + u * ∂φ/∂x[j]
-               = 8ε⁴ * δ_j * φ + (4ε⁴r² - 2ε²D) * (-2ε² * δ_j * φ)
-               = φ * δ_j * [8ε⁴ - 2ε² * (4ε⁴r² - 2ε²D)]
-               = φ * δ_j * [8ε⁴ - 8ε⁶r² + 4ε⁴D]
-               = φ * δ_j * 4ε⁴ * [2 + D - 2ε²r²]
+  ∂(∇²φ)/∂x[j] = φ * δ_j * 4ε⁴ * [2 + D - 2ε²r²]
 """
 function grad_laplacian_gaussian_wrt_x(ε::T) where {T}
     ε2 = ε^2
@@ -615,51 +402,46 @@ function grad_laplacian_gaussian_wrt_x(ε::T) where {T}
     return grad_Lφ_x
 end
 
-"""
-    grad_laplacian_gaussian_wrt_xi(ε)
-
-Returns a function computing ∂/∂xi[j] of [∇²φ] for Gaussian.
-"""
-function grad_laplacian_gaussian_wrt_xi(ε::T) where {T}
-    grad_x = grad_laplacian_gaussian_wrt_x(ε)
-    function grad_Lφ_xi(x, xi)
-        return -grad_x(x, xi)
-    end
-    return grad_Lφ_xi
-end
-
 # ============================================================================
-# Dispatch functions for IMQ and Gaussian
+# Dispatch functions: map basis type to correct gradient functions
 # ============================================================================
 
-function grad_applied_partial_wrt_x(basis::IMQ, dim::Int)
-    return grad_partial_imq_wrt_x(basis.ε, dim)
-end
+"""
+    grad_applied_partial_wrt_x(basis, dim)
 
-function grad_applied_partial_wrt_xi(basis::IMQ, dim::Int)
-    return grad_partial_imq_wrt_xi(basis.ε, dim)
-end
+Get gradient of applied partial derivative operator w.r.t. evaluation point.
+"""
+grad_applied_partial_wrt_x(::PHS1, dim::Int) = grad_partial_phs1_wrt_x(dim)
+grad_applied_partial_wrt_x(::PHS3, dim::Int) = grad_partial_phs3_wrt_x(dim)
+grad_applied_partial_wrt_x(::PHS5, dim::Int) = grad_partial_phs5_wrt_x(dim)
+grad_applied_partial_wrt_x(::PHS7, dim::Int) = grad_partial_phs7_wrt_x(dim)
+grad_applied_partial_wrt_x(basis::IMQ, dim::Int) = grad_partial_imq_wrt_x(basis.ε, dim)
+grad_applied_partial_wrt_x(basis::Gaussian, dim::Int) = grad_partial_gaussian_wrt_x(basis.ε, dim)
 
-function grad_applied_laplacian_wrt_x(basis::IMQ)
-    return grad_laplacian_imq_wrt_x(basis.ε)
-end
+"""
+    grad_applied_partial_wrt_xi(basis, dim)
 
-function grad_applied_laplacian_wrt_xi(basis::IMQ)
-    return grad_laplacian_imq_wrt_xi(basis.ε)
-end
+Get gradient of applied partial derivative operator w.r.t. data point.
+By symmetry, always the negation of the `_wrt_x` version.
+"""
+grad_applied_partial_wrt_xi(b, dim::Int) = negate_grad(grad_applied_partial_wrt_x(b, dim))
 
-function grad_applied_partial_wrt_x(basis::Gaussian, dim::Int)
-    return grad_partial_gaussian_wrt_x(basis.ε, dim)
-end
+"""
+    grad_applied_laplacian_wrt_x(basis)
 
-function grad_applied_partial_wrt_xi(basis::Gaussian, dim::Int)
-    return grad_partial_gaussian_wrt_xi(basis.ε, dim)
-end
+Get gradient of applied Laplacian operator w.r.t. evaluation point.
+"""
+grad_applied_laplacian_wrt_x(::PHS1) = grad_laplacian_phs1_wrt_x()
+grad_applied_laplacian_wrt_x(::PHS3) = grad_laplacian_phs3_wrt_x()
+grad_applied_laplacian_wrt_x(::PHS5) = grad_laplacian_phs5_wrt_x()
+grad_applied_laplacian_wrt_x(::PHS7) = grad_laplacian_phs7_wrt_x()
+grad_applied_laplacian_wrt_x(basis::IMQ) = grad_laplacian_imq_wrt_x(basis.ε)
+grad_applied_laplacian_wrt_x(basis::Gaussian) = grad_laplacian_gaussian_wrt_x(basis.ε)
 
-function grad_applied_laplacian_wrt_x(basis::Gaussian)
-    return grad_laplacian_gaussian_wrt_x(basis.ε)
-end
+"""
+    grad_applied_laplacian_wrt_xi(basis)
 
-function grad_applied_laplacian_wrt_xi(basis::Gaussian)
-    return grad_laplacian_gaussian_wrt_xi(basis.ε)
-end
+Get gradient of applied Laplacian operator w.r.t. data point.
+By symmetry, always the negation of the `_wrt_x` version.
+"""
+grad_applied_laplacian_wrt_xi(b) = negate_grad(grad_applied_laplacian_wrt_x(b))

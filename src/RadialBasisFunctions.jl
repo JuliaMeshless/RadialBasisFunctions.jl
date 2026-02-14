@@ -32,7 +32,7 @@ include("solve/assembly.jl")
 include("solve/execution.jl")
 include("solve/api.jl")
 
-# Backward pass support for AD (used by ChainRulesCore and Enzyme extensions)
+# Backward pass support for AD (used by Enzyme and Mooncake extensions)
 include("solve/backward_cache.jl")
 include("solve/operator_second_derivatives.jl")
 include("solve/shape_parameter_derivatives.jl")
@@ -68,7 +68,11 @@ include("operators/monomial/monomial.jl")
 
 include("operators/operator_algebra.jl")
 
+# Shared AD utilities (depends on Partial/Laplacian types defined above)
+include("solve/ad_shared.jl")
+
 include("interpolation.jl")
+include("interpolation_backward.jl")
 export Interpolator
 
 include("operators/regridding.jl")

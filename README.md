@@ -30,7 +30,7 @@
 - **Flexible Operators** - Built-in Laplacian, gradient, partial derivatives, or define your own custom operators
 - **Boundary Conditions** - Hermite interpolation for Dirichlet, Neumann, and Robin BCs in PDE applications
 - **Local Collocation** - k-nearest neighbor stencils for scalable large-domain problems
-- **Differentiable** - AD-compatible via ChainRulesCore and Mooncake extensions
+- **Differentiable** - AD-compatible via Enzyme and Mooncake extensions
 
 <p align="center">
   <img src="docs/src/assets/interpolation_demo.png" alt="RBF Interpolation Demo" width="800">
