@@ -319,6 +319,102 @@ if ENZYME_SUPPORTED_JULIA
                 end
             end
         end
+
+        @testset "Shape parameter (ε) differentiation via Active basis" begin
+            @testset "IMQ Partial - d(loss)/d(ε)" begin
+                ℒ = Partial(1, 1)
+
+                function loss_imq_eps(ε)
+                    basis = IMQ(ε; poly_deg = 2)
+                    W = RadialBasisFunctions._build_weights(ℒ, points, points, adjl, basis)
+                    return sum(W.nzval .^ 2)
+                end
+
+                dε = Enzyme.autodiff(Reverse, loss_imq_eps, Active, Active(1.0))[1][1]
+                fd_dε = FD.central_fdm(5, 1)(loss_imq_eps, 1.0)
+                @test !iszero(dε)
+                @test isapprox(dε, fd_dε; rtol = 1.0e-3)
+            end
+
+            @testset "IMQ Laplacian - d(loss)/d(ε)" begin
+                ℒ = Laplacian()
+
+                function loss_imq_lap_eps(ε)
+                    basis = IMQ(ε; poly_deg = 2)
+                    W = RadialBasisFunctions._build_weights(ℒ, points, points, adjl, basis)
+                    return sum(W.nzval .^ 2)
+                end
+
+                dε = Enzyme.autodiff(Reverse, loss_imq_lap_eps, Active, Active(1.0))[1][1]
+                fd_dε = FD.central_fdm(5, 1)(loss_imq_lap_eps, 1.0)
+                @test !iszero(dε)
+                @test isapprox(dε, fd_dε; rtol = 1.0e-3)
+            end
+
+            @testset "Gaussian Partial - d(loss)/d(ε)" begin
+                ℒ = Partial(1, 1)
+
+                function loss_gauss_eps(ε)
+                    basis = Gaussian(ε; poly_deg = 2)
+                    W = RadialBasisFunctions._build_weights(ℒ, points, points, adjl, basis)
+                    return sum(W.nzval .^ 2)
+                end
+
+                dε = Enzyme.autodiff(Reverse, loss_gauss_eps, Active, Active(1.0))[1][1]
+                fd_dε = FD.central_fdm(5, 1)(loss_gauss_eps, 1.0)
+                @test !iszero(dε)
+                @test isapprox(dε, fd_dε; rtol = 1.0e-3)
+            end
+
+            @testset "Gaussian Laplacian - d(loss)/d(ε)" begin
+                ℒ = Laplacian()
+
+                function loss_gauss_lap_eps(ε)
+                    basis = Gaussian(ε; poly_deg = 2)
+                    W = RadialBasisFunctions._build_weights(ℒ, points, points, adjl, basis)
+                    return sum(W.nzval .^ 2)
+                end
+
+                dε = Enzyme.autodiff(Reverse, loss_gauss_lap_eps, Active, Active(1.0))[1][1]
+                fd_dε = FD.central_fdm(5, 1)(loss_gauss_lap_eps, 1.0)
+                @test !iszero(dε)
+                @test isapprox(dε, fd_dε; rtol = 1.0e-3)
+            end
+
+            @testset "Different ε values" begin
+                for ε_val in [0.5, 2.0, 5.0]
+                    @testset "IMQ ε=$ε_val" begin
+                        ℒ = Partial(1, 1)
+
+                        function loss_imq_eps_val(ε)
+                            basis = IMQ(ε; poly_deg = 2)
+                            W = RadialBasisFunctions._build_weights(ℒ, points, points, adjl, basis)
+                            return sum(W.nzval .^ 2)
+                        end
+
+                        dε = Enzyme.autodiff(Reverse, loss_imq_eps_val, Active, Active(ε_val))[1][1]
+                        fd_dε = FD.central_fdm(5, 1)(loss_imq_eps_val, ε_val)
+                        @test !iszero(dε)
+                        @test isapprox(dε, fd_dε; rtol = 1.0e-2)
+                    end
+
+                    @testset "Gaussian ε=$ε_val" begin
+                        ℒ = Partial(1, 1)
+
+                        function loss_gauss_eps_val(ε)
+                            basis = Gaussian(ε; poly_deg = 2)
+                            W = RadialBasisFunctions._build_weights(ℒ, points, points, adjl, basis)
+                            return sum(W.nzval .^ 2)
+                        end
+
+                        dε = Enzyme.autodiff(Reverse, loss_gauss_eps_val, Active, Active(ε_val))[1][1]
+                        fd_dε = FD.central_fdm(5, 1)(loss_gauss_eps_val, ε_val)
+                        @test !iszero(dε)
+                        @test isapprox(dε, fd_dε; rtol = 1.0e-2)
+                    end
+                end
+            end
+        end
     end
 else
     @testset "Enzyme Extension - Julia $(VERSION) (skipped)" begin
