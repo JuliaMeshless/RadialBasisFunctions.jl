@@ -1,11 +1,5 @@
-using RadialBasisFunctions
+include("ad_test_utils.jl")
 using Enzyme
-using StaticArraysCore
-using FiniteDifferences
-using LinearAlgebra
-using Test
-
-const FD = FiniteDifferences
 
 # Check Julia version - Enzyme.jl has known issues with Julia 1.12+
 # See: https://github.com/EnzymeAD/Enzyme.jl/issues/2699
@@ -13,57 +7,33 @@ const ENZYME_SUPPORTED_JULIA = VERSION < v"1.12"
 
 if ENZYME_SUPPORTED_JULIA
     @testset "Enzyme Extension - Operator Differentiation" begin
-        N = 50
-        points = [SVector{2}(0.1 + 0.8 * i / N, 0.1 + 0.8 * j / N) for i in 1:isqrt(N) for j in 1:isqrt(N)]
-        N = length(points)
-        values = sin.(getindex.(points, 1)) .+ cos.(getindex.(points, 2))
+        points, N, values = make_operator_test_data()
 
         @testset "Laplacian Operator" begin
             lap = laplacian(points)
-
-            function loss_lap(v)
-                result = lap(v)
-                return sum(result .^ 2)
-            end
+            loss(v) = sum(lap(v) .^ 2)
 
             dv = zeros(N)
-            Enzyme.autodiff(Reverse, loss_lap, Active, Duplicated(values, dv))
-
-            fd_grad = FD.grad(FD.central_fdm(5, 1), loss_lap, values)[1]
-            @test !all(iszero, dv)
-            @test isapprox(dv, fd_grad; rtol = 1.0e-4)
+            Enzyme.autodiff(Reverse, loss, Active, Duplicated(values, dv))
+            validate_gradient(dv, loss, values)
         end
 
         @testset "Gradient Operator" begin
             grad = gradient(points)
-
-            function loss_grad(v)
-                result = grad(v)
-                return sum(result .^ 2)
-            end
+            loss(v) = sum(grad(v) .^ 2)
 
             dv = zeros(N)
-            Enzyme.autodiff(Reverse, loss_grad, Active, Duplicated(values, dv))
-
-            fd_grad = FD.grad(FD.central_fdm(5, 1), loss_grad, values)[1]
-            @test !all(iszero, dv)
-            @test isapprox(dv, fd_grad; rtol = 1.0e-4)
+            Enzyme.autodiff(Reverse, loss, Active, Duplicated(values, dv))
+            validate_gradient(dv, loss, values)
         end
 
         @testset "Partial Derivative Operator" begin
             partial_x = partial(points, 1, 1)
-
-            function loss_partial(v)
-                result = partial_x(v)
-                return sum(result .^ 2)
-            end
+            loss(v) = sum(partial_x(v) .^ 2)
 
             dv = zeros(N)
-            Enzyme.autodiff(Reverse, loss_partial, Active, Duplicated(values, dv))
-
-            fd_grad = FD.grad(FD.central_fdm(5, 1), loss_partial, values)[1]
-            @test !all(iszero, dv)
-            @test isapprox(dv, fd_grad; rtol = 1.0e-4)
+            Enzyme.autodiff(Reverse, loss, Active, Duplicated(values, dv))
+            validate_gradient(dv, loss, values)
         end
     end
 
@@ -73,8 +43,6 @@ if ENZYME_SUPPORTED_JULIA
         values = sin.(getindex.(points, 1))
         eval_points = [SVector{2}(rand(), rand()) for _ in 1:10]
 
-        interp = Interpolator(points, values)
-
         function loss_interp(v)
             interp_local = Interpolator(points, v)
             result = interp_local(eval_points)
@@ -83,10 +51,7 @@ if ENZYME_SUPPORTED_JULIA
 
         dv = zeros(N)
         Enzyme.autodiff(Reverse, loss_interp, Active, Duplicated(values, dv))
-
-        fd_grad = FD.grad(FD.central_fdm(5, 1), loss_interp, values)[1]
-        @test !all(iszero, dv)
-        @test isapprox(dv, fd_grad; rtol = 1.0e-3)
+        validate_gradient(dv, loss_interp, values; rtol=1e-3)
     end
 
     @testset "Enzyme Extension - Basis Function Differentiation" begin
@@ -95,322 +60,94 @@ if ENZYME_SUPPORTED_JULIA
 
         @testset "PHS Basis Functions" begin
             for phs_type in [PHS(1), PHS(3), PHS(5), PHS(7)]
-                function loss_phs(xv)
-                    return phs_type(xv, xi)^2
-                end
+                loss(xv) = phs_type(xv, xi)^2
 
                 dx = zeros(2)
-                Enzyme.autodiff(Reverse, loss_phs, Active, Duplicated(x, dx))
-
-                fd_grad = FD.grad(FD.central_fdm(5, 1), loss_phs, x)[1]
-                @test !all(iszero, dx)
-                @test isapprox(dx, fd_grad; rtol = 1.0e-4)
+                Enzyme.autodiff(Reverse, loss, Active, Duplicated(x, dx))
+                validate_gradient(dx, loss, x)
             end
         end
 
         @testset "IMQ Basis Function" begin
             imq = IMQ(1.0)
-
-            function loss_imq(xv)
-                return imq(xv, xi)^2
-            end
+            loss(xv) = imq(xv, xi)^2
 
             dx = zeros(2)
-            Enzyme.autodiff(Reverse, loss_imq, Active, Duplicated(x, dx))
-
-            fd_grad = FD.grad(FD.central_fdm(5, 1), loss_imq, x)[1]
-            @test !all(iszero, dx)
-            @test isapprox(dx, fd_grad; rtol = 1.0e-4)
+            Enzyme.autodiff(Reverse, loss, Active, Duplicated(x, dx))
+            validate_gradient(dx, loss, x)
         end
 
         @testset "Gaussian Basis Function" begin
             gauss = Gaussian(1.0)
-
-            function loss_gauss(xv)
-                return gauss(xv, xi)^2
-            end
+            loss(xv) = gauss(xv, xi)^2
 
             dx = zeros(2)
-            Enzyme.autodiff(Reverse, loss_gauss, Active, Duplicated(x, dx))
-
-            fd_grad = FD.grad(FD.central_fdm(5, 1), loss_gauss, x)[1]
-            @test !all(iszero, dx)
-            @test isapprox(dx, fd_grad; rtol = 1.0e-4)
+            Enzyme.autodiff(Reverse, loss, Active, Duplicated(x, dx))
+            validate_gradient(dx, loss, x)
         end
     end
+
     @testset "Enzyme Extension - Native Rules for _build_weights" begin
-        N = 25
-        points = [SVector{2}(0.1 + 0.8 * i / 5, 0.1 + 0.8 * j / 5) for i in 1:5 for j in 1:5]
-        adjl = RadialBasisFunctions.find_neighbors(points, 10)
+        points, N, adjl, pts_flat = make_build_weights_test_data()
 
         @testset "Partial operator with PHS3" begin
-            basis = PHS(3; poly_deg = 2)
-            ℒ = Partial(1, 1)
-
-            function loss_partial_weights(pts)
-                pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
-                W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
-                return sum(W.nzval .^ 2)
-            end
-
-            pts_flat = vcat([collect(p) for p in points]...)
+            loss = make_build_weights_loss(Partial(1, 1), adjl, PHS(3; poly_deg=2), N)
             dpts = zeros(length(pts_flat))
-            Enzyme.autodiff(Reverse, loss_partial_weights, Active, Duplicated(pts_flat, dpts))
-
-            fd_grad = FD.grad(FD.central_fdm(5, 1), loss_partial_weights, pts_flat)[1]
-            @test !all(iszero, dpts)
-            @test isapprox(dpts, fd_grad; rtol = 1.0e-3)
+            Enzyme.autodiff(Reverse, loss, Active, Duplicated(pts_flat, dpts))
+            validate_gradient(dpts, loss, pts_flat; rtol=1e-3)
         end
 
         @testset "Laplacian operator with PHS3" begin
-            basis = PHS(3; poly_deg = 2)
-            ℒ = Laplacian()
-
-            function loss_laplacian_weights(pts)
-                pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
-                W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
-                return sum(W.nzval .^ 2)
-            end
-
-            pts_flat = vcat([collect(p) for p in points]...)
+            loss = make_build_weights_loss(Laplacian(), adjl, PHS(3; poly_deg=2), N)
             dpts = zeros(length(pts_flat))
-            Enzyme.autodiff(Reverse, loss_laplacian_weights, Active, Duplicated(pts_flat, dpts))
-
-            fd_grad = FD.grad(FD.central_fdm(5, 1), loss_laplacian_weights, pts_flat)[1]
-            @test !all(iszero, dpts)
-            @test isapprox(dpts, fd_grad; rtol = 1.0e-3)
+            Enzyme.autodiff(Reverse, loss, Active, Duplicated(pts_flat, dpts))
+            validate_gradient(dpts, loss, pts_flat; rtol=1e-3)
         end
 
         @testset "Different PHS orders" begin
             for n in [1, 3, 5, 7]
-                basis = PHS(n; poly_deg = 1)
-                ℒ = Partial(1, 1)
-
-                function loss_phs_order(pts)
-                    pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
-                    W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
-                    return sum(W.nzval .^ 2)
-                end
-
-                pts_flat = vcat([collect(p) for p in points]...)
+                loss = make_build_weights_loss(Partial(1, 1), adjl, PHS(n; poly_deg=1), N)
                 dpts = zeros(length(pts_flat))
-                Enzyme.autodiff(Reverse, loss_phs_order, Active, Duplicated(pts_flat, dpts))
-
-                fd_grad = FD.grad(FD.central_fdm(5, 1), loss_phs_order, pts_flat)[1]
-                @test !all(iszero, dpts) || n == 1  # PHS1 may have zero gradient for some configurations
-                @test isapprox(dpts, fd_grad; rtol = 1.0e-2)
+                Enzyme.autodiff(Reverse, loss, Active, Duplicated(pts_flat, dpts))
+                validate_gradient(dpts, loss, pts_flat; rtol=1e-2, check_nonzero=(n != 1))
             end
         end
 
-        @testset "IMQ basis with Partial operator" begin
-            basis = IMQ(1.0; poly_deg = 2)
-            ℒ = Partial(1, 1)
-
-            function loss_imq_partial(pts)
-                pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
-                W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
-                return sum(W.nzval .^ 2)
-            end
-
-            pts_flat = vcat([collect(p) for p in points]...)
+        @testset "$BasisName basis with $OpName operator" for
+                (BasisName, basis) in [("IMQ", IMQ(1.0; poly_deg=2)), ("Gaussian", Gaussian(1.0; poly_deg=2))],
+                (OpName, op) in [("Partial", Partial(1, 1)), ("Laplacian", Laplacian())]
+            loss = make_build_weights_loss(op, adjl, basis, N)
             dpts = zeros(length(pts_flat))
-            Enzyme.autodiff(Reverse, loss_imq_partial, Active, Duplicated(pts_flat, dpts))
-
-            fd_grad = FD.grad(FD.central_fdm(5, 1), loss_imq_partial, pts_flat)[1]
-            @test !all(iszero, dpts)
-            @test isapprox(dpts, fd_grad; rtol = 1.0e-3)
-        end
-
-        @testset "IMQ basis with Laplacian operator" begin
-            basis = IMQ(1.0; poly_deg = 2)
-            ℒ = Laplacian()
-
-            function loss_imq_laplacian(pts)
-                pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
-                W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
-                return sum(W.nzval .^ 2)
-            end
-
-            pts_flat = vcat([collect(p) for p in points]...)
-            dpts = zeros(length(pts_flat))
-            Enzyme.autodiff(Reverse, loss_imq_laplacian, Active, Duplicated(pts_flat, dpts))
-
-            fd_grad = FD.grad(FD.central_fdm(5, 1), loss_imq_laplacian, pts_flat)[1]
-            @test !all(iszero, dpts)
-            @test isapprox(dpts, fd_grad; rtol = 1.0e-3)
-        end
-
-        @testset "Gaussian basis with Partial operator" begin
-            basis = Gaussian(1.0; poly_deg = 2)
-            ℒ = Partial(1, 1)
-
-            function loss_gaussian_partial(pts)
-                pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
-                W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
-                return sum(W.nzval .^ 2)
-            end
-
-            pts_flat = vcat([collect(p) for p in points]...)
-            dpts = zeros(length(pts_flat))
-            Enzyme.autodiff(Reverse, loss_gaussian_partial, Active, Duplicated(pts_flat, dpts))
-
-            fd_grad = FD.grad(FD.central_fdm(5, 1), loss_gaussian_partial, pts_flat)[1]
-            @test !all(iszero, dpts)
-            @test isapprox(dpts, fd_grad; rtol = 1.0e-3)
-        end
-
-        @testset "Gaussian basis with Laplacian operator" begin
-            basis = Gaussian(1.0; poly_deg = 2)
-            ℒ = Laplacian()
-
-            function loss_gaussian_laplacian(pts)
-                pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
-                W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
-                return sum(W.nzval .^ 2)
-            end
-
-            pts_flat = vcat([collect(p) for p in points]...)
-            dpts = zeros(length(pts_flat))
-            Enzyme.autodiff(Reverse, loss_gaussian_laplacian, Active, Duplicated(pts_flat, dpts))
-
-            fd_grad = FD.grad(FD.central_fdm(5, 1), loss_gaussian_laplacian, pts_flat)[1]
-            @test !all(iszero, dpts)
-            @test isapprox(dpts, fd_grad; rtol = 1.0e-3)
+            Enzyme.autodiff(Reverse, loss, Active, Duplicated(pts_flat, dpts))
+            validate_gradient(dpts, loss, pts_flat; rtol=1e-3)
         end
 
         @testset "Different shape parameters" begin
             for ε in [0.5, 1.0, 2.0]
-                @testset "IMQ with ε=$ε" begin
-                    basis = IMQ(ε; poly_deg = 2)
-                    ℒ = Partial(1, 1)
-
-                    function loss_imq_shape(pts)
-                        pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
-                        W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
-                        return sum(W.nzval .^ 2)
-                    end
-
-                    pts_flat = vcat([collect(p) for p in points]...)
+                @testset "$BasisName with ε=$ε" for (BasisName, BT) in [("IMQ", IMQ), ("Gaussian", Gaussian)]
+                    loss = make_build_weights_loss(Partial(1, 1), adjl, BT(ε; poly_deg=2), N)
                     dpts = zeros(length(pts_flat))
-                    Enzyme.autodiff(Reverse, loss_imq_shape, Active, Duplicated(pts_flat, dpts))
-
-                    fd_grad = FD.grad(FD.central_fdm(5, 1), loss_imq_shape, pts_flat)[1]
-                    @test !all(iszero, dpts)
-                    @test isapprox(dpts, fd_grad; rtol = 1.0e-2)
-                end
-
-                @testset "Gaussian with ε=$ε" begin
-                    basis = Gaussian(ε; poly_deg = 2)
-                    ℒ = Partial(1, 1)
-
-                    function loss_gaussian_shape(pts)
-                        pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
-                        W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
-                        return sum(W.nzval .^ 2)
-                    end
-
-                    pts_flat = vcat([collect(p) for p in points]...)
-                    dpts = zeros(length(pts_flat))
-                    Enzyme.autodiff(Reverse, loss_gaussian_shape, Active, Duplicated(pts_flat, dpts))
-
-                    fd_grad = FD.grad(FD.central_fdm(5, 1), loss_gaussian_shape, pts_flat)[1]
-                    @test !all(iszero, dpts)
-                    @test isapprox(dpts, fd_grad; rtol = 1.0e-2)
+                    Enzyme.autodiff(Reverse, loss, Active, Duplicated(pts_flat, dpts))
+                    validate_gradient(dpts, loss, pts_flat; rtol=1e-2)
                 end
             end
         end
 
         @testset "Shape parameter (ε) differentiation via Active basis" begin
-            @testset "IMQ Partial - d(loss)/d(ε)" begin
-                ℒ = Partial(1, 1)
-
-                function loss_imq_eps(ε)
-                    basis = IMQ(ε; poly_deg = 2)
-                    W = RadialBasisFunctions._build_weights(ℒ, points, points, adjl, basis)
-                    return sum(W.nzval .^ 2)
-                end
-
-                dε = Enzyme.autodiff(Reverse, loss_imq_eps, Active, Active(1.0))[1][1]
-                fd_dε = FD.central_fdm(5, 1)(loss_imq_eps, 1.0)
-                @test !iszero(dε)
-                @test isapprox(dε, fd_dε; rtol = 1.0e-3)
-            end
-
-            @testset "IMQ Laplacian - d(loss)/d(ε)" begin
-                ℒ = Laplacian()
-
-                function loss_imq_lap_eps(ε)
-                    basis = IMQ(ε; poly_deg = 2)
-                    W = RadialBasisFunctions._build_weights(ℒ, points, points, adjl, basis)
-                    return sum(W.nzval .^ 2)
-                end
-
-                dε = Enzyme.autodiff(Reverse, loss_imq_lap_eps, Active, Active(1.0))[1][1]
-                fd_dε = FD.central_fdm(5, 1)(loss_imq_lap_eps, 1.0)
-                @test !iszero(dε)
-                @test isapprox(dε, fd_dε; rtol = 1.0e-3)
-            end
-
-            @testset "Gaussian Partial - d(loss)/d(ε)" begin
-                ℒ = Partial(1, 1)
-
-                function loss_gauss_eps(ε)
-                    basis = Gaussian(ε; poly_deg = 2)
-                    W = RadialBasisFunctions._build_weights(ℒ, points, points, adjl, basis)
-                    return sum(W.nzval .^ 2)
-                end
-
-                dε = Enzyme.autodiff(Reverse, loss_gauss_eps, Active, Active(1.0))[1][1]
-                fd_dε = FD.central_fdm(5, 1)(loss_gauss_eps, 1.0)
-                @test !iszero(dε)
-                @test isapprox(dε, fd_dε; rtol = 1.0e-3)
-            end
-
-            @testset "Gaussian Laplacian - d(loss)/d(ε)" begin
-                ℒ = Laplacian()
-
-                function loss_gauss_lap_eps(ε)
-                    basis = Gaussian(ε; poly_deg = 2)
-                    W = RadialBasisFunctions._build_weights(ℒ, points, points, adjl, basis)
-                    return sum(W.nzval .^ 2)
-                end
-
-                dε = Enzyme.autodiff(Reverse, loss_gauss_lap_eps, Active, Active(1.0))[1][1]
-                fd_dε = FD.central_fdm(5, 1)(loss_gauss_lap_eps, 1.0)
-                @test !iszero(dε)
-                @test isapprox(dε, fd_dε; rtol = 1.0e-3)
+            @testset "$BasisName $OpName - d(loss)/d(ε)" for
+                    (BasisName, BT) in [("IMQ", IMQ), ("Gaussian", Gaussian)],
+                    (OpName, op) in [("Partial", Partial(1, 1)), ("Laplacian", Laplacian())]
+                loss = make_eps_loss(op, points, adjl, BT)
+                dε = Enzyme.autodiff(Reverse, loss, Active, Active(1.0))[1][1]
+                validate_scalar_gradient(dε, loss, 1.0)
             end
 
             @testset "Different ε values" begin
                 for ε_val in [0.5, 2.0, 5.0]
-                    @testset "IMQ ε=$ε_val" begin
-                        ℒ = Partial(1, 1)
-
-                        function loss_imq_eps_val(ε)
-                            basis = IMQ(ε; poly_deg = 2)
-                            W = RadialBasisFunctions._build_weights(ℒ, points, points, adjl, basis)
-                            return sum(W.nzval .^ 2)
-                        end
-
-                        dε = Enzyme.autodiff(Reverse, loss_imq_eps_val, Active, Active(ε_val))[1][1]
-                        fd_dε = FD.central_fdm(5, 1)(loss_imq_eps_val, ε_val)
-                        @test !iszero(dε)
-                        @test isapprox(dε, fd_dε; rtol = 1.0e-2)
-                    end
-
-                    @testset "Gaussian ε=$ε_val" begin
-                        ℒ = Partial(1, 1)
-
-                        function loss_gauss_eps_val(ε)
-                            basis = Gaussian(ε; poly_deg = 2)
-                            W = RadialBasisFunctions._build_weights(ℒ, points, points, adjl, basis)
-                            return sum(W.nzval .^ 2)
-                        end
-
-                        dε = Enzyme.autodiff(Reverse, loss_gauss_eps_val, Active, Active(ε_val))[1][1]
-                        fd_dε = FD.central_fdm(5, 1)(loss_gauss_eps_val, ε_val)
-                        @test !iszero(dε)
-                        @test isapprox(dε, fd_dε; rtol = 1.0e-2)
+                    @testset "$BasisName ε=$ε_val" for (BasisName, BT) in [("IMQ", IMQ), ("Gaussian", Gaussian)]
+                        loss = make_eps_loss(Partial(1, 1), points, adjl, BT)
+                        dε = Enzyme.autodiff(Reverse, loss, Active, Active(ε_val))[1][1]
+                        validate_scalar_gradient(dε, loss, ε_val; rtol=1e-2)
                     end
                 end
             end
@@ -419,18 +156,13 @@ if ENZYME_SUPPORTED_JULIA
 else
     @testset "Enzyme Extension - Julia $(VERSION) (skipped)" begin
         @test_skip begin
-            # Enzyme.jl has known issues with Julia 1.12+
-            # See: https://github.com/EnzymeAD/Enzyme.jl/issues/2699
             @info "Enzyme tests skipped on Julia $(VERSION) due to known compatibility issues"
             true
         end
     end
 end
 
-# Test that the extension loads correctly regardless of Julia version
 @testset "Enzyme Extension - Loading" begin
     @test Base.find_package("Enzyme") !== nothing
-    # The extension should be loaded when both packages are available
-    # (verified by the package loading without error)
     @test true
 end

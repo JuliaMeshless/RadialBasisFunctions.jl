@@ -6,6 +6,14 @@ Used by Enzyme and Mooncake extensions via import.
 =#
 
 """
+    _optype(ℒ)
+
+Map operator instance to its abstract type for dispatch in AD rules.
+"""
+_optype(::Partial) = Partial
+_optype(::Laplacian) = Laplacian
+
+"""
     _get_grad_funcs(OpType, basis, ℒ)
 
 Get gradient functions for the given operator type and basis.

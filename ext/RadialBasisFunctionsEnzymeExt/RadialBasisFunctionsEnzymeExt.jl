@@ -7,7 +7,7 @@ using EnzymeRules (augmented_primal + reverse).
 This extension requires Enzyme to be loaded.
 
 Native rules are provided for:
-- Basis function evaluation: PHS1, PHS3, PHS5, PHS7, IMQ, Gaussian
+- Basis function evaluation: all AbstractRadialBasis subtypes
 - Operator evaluation: `_eval_op(op, x)` for scalar and vector-valued operators
 - Operator call syntax: `op(x)`
 - Interpolator evaluation: single point and batch
@@ -24,9 +24,9 @@ using SparseArrays
 
 # Import internal functions
 import RadialBasisFunctions: _eval_op, RadialBasisOperator, Interpolator
-import RadialBasisFunctions: PHS1, PHS3, PHS5, PHS7, IMQ, Gaussian
+import RadialBasisFunctions: IMQ, Gaussian
 import RadialBasisFunctions: AbstractRadialBasis, VectorValuedOperator
-import RadialBasisFunctions: _build_weights, Partial, Laplacian
+import RadialBasisFunctions: _build_weights, Partial, Laplacian, _optype
 import RadialBasisFunctions: MonomialBasis
 
 # Import backward pass support from main package
@@ -40,49 +40,35 @@ import RadialBasisFunctions: _interpolator_point_gradient!
 # Basis Function Rules
 # =============================================================================
 
-# Helper macro to define basis function rules for a given type
-macro define_basis_rule(BasisType)
-    return quote
-        function EnzymeRules.augmented_primal(
-                config::EnzymeRules.RevConfigWidth{1},
-                func::EnzymeCore.Const{<:$(esc(BasisType))},
-                ::Type{<:EnzymeCore.Active},
-                x::EnzymeCore.Duplicated,
-                xi::EnzymeCore.Duplicated,
-            )
-            basis = func.val
-            y = basis(x.val, xi.val)
-            # Tape stores copies of x and xi for the reverse pass
-            tape = (copy(x.val), copy(xi.val))
-            return EnzymeRules.AugmentedReturn(y, nothing, tape)
-        end
-
-        function EnzymeRules.reverse(
-                config::EnzymeRules.RevConfigWidth{1},
-                func::EnzymeCore.Const{<:$(esc(BasisType))},
-                dret::EnzymeCore.Active,
-                tape,
-                x::EnzymeCore.Duplicated,
-                xi::EnzymeCore.Duplicated,
-            )
-            basis = func.val
-            x_val, xi_val = tape
-            grad_fn = ∇(basis)
-            ∇φ = grad_fn(x_val, xi_val)
-            # d/dx[φ(x, xi)] = ∇φ, d/dxi[φ(x, xi)] = -∇φ
-            x.dval .+= dret.val .* ∇φ
-            xi.dval .-= dret.val .* ∇φ
-            return (nothing, nothing)
-        end
-    end
+function EnzymeRules.augmented_primal(
+        config::EnzymeRules.RevConfigWidth{1},
+        func::EnzymeCore.Const{<:AbstractRadialBasis},
+        ::Type{<:EnzymeCore.Active},
+        x::EnzymeCore.Duplicated,
+        xi::EnzymeCore.Duplicated,
+    )
+    basis = func.val
+    y = basis(x.val, xi.val)
+    tape = (copy(x.val), copy(xi.val))
+    return EnzymeRules.AugmentedReturn(y, nothing, tape)
 end
 
-@define_basis_rule PHS1
-@define_basis_rule PHS3
-@define_basis_rule PHS5
-@define_basis_rule PHS7
-@define_basis_rule IMQ
-@define_basis_rule Gaussian
+function EnzymeRules.reverse(
+        config::EnzymeRules.RevConfigWidth{1},
+        func::EnzymeCore.Const{<:AbstractRadialBasis},
+        dret::EnzymeCore.Active,
+        tape,
+        x::EnzymeCore.Duplicated,
+        xi::EnzymeCore.Duplicated,
+    )
+    basis = func.val
+    x_val, xi_val = tape
+    grad_fn = ∇(basis)
+    ∇φ = grad_fn(x_val, xi_val)
+    x.dval .+= dret.val .* ∇φ
+    xi.dval .-= dret.val .* ∇φ
+    return (nothing, nothing)
+end
 
 # =============================================================================
 # Operator Evaluation Rules: _eval_op(op, x)
@@ -264,7 +250,6 @@ end
 # Import shared utilities from main package
 import RadialBasisFunctions: extract_stencil_cotangent, _get_grad_funcs
 import RadialBasisFunctions: build_weights_pullback_loop!
-import RadialBasisFunctions: WeightsBuildForwardCache
 
 # =============================================================================
 # Helper functions
@@ -316,40 +301,8 @@ function _enzyme_augmented_primal_body(ℒ_arg, data, eval_points, adjl, basis, 
     return EnzymeRules.AugmentedReturn(W, shadow, tape)
 end
 
-# =============================================================================
-# Explicit rules: Duplicated data, Const basis
-# =============================================================================
-
-# Partial with Duplicated data, Const basis
-function EnzymeRules.augmented_primal(
-        config::EnzymeRules.RevConfigWidth{1},
-        func::EnzymeCore.Const{typeof(_build_weights)},
-        ::Type{RT},
-        ℒ_arg::EnzymeCore.Const{<:Partial},
-        data::EnzymeCore.Duplicated,
-        eval_points::EnzymeCore.Duplicated,
-        adjl::EnzymeCore.Const,
-        basis::EnzymeCore.Const{<:AbstractRadialBasis},
-    ) where {RT}
-    return _enzyme_augmented_primal_body(ℒ_arg, data, eval_points, adjl, basis, RT, Partial; copy_data=true)
-end
-
-# Laplacian with Duplicated data, Const basis
-function EnzymeRules.augmented_primal(
-        config::EnzymeRules.RevConfigWidth{1},
-        func::EnzymeCore.Const{typeof(_build_weights)},
-        ::Type{RT},
-        ℒ_arg::EnzymeCore.Const{<:Laplacian},
-        data::EnzymeCore.Duplicated,
-        eval_points::EnzymeCore.Duplicated,
-        adjl::EnzymeCore.Const,
-        basis::EnzymeCore.Const{<:AbstractRadialBasis},
-    ) where {RT}
-    return _enzyme_augmented_primal_body(ℒ_arg, data, eval_points, adjl, basis, RT, Laplacian; copy_data=true)
-end
-
-# Shared reverse for Duplicated data, Const basis (both Partial and Laplacian)
-function _enzyme_reverse_duplicated_data!(dret, tape, data, eval_points, OpType)
+# Shared pullback core for all _build_weights reverse rules
+function _enzyme_run_pullback_loop(dret, tape, OpType)
     op_cached, cache, adjl_val, basis_val, mon, data_val, eval_points_val, shadow = tape
     ΔW = _extract_dret_with_shadow(dret, shadow)
 
@@ -371,125 +324,88 @@ function _enzyme_reverse_duplicated_data!(dret, tape, data, eval_points, OpType)
         grad_Lφ_x, grad_Lφ_xi
     )
 
-    for i in 1:N_data
+    return Δdata_raw, Δeval_raw, Δε_acc
+end
+
+# =============================================================================
+# Explicit rules: Duplicated data, Const basis
+# =============================================================================
+
+function EnzymeRules.augmented_primal(
+        config::EnzymeRules.RevConfigWidth{1},
+        func::EnzymeCore.Const{typeof(_build_weights)},
+        ::Type{RT},
+        ℒ_arg::EnzymeCore.Const{<:Union{Partial, Laplacian}},
+        data::EnzymeCore.Duplicated,
+        eval_points::EnzymeCore.Duplicated,
+        adjl::EnzymeCore.Const,
+        basis::EnzymeCore.Const{<:AbstractRadialBasis},
+    ) where {RT}
+    return _enzyme_augmented_primal_body(ℒ_arg, data, eval_points, adjl, basis, RT, _optype(ℒ_arg.val); copy_data=true)
+end
+
+function EnzymeRules.reverse(
+        config::EnzymeRules.RevConfigWidth{1},
+        func::EnzymeCore.Const{typeof(_build_weights)},
+        dret, tape,
+        ℒ_arg::EnzymeCore.Const{<:Union{Partial, Laplacian}},
+        data::EnzymeCore.Duplicated,
+        eval_points::EnzymeCore.Duplicated,
+        adjl::EnzymeCore.Const,
+        basis::EnzymeCore.Const{<:AbstractRadialBasis},
+    )
+    return _enzyme_reverse_duplicated_data!(dret, tape, data, eval_points, _optype(ℒ_arg.val))
+end
+
+# Shared reverse for Duplicated data, Const basis
+function _enzyme_reverse_duplicated_data!(dret, tape, data, eval_points, OpType)
+    Δdata_raw, Δeval_raw, _ = _enzyme_run_pullback_loop(dret, tape, OpType)
+
+    for i in eachindex(Δdata_raw)
         data.dval[i] .+= Δdata_raw[i]
     end
-    for i in 1:N_eval
+    for i in eachindex(Δeval_raw)
         eval_points.dval[i] .+= Δeval_raw[i]
     end
 
     return (nothing, nothing, nothing, nothing, nothing)
 end
 
-function EnzymeRules.reverse(
-        config::EnzymeRules.RevConfigWidth{1},
-        func::EnzymeCore.Const{typeof(_build_weights)},
-        dret, tape,
-        ℒ_arg::EnzymeCore.Const{<:Partial},
-        data::EnzymeCore.Duplicated,
-        eval_points::EnzymeCore.Duplicated,
-        adjl::EnzymeCore.Const,
-        basis::EnzymeCore.Const{<:AbstractRadialBasis},
-    )
-    return _enzyme_reverse_duplicated_data!(dret, tape, data, eval_points, Partial)
-end
-
-function EnzymeRules.reverse(
-        config::EnzymeRules.RevConfigWidth{1},
-        func::EnzymeCore.Const{typeof(_build_weights)},
-        dret, tape,
-        ℒ_arg::EnzymeCore.Const{<:Laplacian},
-        data::EnzymeCore.Duplicated,
-        eval_points::EnzymeCore.Duplicated,
-        adjl::EnzymeCore.Const,
-        basis::EnzymeCore.Const{<:AbstractRadialBasis},
-    )
-    return _enzyme_reverse_duplicated_data!(dret, tape, data, eval_points, Laplacian)
-end
-
 # =============================================================================
 # Explicit rules: Const data, Active basis (shape parameter optimization)
 # =============================================================================
 
-# Partial with Const data, Active basis
 function EnzymeRules.augmented_primal(
         config::EnzymeRules.RevConfigWidth{1},
         func::EnzymeCore.Const{typeof(_build_weights)},
         ::Type{RT},
-        ℒ_arg::EnzymeCore.Const{<:Partial},
+        ℒ_arg::EnzymeCore.Const{<:Union{Partial, Laplacian}},
         data::EnzymeCore.Const,
         eval_points::EnzymeCore.Const,
         adjl::EnzymeCore.Const,
         basis::EnzymeCore.Active{B},
     ) where {RT, B<:AbstractRadialBasis}
-    return _enzyme_augmented_primal_body(ℒ_arg, data, eval_points, adjl, basis, RT, Partial)
+    return _enzyme_augmented_primal_body(ℒ_arg, data, eval_points, adjl, basis, RT, _optype(ℒ_arg.val))
 end
 
-# Laplacian with Const data, Active basis
-function EnzymeRules.augmented_primal(
+function EnzymeRules.reverse(
         config::EnzymeRules.RevConfigWidth{1},
         func::EnzymeCore.Const{typeof(_build_weights)},
-        ::Type{RT},
-        ℒ_arg::EnzymeCore.Const{<:Laplacian},
+        dret, tape,
+        ℒ_arg::EnzymeCore.Const{<:Union{Partial, Laplacian}},
         data::EnzymeCore.Const,
         eval_points::EnzymeCore.Const,
         adjl::EnzymeCore.Const,
         basis::EnzymeCore.Active{B},
-    ) where {RT, B<:AbstractRadialBasis}
-    return _enzyme_augmented_primal_body(ℒ_arg, data, eval_points, adjl, basis, RT, Laplacian)
+    ) where {B<:AbstractRadialBasis}
+    return _enzyme_reverse_active_basis!(dret, tape, B, _optype(ℒ_arg.val))
 end
 
-# Shared reverse for Const data, Active basis (both Partial and Laplacian)
+# Shared reverse for Const data, Active basis
 function _enzyme_reverse_active_basis!(dret, tape, ::Type{B}, OpType) where {B<:AbstractRadialBasis}
-    op_cached, cache, adjl_val, basis_val, mon, data_val, eval_points_val, shadow = tape
-    ΔW = _extract_dret_with_shadow(dret, shadow)
-
-    TD = eltype(first(data_val))
-    N_data = length(data_val)
-    N_eval = length(eval_points_val)
-    dim_space = length(first(data_val))
-
-    grad_Lφ_x, grad_Lφ_xi = _get_grad_funcs(OpType, basis_val, op_cached)
-
-    Δdata_raw = [zeros(TD, dim_space) for _ in 1:N_data]
-    Δeval_raw = [zeros(TD, dim_space) for _ in 1:N_eval]
-    Δε_acc = Ref(zero(TD))
-
-    build_weights_pullback_loop!(
-        Δdata_raw, Δeval_raw, Δε_acc,
-        (eval_idx, neighbors, k) -> extract_stencil_cotangent(ΔW, eval_idx, neighbors, k, cache.num_ops),
-        cache, adjl_val, eval_points_val, data_val, basis_val, mon, op_cached, OpType,
-        grad_Lφ_x, grad_Lφ_xi
-    )
-
-    Δbasis = _make_enzyme_tangent(B, basis_val, Δε_acc[])
+    _, _, Δε_acc = _enzyme_run_pullback_loop(dret, tape, OpType)
+    Δbasis = _make_enzyme_tangent(B, tape[4], Δε_acc[])
     return (nothing, nothing, nothing, nothing, Δbasis)
-end
-
-function EnzymeRules.reverse(
-        config::EnzymeRules.RevConfigWidth{1},
-        func::EnzymeCore.Const{typeof(_build_weights)},
-        dret, tape,
-        ℒ_arg::EnzymeCore.Const{<:Partial},
-        data::EnzymeCore.Const,
-        eval_points::EnzymeCore.Const,
-        adjl::EnzymeCore.Const,
-        basis::EnzymeCore.Active{B},
-    ) where {B<:AbstractRadialBasis}
-    return _enzyme_reverse_active_basis!(dret, tape, B, Partial)
-end
-
-function EnzymeRules.reverse(
-        config::EnzymeRules.RevConfigWidth{1},
-        func::EnzymeCore.Const{typeof(_build_weights)},
-        dret, tape,
-        ℒ_arg::EnzymeCore.Const{<:Laplacian},
-        data::EnzymeCore.Const,
-        eval_points::EnzymeCore.Const,
-        adjl::EnzymeCore.Const,
-        basis::EnzymeCore.Active{B},
-    ) where {B<:AbstractRadialBasis}
-    return _enzyme_reverse_active_basis!(dret, tape, B, Laplacian)
 end
 
 end # module

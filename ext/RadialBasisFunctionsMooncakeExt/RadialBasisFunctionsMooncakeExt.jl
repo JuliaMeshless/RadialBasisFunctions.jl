@@ -21,9 +21,9 @@ using SparseArrays: SparseMatrixCSC
 
 # Import types and functions we need
 import RadialBasisFunctions: _eval_op, RadialBasisOperator, Interpolator
-import RadialBasisFunctions: PHS, PHS1, PHS3, PHS5, PHS7, AbstractPHS, IMQ, Gaussian
+import RadialBasisFunctions: AbstractPHS, IMQ, Gaussian
 import RadialBasisFunctions: AbstractRadialBasis, VectorValuedOperator
-import RadialBasisFunctions: _build_weights, Partial, Laplacian, MonomialBasis
+import RadialBasisFunctions: _build_weights, Partial, Laplacian, MonomialBasis, _optype
 import RadialBasisFunctions: _interpolator_point_gradient!
 
 # Import backward pass support from main package
@@ -207,14 +207,8 @@ end
 # Native rrule!! for _build_weights
 # =============================================================================
 
-# Declare _build_weights as primitive (consolidated using abstract types)
-# PHS types
-Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{typeof(_build_weights), Laplacian, AbstractVector, AbstractVector, AbstractVector, <:AbstractPHS}
-Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{typeof(_build_weights), <:Partial, AbstractVector, AbstractVector, AbstractVector, <:AbstractPHS}
-
-# IMQ and Gaussian
-Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{typeof(_build_weights), Laplacian, AbstractVector, AbstractVector, AbstractVector, <:Union{IMQ, Gaussian}}
-Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{typeof(_build_weights), <:Partial, AbstractVector, AbstractVector, AbstractVector, <:Union{IMQ, Gaussian}}
+Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{typeof(_build_weights), Laplacian, AbstractVector, AbstractVector, AbstractVector, <:AbstractRadialBasis}
+Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{typeof(_build_weights), <:Partial, AbstractVector, AbstractVector, AbstractVector, <:AbstractRadialBasis}
 
 # =============================================================================
 # Shared helpers for _build_weights rrule!! implementations
@@ -306,7 +300,7 @@ function Mooncake.rrule!!(
         basis::CoDual{<:AbstractPHS},
     )
     ℒ, pts, eval_pts, adj, bas = primal(op), primal(data), primal(eval_points), primal(adjl), primal(basis)
-    OpType = typeof(ℒ) <: Partial ? Partial : Laplacian
+    OpType = _optype(ℒ)
     W, W_codual, cache, mon, dim_space = _mooncake_build_weights_forward(ℒ, pts, eval_pts, adj, bas, OpType)
     shared_pb!! = _mooncake_build_weights_pullback(W_codual.dx, W, data, eval_points, cache, adj, pts, eval_pts, bas, mon, ℒ, OpType, dim_space)
 
@@ -328,7 +322,7 @@ function Mooncake.rrule!!(
         basis::CoDual{<:Union{IMQ, Gaussian}},
     )
     ℒ, pts, eval_pts, adj, bas = primal(op), primal(data), primal(eval_points), primal(adjl), primal(basis)
-    OpType = typeof(ℒ) <: Partial ? Partial : Laplacian
+    OpType = _optype(ℒ)
     W, W_codual, cache, mon, dim_space = _mooncake_build_weights_forward(ℒ, pts, eval_pts, adj, bas, OpType)
     shared_pb!! = _mooncake_build_weights_pullback(W_codual.dx, W, data, eval_points, cache, adj, pts, eval_pts, bas, mon, ℒ, OpType, dim_space)
     TD = eltype(first(pts))
