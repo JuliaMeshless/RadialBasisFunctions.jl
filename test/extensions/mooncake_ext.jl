@@ -43,7 +43,7 @@ end
 
     rule = Mooncake.build_rrule(loss, eval_pt)
     _, (_, dx) = Mooncake.value_and_gradient!!(rule, loss, eval_pt)
-    validate_gradient(dx, loss, eval_pt; rtol=1e-3)
+    validate_gradient(dx, loss, eval_pt; rtol = 1.0e-3)
 end
 
 @testset "Mooncake Extension - Basis Function Differentiation" begin
@@ -83,51 +83,51 @@ end
     points, N, adjl, pts_flat = make_build_weights_test_data()
 
     @testset "Partial operator with PHS3" begin
-        loss = make_build_weights_loss(Partial(1, 1), adjl, PHS(3; poly_deg=2), N)
+        loss = make_build_weights_loss(Partial(1, 1), adjl, PHS(3; poly_deg = 2), N)
         rule = Mooncake.build_rrule(loss, pts_flat)
         _, (_, dpts) = Mooncake.value_and_gradient!!(rule, loss, pts_flat)
-        validate_gradient(dpts, loss, pts_flat; rtol=1e-3)
+        validate_gradient(dpts, loss, pts_flat; rtol = 1.0e-3)
     end
 
     @testset "Laplacian operator with PHS3" begin
-        loss = make_build_weights_loss(Laplacian(), adjl, PHS(3; poly_deg=2), N)
+        loss = make_build_weights_loss(Laplacian(), adjl, PHS(3; poly_deg = 2), N)
         rule = Mooncake.build_rrule(loss, pts_flat)
         _, (_, dpts) = Mooncake.value_and_gradient!!(rule, loss, pts_flat)
-        validate_gradient(dpts, loss, pts_flat; rtol=1e-3)
+        validate_gradient(dpts, loss, pts_flat; rtol = 1.0e-3)
     end
 
     @testset "Different PHS orders" begin
         for n in [1, 3, 5, 7]
-            loss = make_build_weights_loss(Partial(1, 1), adjl, PHS(n; poly_deg=1), N)
+            loss = make_build_weights_loss(Partial(1, 1), adjl, PHS(n; poly_deg = 1), N)
             rule = Mooncake.build_rrule(loss, pts_flat)
             _, (_, dpts) = Mooncake.value_and_gradient!!(rule, loss, pts_flat)
-            validate_gradient(dpts, loss, pts_flat; rtol=1e-2, check_nonzero=(n != 1))
+            validate_gradient(dpts, loss, pts_flat; rtol = 1.0e-2, check_nonzero = (n != 1))
         end
     end
 
     @testset "$BasisName basis with $OpName operator" for
-            (BasisName, basis) in [("IMQ", IMQ(1.0; poly_deg=2)), ("Gaussian", Gaussian(1.0; poly_deg=2))],
+        (BasisName, basis) in [("IMQ", IMQ(1.0; poly_deg = 2)), ("Gaussian", Gaussian(1.0; poly_deg = 2))],
             (OpName, op) in [("Partial", Partial(1, 1)), ("Laplacian", Laplacian())]
         loss = make_build_weights_loss(op, adjl, basis, N)
         rule = Mooncake.build_rrule(loss, pts_flat)
         _, (_, dpts) = Mooncake.value_and_gradient!!(rule, loss, pts_flat)
-        validate_gradient(dpts, loss, pts_flat; rtol=1e-3)
+        validate_gradient(dpts, loss, pts_flat; rtol = 1.0e-3)
     end
 
     @testset "Different shape parameters" begin
         for ε in [0.5, 1.0, 2.0]
             @testset "$BasisName with ε=$ε" for (BasisName, BT) in [("IMQ", IMQ), ("Gaussian", Gaussian)]
-                loss = make_build_weights_loss(Partial(1, 1), adjl, BT(ε; poly_deg=2), N)
+                loss = make_build_weights_loss(Partial(1, 1), adjl, BT(ε; poly_deg = 2), N)
                 rule = Mooncake.build_rrule(loss, pts_flat)
                 _, (_, dpts) = Mooncake.value_and_gradient!!(rule, loss, pts_flat)
-                validate_gradient(dpts, loss, pts_flat; rtol=1e-2)
+                validate_gradient(dpts, loss, pts_flat; rtol = 1.0e-2)
             end
         end
     end
 
     @testset "Shape parameter (ε) differentiation" begin
         @testset "$BasisName $OpName - d(loss)/d(ε)" for
-                (BasisName, BT) in [("IMQ", IMQ), ("Gaussian", Gaussian)],
+            (BasisName, BT) in [("IMQ", IMQ), ("Gaussian", Gaussian)],
                 (OpName, op) in [("Partial", Partial(1, 1)), ("Laplacian", Laplacian())]
             loss = make_eps_loss(op, points, adjl, BT)
             rule = Mooncake.build_rrule(loss, 1.0)
@@ -141,7 +141,7 @@ end
                     loss = make_eps_loss(Partial(1, 1), points, adjl, BT)
                     rule = Mooncake.build_rrule(loss, ε_val)
                     _, (_, dε) = Mooncake.value_and_gradient!!(rule, loss, ε_val)
-                    validate_scalar_gradient(dε, loss, ε_val; rtol=1e-2)
+                    validate_scalar_gradient(dε, loss, ε_val; rtol = 1.0e-2)
                 end
             end
         end

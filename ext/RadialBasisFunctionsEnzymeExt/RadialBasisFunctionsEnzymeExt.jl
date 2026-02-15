@@ -270,15 +270,15 @@ _extract_dret_with_shadow(::Type, ::Nothing) = nothing
 _make_enzyme_tangent(::Type{<:AbstractRadialBasis}, _basis, _Δε) = nothing  # PHS has no ε
 
 function _make_enzyme_tangent(::Type{Gaussian{T, D}}, _basis::Gaussian{T, D}, Δε) where {T, D}
-    return Gaussian(convert(T, Δε); poly_deg=D(0))
+    return Gaussian(convert(T, Δε); poly_deg = D(0))
 end
 
 function _make_enzyme_tangent(::Type{IMQ{T, D}}, _basis::IMQ{T, D}, Δε) where {T, D}
-    return IMQ(convert(T, Δε); poly_deg=D(0))
+    return IMQ(convert(T, Δε); poly_deg = D(0))
 end
 
 # Shared augmented_primal body for all _build_weights rules
-function _enzyme_augmented_primal_body(ℒ_arg, data, eval_points, adjl, basis, RT, OpType; copy_data=false)
+function _enzyme_augmented_primal_body(ℒ_arg, data, eval_points, adjl, basis, RT, OpType; copy_data = false)
     op_val = ℒ_arg.val
     data_val = data.val
     eval_points_val = eval_points.val
@@ -341,7 +341,7 @@ function EnzymeRules.augmented_primal(
         adjl::EnzymeCore.Const,
         basis::EnzymeCore.Const{<:AbstractRadialBasis},
     ) where {RT}
-    return _enzyme_augmented_primal_body(ℒ_arg, data, eval_points, adjl, basis, RT, _optype(ℒ_arg.val); copy_data=true)
+    return _enzyme_augmented_primal_body(ℒ_arg, data, eval_points, adjl, basis, RT, _optype(ℒ_arg.val); copy_data = true)
 end
 
 function EnzymeRules.reverse(
@@ -384,7 +384,7 @@ function EnzymeRules.augmented_primal(
         eval_points::EnzymeCore.Const,
         adjl::EnzymeCore.Const,
         basis::EnzymeCore.Active{B},
-    ) where {RT, B<:AbstractRadialBasis}
+    ) where {RT, B <: AbstractRadialBasis}
     return _enzyme_augmented_primal_body(ℒ_arg, data, eval_points, adjl, basis, RT, _optype(ℒ_arg.val))
 end
 
@@ -397,12 +397,12 @@ function EnzymeRules.reverse(
         eval_points::EnzymeCore.Const,
         adjl::EnzymeCore.Const,
         basis::EnzymeCore.Active{B},
-    ) where {B<:AbstractRadialBasis}
+    ) where {B <: AbstractRadialBasis}
     return _enzyme_reverse_active_basis!(dret, tape, B, _optype(ℒ_arg.val))
 end
 
 # Shared reverse for Const data, Active basis
-function _enzyme_reverse_active_basis!(dret, tape, ::Type{B}, OpType) where {B<:AbstractRadialBasis}
+function _enzyme_reverse_active_basis!(dret, tape, ::Type{B}, OpType) where {B <: AbstractRadialBasis}
     _, _, Δε_acc = _enzyme_run_pullback_loop(dret, tape, OpType)
     Δbasis = _make_enzyme_tangent(B, tape[4], Δε_acc[])
     return (nothing, nothing, nothing, nothing, Δbasis)

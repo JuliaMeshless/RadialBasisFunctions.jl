@@ -21,11 +21,11 @@ Returns (grad_Lφ_x, grad_Lφ_xi) tuple.
 """
 _get_grad_funcs(::Type{<:Partial}, basis, ℒ) = (
     grad_applied_partial_wrt_x(basis, ℒ.dim),
-    grad_applied_partial_wrt_xi(basis, ℒ.dim)
+    grad_applied_partial_wrt_xi(basis, ℒ.dim),
 )
 _get_grad_funcs(::Type{<:Laplacian}, basis, ℒ) = (
     grad_applied_laplacian_wrt_x(basis),
-    grad_applied_laplacian_wrt_xi(basis)
+    grad_applied_laplacian_wrt_xi(basis),
 )
 
 """
@@ -40,7 +40,7 @@ Returns `(poly_backward!, ∂Lφ_∂ε_fn)` keyword arguments.
 function _get_rhs_closures(::Type{<:Partial}, ℒ, basis)
     dim = ℒ.dim
     poly_backward! = (Δeval_point, Δb, k, nmon, num_ops) ->
-        _backward_partial_polynomial_section!(Δeval_point, Δb, k, nmon, dim, num_ops)
+    _backward_partial_polynomial_section!(Δeval_point, Δb, k, nmon, dim, num_ops)
     ∂Lφ_∂ε_fn = (x, xi) -> ∂Partial_φ_∂ε(basis, dim, x, xi)
     return poly_backward!, ∂Lφ_∂ε_fn
 end

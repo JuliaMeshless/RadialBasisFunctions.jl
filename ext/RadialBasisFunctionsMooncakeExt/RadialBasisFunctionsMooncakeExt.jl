@@ -248,6 +248,7 @@ function _accumulate_into_mooncake_fdata!(
         new_data = ntuple(d -> old_data[d] + Δ[d], Val(dim_space))
         fdata[i] = typeof(fdata[i])((data = new_data,))
     end
+    return
 end
 
 """

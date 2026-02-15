@@ -516,4 +516,3 @@ function extract_stencil_cotangent_from_nzval(
     end
     return Δw
 end
-
