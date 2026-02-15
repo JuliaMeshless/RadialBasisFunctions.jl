@@ -8,6 +8,7 @@ Includes rrule!! for:
 - Basis function evaluation (all AbstractRadialBasis types)
 - Operator evaluation: `_eval_op(op, x)` for scalar and vector-valued
 - Operator call syntax: `op(x)`
+- Interpolator constructor: `Interpolator(x, y, basis)`
 - Interpolator evaluation
 - Weight construction: `_build_weights` for Partial and Laplacian operators
 """
@@ -17,6 +18,7 @@ using RadialBasisFunctions
 using Mooncake
 using Mooncake: CoDual, NoFData, NoRData, primal, zero_fcodual
 using StaticArrays: SVector
+using LinearAlgebra: Symmetric
 using SparseArrays: SparseMatrixCSC
 
 # Import types and functions we need
@@ -25,6 +27,7 @@ import RadialBasisFunctions: AbstractPHS, IMQ, Gaussian
 import RadialBasisFunctions: AbstractRadialBasis, VectorValuedOperator
 import RadialBasisFunctions: _build_weights, Partial, Laplacian, MonomialBasis, _optype
 import RadialBasisFunctions: _interpolator_point_gradient!
+import RadialBasisFunctions: _interpolator_constructor_backward, _build_collocation_matrix!
 
 # Import backward pass support from main package
 import RadialBasisFunctions: _forward_with_cache
@@ -183,7 +186,57 @@ function Mooncake.rrule!!(
 end
 
 # =============================================================================
-# Interpolator Rule
+# Interpolator Constructor Rule
+# =============================================================================
+# Makes the Interpolator(x, y, basis) constructor opaque to Mooncake so it
+# doesn't try to trace through `Symmetric(A) \ b` (which hits unsupported
+# LAPACK foreigncalls). The backward pass uses the implicit function theorem.
+
+Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{
+    Type{Interpolator}, AbstractVector, AbstractVector, <:AbstractRadialBasis
+}
+
+function Mooncake.rrule!!(
+        ::CoDual{Type{Interpolator}},
+        x_cd::CoDual{<:AbstractVector},
+        y_cd::CoDual{<:AbstractVector},
+        basis_cd::CoDual{<:AbstractRadialBasis},
+    )
+    x_val = primal(x_cd)
+    y_val = primal(y_cd)
+    basis_val = primal(basis_cd)
+
+    # Forward pass: reproduce Interpolator constructor logic
+    dim = length(first(x_val))
+    k = length(x_val)
+    npoly = binomial(dim + basis_val.poly_deg, basis_val.poly_deg)
+    n = k + npoly
+    mon = MonomialBasis(dim, basis_val.poly_deg)
+    data_type = promote_type(eltype(first(x_val)), eltype(y_val))
+    A = Symmetric(zeros(data_type, n, n))
+    _build_collocation_matrix!(A, x_val, basis_val, mon, k)
+    b = vcat(y_val, zeros(data_type, npoly))
+    w = A \ b
+
+    interp = Interpolator(x_val, y_val, w[1:k], w[(k + 1):end], basis_val, mon)
+    interp_cd = zero_fcodual(interp)
+    interp_fdata = interp_cd.dx
+
+    basis_zero_rdata = Mooncake.zero_rdata(basis_val)
+
+    function interpolator_ctor_pb!!(::Union{NoRData, Mooncake.RData})
+        Δrbf = interp_fdata.data.rbf_weights
+        Δmon = interp_fdata.data.monomial_weights
+        Δy = _interpolator_constructor_backward(Δrbf, Δmon, A, k)
+        y_cd.dx .+= Δy
+        return NoRData(), NoRData(), NoRData(), basis_zero_rdata
+    end
+
+    return interp_cd, interpolator_ctor_pb!!
+end
+
+# =============================================================================
+# Interpolator Evaluation Rule
 # =============================================================================
 # Output is Float64 scalar → rdata is Float64.
 

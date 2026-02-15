@@ -44,3 +44,21 @@ function _interpolator_point_gradient!(Δx, interp::Interpolator, x, Δy)
 
     return nothing
 end
+
+"""
+    _interpolator_constructor_backward(Δrbf_weights, Δmon_weights, A, k)
+
+Backward pass for the Interpolator constructor w.r.t. `y` (the data values).
+
+Given cotangents of `rbf_weights` and `monomial_weights`, computes the cotangent of `y`
+using the implicit function theorem. Since `w = A⁻¹ [y; 0]` and `A` is constant w.r.t. `y`:
+
+    Δy = (A⁻¹ [Δrbf_weights; Δmon_weights])[1:k]
+
+Used by both Mooncake and potentially Enzyme extensions.
+"""
+function _interpolator_constructor_backward(Δrbf_weights, Δmon_weights, A, k)
+    Δw = vcat(Δrbf_weights, Δmon_weights)
+    Δb = A \ Δw  # A is symmetric ⟹ A⁻ᵀ = A⁻¹
+    return Δb[1:k]
+end
