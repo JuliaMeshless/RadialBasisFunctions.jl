@@ -70,6 +70,8 @@ function Mooncake.rrule!!(
     x_val, xi_val = primal(x), primal(xi)
     y = basis_val(x_val, xi_val)
 
+    basis_zero_rdata = Mooncake.zero_rdata(basis_val)
+
     function basis_pb!!(Δy)
         grad_fn = ∇(basis_val)
         ∇φ = grad_fn(x_val, xi_val)
@@ -77,7 +79,7 @@ function Mooncake.rrule!!(
             x.dx[d] += Δy * ∇φ[d]
             xi.dx[d] -= Δy * ∇φ[d]
         end
-        return NoRData(), NoRData(), NoRData()
+        return basis_zero_rdata, NoRData(), NoRData()
     end
 
     return zero_fcodual(y), basis_pb!!
