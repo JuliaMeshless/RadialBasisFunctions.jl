@@ -95,9 +95,9 @@ end
     include("solve/integration/partial_y_end_to_end.jl")
 end
 
-if Base.find_package("Enzyme") !== nothing
-    @safetestset "Enzyme Extension" begin
-        include("extensions/enzyme_ext.jl")
+if Base.find_package("DifferentiationInterface") !== nothing
+    @safetestset "Autodiff via DifferentiationInterface" begin
+        include("extensions/autodiff_di.jl")
     end
 end
 

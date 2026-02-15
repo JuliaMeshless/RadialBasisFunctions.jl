@@ -2,6 +2,9 @@ using RadialBasisFunctions
 using StaticArraysCore
 using Statistics
 using HaltonSequences
+using Random: MersenneTwister
+
+rng = MersenneTwister(567)
 
 include("../test_utils.jl")
 
@@ -11,7 +14,7 @@ N = 10_000
 x = SVector{2}.(HaltonPoint(2)[1:N])
 y = f.(x)
 
-x2 = map(x -> SVector{2}(rand(2)), 1:100)
+x2 = map(x -> SVector{2}(rand(rng, 2)), 1:100)
 
 @testset "Positional Basis Constructor" begin
     r = regrid(x, x2, PHS(3; poly_deg = 2))

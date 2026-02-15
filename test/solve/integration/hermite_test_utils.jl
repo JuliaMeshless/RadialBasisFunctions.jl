@@ -1,8 +1,11 @@
 using Test
 using StaticArraysCore
 using LinearAlgebra
+using Random: MersenneTwister
 
-function create_2d_unit_square_domain(spacing::Float64 = 0.05; randomize = false)
+function create_2d_unit_square_domain(
+        spacing::Float64 = 0.05; randomize = false, rng = MersenneTwister(101)
+    )
     domain_2d = SVector{2, Float64}[]
     for x in 0.0:spacing:1.0
         for y in 0.0:spacing:1.0
@@ -11,8 +14,8 @@ function create_2d_unit_square_domain(spacing::Float64 = 0.05; randomize = false
 
             if randomize && !is_on_boundary
                 # Only add noise to interior points
-                noise_x = (rand() - 0.5) * spacing * 0.3
-                noise_y = (rand() - 0.5) * spacing * 0.3
+                noise_x = (rand(rng) - 0.5) * spacing * 0.3
+                noise_y = (rand(rng) - 0.5) * spacing * 0.3
                 push!(domain_2d, SVector(x + noise_x, y + noise_y))
             else
                 # Keep boundary points exact

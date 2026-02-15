@@ -1,8 +1,10 @@
 import { defineConfig } from 'vitepress'
 import { tabsMarkdownPlugin } from 'vitepress-plugin-tabs'
-import mathjax3 from "markdown-it-mathjax3";
+import { mathjaxPlugin } from './mathjax-plugin'
 import footnote from "markdown-it-footnote";
 import path from 'path'
+
+const mathjax = mathjaxPlugin()
 
 function getBaseRepository(base: string): string {
   if (!base || base === '/') return '/';
@@ -18,6 +20,8 @@ const navTemp = {
   nav: [
     { text: 'Home', link: '/index' },
     { text: 'Getting Started', link: '/getting_started' },
+    { text: 'Autodiff', link: '/autodiff' },
+    { text: 'Quick Reference', link: '/quickref' },
     { text: 'Theory', link: '/theory' },
     { text: 'Internals', link: '/internals' },
     { text: 'API', link: '/api' }
@@ -45,6 +49,9 @@ export default defineConfig({
     ],
 
     vite: {
+      plugins: [
+        mathjax.vitePlugin,
+      ],
       define: {
         __DEPLOY_ABSPATH__: JSON.stringify('/'),
       },
@@ -68,11 +75,10 @@ export default defineConfig({
       },
     },
     markdown: {
-      math: true,
       config(md) {
-        md.use(tabsMarkdownPlugin),
-        md.use(mathjax3),
-        md.use(footnote)
+        md.use(tabsMarkdownPlugin);
+        md.use(footnote);
+        mathjax.markdownConfig(md);
       },
       theme: {
         light: "github-light",
@@ -92,6 +98,8 @@ export default defineConfig({
       sidebar: [
         { text: 'Home', link: '/index' },
         { text: 'Getting Started', link: '/getting_started' },
+        { text: 'Autodiff', link: '/autodiff' },
+        { text: 'Quick Reference', link: '/quickref' },
         { text: 'Theory', link: '/theory' },
         { text: 'Internals', link: '/internals' },
         { text: 'API', link: '/api' }

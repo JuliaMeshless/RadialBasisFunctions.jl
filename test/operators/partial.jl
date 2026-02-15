@@ -2,6 +2,9 @@ using RadialBasisFunctions
 using StaticArraysCore
 using Statistics
 using HaltonSequences
+using Random: MersenneTwister
+
+rng = MersenneTwister(234)
 
 include("../test_utils.jl")
 
@@ -62,7 +65,7 @@ end
 end
 
 @testset "Different Evaluation Points" begin
-    x2 = map(x -> SVector{2}(rand(2)), 1:100)
+    x2 = map(x -> SVector{2}(rand(rng, 2)), 1:100)
     ∂x = partial(x, x2, 1, 1, PHS(3; poly_deg = 2))
     ∂y = partial(x, x2, 1, 2, PHS(3; poly_deg = 2))
     @test mean_percent_error(∂x(y), df_dx.(x2)) < 10

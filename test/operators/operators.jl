@@ -4,6 +4,9 @@ using StaticArraysCore
 using LinearAlgebra
 using Statistics
 using HaltonSequences
+using Random: MersenneTwister
+
+rng = MersenneTwister(123)
 
 N = 100
 x = SVector{2}.(HaltonPoint(2)[1:N])
@@ -17,8 +20,8 @@ end
 
 @testset "Operator Evaluation" begin
     ∂ = partial(x, 1, 1)
-    y = rand(N)
-    z = rand(N)
+    y = rand(rng, N)
+    z = rand(rng, N)
     ∂(y, z)
     @test y ≈ ∂.weights * z
 
@@ -34,15 +37,15 @@ end
 @testset "Operator Update" begin
     ∂ = partial(x, 1, 1)
     correct_weights = copy(∂.weights)
-    ∂.weights .= rand(size(∂.weights))
+    ∂.weights .= rand(rng, size(∂.weights))
     update_weights!(∂)
     @test ∂.weights ≈ correct_weights
     @test is_cache_valid(∂)
 
     ∇ = gradient(x, PHS(3; poly_deg = 2))
     correct_weights = copy.(∇.weights)
-    ∇.weights[1] .= rand(size(∇.weights[1]))
-    ∇.weights[2] .= rand(size(∇.weights[2]))
+    ∇.weights[1] .= rand(rng, size(∇.weights[1]))
+    ∇.weights[2] .= rand(rng, size(∇.weights[2]))
     update_weights!(∇)
     @test ∇.weights[1] ≈ correct_weights[1]
     @test ∇.weights[2] ≈ correct_weights[2]
@@ -63,7 +66,7 @@ end
     @test RBF.dim(∂) == 2
 
     # 3D test
-    x3d = [SVector{3}(rand(3)) for _ in 1:50]
+    x3d = [SVector{3}(rand(rng, 3)) for _ in 1:50]
     ∂3d = partial(x3d, 1, 1)
     @test RBF.dim(∂3d) == 3
 end
