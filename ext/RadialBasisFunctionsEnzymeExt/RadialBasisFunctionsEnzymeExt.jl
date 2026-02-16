@@ -114,7 +114,7 @@ function EnzymeRules.augmented_primal(
     ) where {RT}
     y = _eval_op(op.val, x.val)
     shadow = _make_shadow_for_return(RT, y)
-    return EnzymeRules.AugmentedReturn(y, shadow, (op.val, shadow))
+    return EnzymeRules.AugmentedReturn(y, shadow, shadow)
 end
 
 function EnzymeRules.reverse(
@@ -125,10 +125,10 @@ function EnzymeRules.reverse(
         op::EnzymeCore.Const{<:RadialBasisOperator},
         x::EnzymeCore.Duplicated,
     )
-    operator, shadow = tape
+    shadow = tape
     Δy = _extract_dret_with_shadow(dret, shadow)
     # Pullback: Δx = W' * Δy
-    x.dval .+= operator.weights' * Δy
+    x.dval .+= op.val.weights' * Δy
     return (nothing, nothing)
 end
 
@@ -142,7 +142,7 @@ function EnzymeRules.augmented_primal(
     ) where {D, RT}
     y = _eval_op(op.val, x.val)
     shadow = _make_shadow_for_return(RT, y)
-    return EnzymeRules.AugmentedReturn(y, shadow, (op.val, D, shadow))
+    return EnzymeRules.AugmentedReturn(y, shadow, shadow)
 end
 
 function EnzymeRules.reverse(
@@ -153,7 +153,9 @@ function EnzymeRules.reverse(
         op::EnzymeCore.Const{<:RadialBasisOperator{<:VectorValuedOperator}},
         x::EnzymeCore.Duplicated,
     )
-    operator, D, shadow = tape
+    operator = op.val
+    D = length(operator.weights)
+    shadow = tape
     Δy = _extract_dret_with_shadow(dret, shadow)
     # Pullback: Δx = Σ_d W[d]' * Δy[:,d]
     for d in 1:D
@@ -174,11 +176,9 @@ function EnzymeRules.augmented_primal(
         x::EnzymeCore.Duplicated,
     ) where {RT}
     operator = op.val
-    # Ensure weights are computed
-    !RadialBasisFunctions.is_cache_valid(operator) && RadialBasisFunctions.update_weights!(operator)
-    y = _eval_op(operator, x.val)
+    y = operator.weights * x.val
     shadow = _make_shadow_for_return(RT, y)
-    return EnzymeRules.AugmentedReturn(y, shadow, (operator, shadow))
+    return EnzymeRules.AugmentedReturn(y, shadow, shadow)
 end
 
 function EnzymeRules.reverse(
@@ -188,9 +188,9 @@ function EnzymeRules.reverse(
         tape,
         x::EnzymeCore.Duplicated,
     )
-    operator, shadow = tape
+    shadow = tape
     Δy = _extract_dret_with_shadow(dret, shadow)
-    x.dval .+= operator.weights' * Δy
+    x.dval .+= op.val.weights' * Δy
     return (nothing,)
 end
 
@@ -202,10 +202,9 @@ function EnzymeRules.augmented_primal(
         x::EnzymeCore.Duplicated,
     ) where {D, RT}
     operator = op.val
-    !RadialBasisFunctions.is_cache_valid(operator) && RadialBasisFunctions.update_weights!(operator)
     y = _eval_op(operator, x.val)
     shadow = _make_shadow_for_return(RT, y)
-    return EnzymeRules.AugmentedReturn(y, shadow, (operator, D, shadow))
+    return EnzymeRules.AugmentedReturn(y, shadow, shadow)
 end
 
 function EnzymeRules.reverse(
@@ -215,7 +214,9 @@ function EnzymeRules.reverse(
         tape,
         x::EnzymeCore.Duplicated,
     )
-    operator, D, shadow = tape
+    operator = op.val
+    D = length(operator.weights)
+    shadow = tape
     Δy = _extract_dret_with_shadow(dret, shadow)
     for d in 1:D
         x.dval .+= operator.weights[d]' * view(Δy, :, d)
@@ -293,11 +294,17 @@ import RadialBasisFunctions: build_weights_pullback_loop!
 # Helper functions
 # =============================================================================
 
-# For Duplicated return types, we need to allocate a shadow
+# For Duplicated/DuplicatedNoNeed return types, we need to allocate a shadow
 function _make_shadow_for_return(::Type{<:EnzymeCore.Duplicated}, W::SparseMatrixCSC)
     return SparseMatrixCSC(W.m, W.n, copy(W.colptr), copy(W.rowval), zeros(eltype(W), length(W.nzval)))
 end
 function _make_shadow_for_return(::Type{<:EnzymeCore.Duplicated}, y::AbstractArray)
+    return zero(y)
+end
+function _make_shadow_for_return(::Type{<:EnzymeCore.DuplicatedNoNeed}, W::SparseMatrixCSC)
+    return SparseMatrixCSC(W.m, W.n, copy(W.colptr), copy(W.rowval), zeros(eltype(W), length(W.nzval)))
+end
+function _make_shadow_for_return(::Type{<:EnzymeCore.DuplicatedNoNeed}, y::AbstractArray)
     return zero(y)
 end
 _make_shadow_for_return(::Type, _W) = nothing
