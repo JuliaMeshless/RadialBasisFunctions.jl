@@ -193,7 +193,7 @@ end
 # LAPACK foreigncalls). The backward pass uses the implicit function theorem.
 
 Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{
-    Type{Interpolator}, AbstractVector, AbstractVector, <:AbstractRadialBasis
+    Type{Interpolator}, AbstractVector, AbstractVector, <:AbstractRadialBasis,
 }
 
 function Mooncake.rrule!!(
