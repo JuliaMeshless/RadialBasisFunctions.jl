@@ -7,110 +7,97 @@ import path from 'path'
 const mathjax = mathjaxPlugin()
 
 function getBaseRepository(base: string): string {
-  if (!base || base === '/') return '/';
-  const parts = base.split('/').filter(Boolean);
-  return parts.length > 0 ? `/${parts[0]}/` : '/';
+    if (!base || base === '/') return '/';
+    const parts = base.split('/').filter(Boolean);
+    return parts.length > 0 ? `/${parts[0]}/` : '/';
 }
 
 const baseTemp = {
-  base: '/',// defined defined defined defined defined defined by define define defined
+    base: 'REPLACE_ME_DOCUMENTER_VITEPRESS',// TODO: replace this in makedocs!
 }
 
 const navTemp = {
-  nav: [
-    { text: 'Home', link: '/index' },
-    { text: 'Getting Started', link: '/getting_started' },
-    { text: 'Autodiff', link: '/autodiff' },
-    { text: 'Quick Reference', link: '/quickref' },
-    { text: 'Theory', link: '/theory' },
-    { text: 'Internals', link: '/internals' },
-    { text: 'API', link: '/api' }
-  ],
+    nav: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
 }
 
 const nav = [
-  ...navTemp.nav,
-  {
-    component: 'VersionPicker'
-  }
+    ...navTemp.nav,
+    {
+        component: 'VersionPicker'
+    }
 ]
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
-    base: '/',// defined defined defined defined defined defined by define define defined
-    title: 'RadialBasisFunctions.jl',
-    description: 'Documentation for RadialBasisFunctions.jl',
+    base: 'REPLACE_ME_DOCUMENTER_VITEPRESS',// TODO: replace this in makedocs!
+    title: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
+    description: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
     lastUpdated: true,
     cleanUrls: true,
-    outDir: '../1',
+    outDir: 'REPLACE_ME_DOCUMENTER_VITEPRESS', // This is required for MarkdownVitepress to work correctly...
     head: [
-      ['script', {src: `${getBaseRepository(baseTemp.base)}versions.js`}],
-      ['script', {src: `${baseTemp.base}siteinfo.js`}]
+        ['link', { rel: 'icon', href: 'REPLACE_ME_DOCUMENTER_VITEPRESS_FAVICON' }],
+        ['script', { src: `${getBaseRepository(baseTemp.base)}versions.js` }],
+        // ['script', {src: '/versions.js'], for custom domains, I guess if deploy_url is available.
+        ['script', { src: `${baseTemp.base}siteinfo.js` }]
     ],
 
-    vite: {
-      plugins: [
-        mathjax.vitePlugin,
-      ],
-      define: {
-        __DEPLOY_ABSPATH__: JSON.stringify('/'),
-      },
-      resolve: {
-        alias: {
-          '@': path.resolve(__dirname, '../components')
-        }
-      },
-      optimizeDeps: {
-        exclude: [
-          '@nolebase/vitepress-plugin-enhanced-readabilities/client',
-          'vitepress',
-          '@nolebase/ui',
-        ],
-      },
-      ssr: {
-        noExternal: [
-          '@nolebase/vitepress-plugin-enhanced-readabilities',
-          '@nolebase/ui',
-        ],
-      },
-    },
     markdown: {
-      config(md) {
-        md.use(tabsMarkdownPlugin);
-        md.use(footnote);
-        mathjax.markdownConfig(md);
-      },
-      theme: {
-        light: "github-light",
-        dark: "github-dark"
-      }
+        config(md) {
+            md.use(tabsMarkdownPlugin);
+            md.use(footnote);
+            mathjax.markdownConfig(md);
+        },
+        theme: {
+            light: "github-light",
+            dark: "github-dark"
+        },
+    },
+    vite: {
+        plugins: [
+            mathjax.vitePlugin,
+        ],
+        define: {
+            __DEPLOY_ABSPATH__: JSON.stringify('REPLACE_ME_DOCUMENTER_VITEPRESS_DEPLOY_ABSPATH'),
+        },
+        resolve: {
+            alias: {
+                '@': path.resolve(__dirname, '../components')
+            }
+        },
+        optimizeDeps: {
+            exclude: [
+                '@nolebase/vitepress-plugin-enhanced-readabilities/client',
+                'vitepress',
+                '@nolebase/ui',
+            ],
+        },
+        ssr: {
+            noExternal: [
+                // If there are other packages that need to be processed by Vite, you can add them here.
+                '@nolebase/vitepress-plugin-enhanced-readabilities',
+                '@nolebase/ui',
+            ],
+        },
     },
     themeConfig: {
-      outline: 'deep',
-      logo: { src: '/logo.svg', width: 24, height: 24},
-      search: {
-        provider: 'local',
-        options: {
-          detailedView: true
+        outline: 'deep',
+        logo: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
+        search: {
+            provider: 'local',
+            options: {
+                detailedView: true
+            }
+        },
+        nav,
+        sidebar: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
+        editLink: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
+        socialLinks: [
+            { icon: 'github', link: 'REPLACE_ME_DOCUMENTER_VITEPRESS' }
+        ],
+        footer: {
+            message: 'Made with <a href="https://luxdl.github.io/DocumenterVitepress.jl/dev/" target="_blank"><strong>DocumenterVitepress.jl</strong></a><br>',
+            copyright: `© Copyright ${new Date().getUTCFullYear()}.`
         }
-      },
-      nav,
-      sidebar: [
-        { text: 'Home', link: '/index' },
-        { text: 'Getting Started', link: '/getting_started' },
-        { text: 'Autodiff', link: '/autodiff' },
-        { text: 'Quick Reference', link: '/quickref' },
-        { text: 'Theory', link: '/theory' },
-        { text: 'Internals', link: '/internals' },
-        { text: 'API', link: '/api' }
-      ],
-      editLink: { pattern: "https://github.com/JuliaMeshless/RadialBasisFunctions.jl/edit/main/docs/src/:path" },
-      socialLinks: [
-        { icon: 'github', link: 'https://github.com/JuliaMeshless/RadialBasisFunctions.jl' }
-      ],
-      footer: {
-        message: 'Made with <a href="https://luxdl.github.io/DocumenterVitepress.jl/dev/" target="_blank"><strong>DocumenterVitepress.jl</strong></a><br>',
-        copyright: `© Copyright ${new Date().getUTCFullYear()}.`
-      }
     }
-  })
+})
