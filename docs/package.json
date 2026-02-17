@@ -14,6 +14,7 @@
     "docs:preview": "vitepress preview build/.documenter"
   },
   "dependencies": {
+    "@mathjax/src": "^4.0.0",
     "@mdit/plugin-mathjax": "^0.25.0",
     "@mdit/plugin-tex": "^0.23.1",
     "d3-format": "^3.1.0",

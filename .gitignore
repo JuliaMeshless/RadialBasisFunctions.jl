@@ -20,3 +20,5 @@ Manifest.toml
 
 # Flyer et al. script to test
 *.m
+
+docs/package-lock.json
