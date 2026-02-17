@@ -15,7 +15,6 @@ makedocs(;
         repo = "https://github.com/JuliaMeshless/RadialBasisFunctions.jl",
         devbranch = "main",
         devurl = "dev",
-        deploy_url = "juliameshless.github.io/RadialBasisFunctions.jl",
         build_vitepress = (!haskey(ENV, "VITEPRESS_DEV")),
     ),
     pages = [
@@ -35,6 +34,5 @@ DocumenterVitepress.deploydocs(;
     target = joinpath(@__DIR__, "build"),
     branch = "gh-pages",
     devbranch = "main",
-    push_preview = false,
-    forcepush = true,
+    push_preview = true,
 )
