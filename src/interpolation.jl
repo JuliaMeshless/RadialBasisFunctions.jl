@@ -35,16 +35,13 @@ end
 
 function (rbfi::Interpolator)(x::T) where {T}
     rbf = zero(eltype(T))
-    for i in eachindex(rbfi.rbf_weights)
+    @inbounds for i in eachindex(rbfi.rbf_weights)
         rbf += rbfi.rbf_weights[i] * rbfi.rbf_basis(x, rbfi.x[i])
     end
 
     poly = zero(eltype(T))
     if !isempty(rbfi.monomial_weights)
-        val_poly = rbfi.monomial_basis(x)
-        for (i, val) in enumerate(val_poly)
-            poly += rbfi.monomial_weights[i] * val
-        end
+        poly = LinearAlgebra.dot(rbfi.monomial_weights, rbfi.monomial_basis(x))
     end
     return rbf + poly
 end

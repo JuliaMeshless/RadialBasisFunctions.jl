@@ -234,8 +234,10 @@ function launch_kernel!(
 
         # Pre-allocate work arrays for this thread
         n = k + nmon
-        A = Symmetric(zeros(TD, n, n), :U)
+        A_full = zeros(TD, n, n)
+        A = Symmetric(A_full, :U)
         b = _prepare_buffer(ℒrbf, TD, n)
+        λ = _prepare_buffer(ℒrbf, TD, n)
 
         for eval_idx in start_idx:end_idx
             start_pos = row_offsets[eval_idx]
@@ -251,11 +253,17 @@ function launch_kernel!(
                 # Identity row: only diagonal is 1.0
                 fill_dirichlet_entry!(I, J, V, eval_idx, start_pos, num_ops)
                 continue
-            elseif stype isa InteriorStencil
+            end
+
+            # Reset workspace for reuse
+            fill!(A_full, zero(TD))
+            fill!(b, zero(TD))
+
+            if stype isa InteriorStencil
                 # Standard interior stencil (no boundary points)
                 local_data = view(data, neighbors)
                 weights = _build_stencil!(
-                    A, b, ℒrbf, ℒmon, local_data, eval_point, basis, mon, k
+                    λ, A, b, ℒrbf, ℒmon, local_data, eval_point, basis, mon, k
                 )
             else  # HermiteStencil
                 # Mixed interior/boundary stencil
@@ -269,7 +277,7 @@ function launch_kernel!(
                     global_to_boundary,
                 )
                 weights = _build_stencil!(
-                    A, b, ℒrbf, ℒmon, hermite_data, eval_point, basis, mon, k
+                    λ, A, b, ℒrbf, ℒmon, hermite_data, eval_point, basis, mon, k
                 )
             end
 

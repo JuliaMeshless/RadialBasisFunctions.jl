@@ -4,7 +4,7 @@ Forward pass with caching for backward pass of _build_weights differentiation ru
 This builds weights while storing intermediate results needed for the pullback.
 =#
 
-using LinearAlgebra: Symmetric
+using LinearAlgebra: Symmetric, copytri!
 using SparseArrays: sparse
 
 """
@@ -44,48 +44,44 @@ function _forward_with_cache(
     # Allocate stencil caches
     stencil_caches = Vector{StencilForwardCache{TD, Matrix{TD}}}(undef, N_eval)
 
+    # Pre-allocate workspace outside the loop
+    A_full = zeros(TD, n, n)
+    b = zeros(TD, n, num_ops)
+
     # Process each evaluation point
     pos = 1
     for eval_idx in 1:N_eval
         neighbors = adjl[eval_idx]
         eval_point = eval_points[eval_idx]
 
-        # Get local data for this stencil
-        local_data = [data[i] for i in neighbors]
+        # Use view instead of allocating new vector
+        local_data = view(data, neighbors)
 
-        # Build collocation matrix
-        A_full = zeros(TD, n, n)
+        # Reset and reuse pre-allocated collocation matrix
+        fill!(A_full, zero(TD))
         A = Symmetric(A_full, :U)
         _build_collocation_matrix!(A, local_data, basis, mon, k)
 
-        # Build RHS vector
-        b = zeros(TD, n, num_ops)
+        # Reset and reuse pre-allocated RHS
+        fill!(b, zero(TD))
         b_vec = view(b, :, 1)
         _build_rhs!(b_vec, ℒrbf, ℒmon, local_data, eval_point, basis, mon, k)
 
         # Solve (symmetric matrix, not positive definite due to zero block)
         λ = Symmetric(A_full, :U) \ b
 
-        # Extract weights (first k entries)
-        w = λ[1:k, :]
-
         # Store in COO format
-        for (local_idx, global_idx) in enumerate(neighbors)
+        @inbounds for (local_idx, global_idx) in enumerate(neighbors)
             I[pos] = eval_idx
             J[pos] = global_idx
-            V[pos] = w[local_idx, 1]
+            V[pos] = λ[local_idx, 1]
             pos += 1
         end
 
         # Cache for backward pass - store full symmetric matrix
-        A_full_symmetric = copy(A_full)
-        # Fill lower triangle from upper
-        for j in 1:n
-            for i in (j + 1):n
-                A_full_symmetric[i, j] = A_full[j, i]
-            end
-        end
-        stencil_caches[eval_idx] = StencilForwardCache(copy(λ), A_full_symmetric, k, nmon)
+        A_cached = copy(A_full)
+        copytri!(A_cached, 'U')
+        stencil_caches[eval_idx] = StencilForwardCache(copy(λ), A_cached, k, nmon)
     end
 
     # Construct sparse matrix

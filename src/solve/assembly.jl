@@ -1,4 +1,4 @@
-using LinearAlgebra: Symmetric, dot
+using LinearAlgebra: Symmetric, dot, bunchkaufman!, ldiv!
 
 # Compute RBF matrix entry - dispatch on data type
 _rbf_entry(i, j, data::AbstractVector, basis) = basis(data[i], data[j])
@@ -197,6 +197,34 @@ function _build_stencil!(
     _build_rhs!(b, ℒrbf, ℒmon, data, eval_point, basis, mon, k)
     return (A \ b)[1:k, :]
 end
+
+"""
+    _build_stencil!(λ, A, b, ℒrbf, ℒmon, data, eval_point, basis, mon, k)
+
+In-place variant: writes solution into pre-allocated `λ` buffer, returns view of first k rows.
+Avoids allocating the solution vector and the slice on every call.
+"""
+function _build_stencil!(
+        λ,
+        A::Symmetric,
+        b,
+        ℒrbf,
+        ℒmon,
+        data,
+        eval_point,
+        basis::AbstractRadialBasis,
+        mon::MonomialBasis,
+        k::Int,
+    )
+    _build_collocation_matrix!(A, data, basis, mon, k)
+    _build_rhs!(b, ℒrbf, ℒmon, data, eval_point, basis, mon, k)
+    ldiv!(λ, bunchkaufman!(A, true), b)
+    return _weight_view(λ, k)
+end
+
+# Dispatch helpers: Vector gets 1D view, Matrix gets 2D slice view
+_weight_view(λ::AbstractVector, k) = view(λ, 1:k)
+_weight_view(λ::AbstractMatrix, k) = view(λ, 1:k, :)
 
 # ============================================================================
 # Hermite-Specific Computations
