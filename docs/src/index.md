@@ -4,8 +4,8 @@ layout: home
 
 hero:
   name: RadialBasisFunctions.jl
-  text: Differential Operators on Scattered Data
-  tagline: Build interpolators, Laplacians, and gradients directly from point clouds — no mesh required
+  text: Meshless Computing in Julia
+  tagline: Radial basis functions for operators, machine learning, and beyond.
   actions:
     - theme: brand
       text: Get Started
@@ -15,16 +15,16 @@ hero:
       link: https://github.com/JuliaMeshless/RadialBasisFunctions.jl
 
 features:
-  - icon: 📐
+  - icon: ☁️
     title: No Mesh Required
     details: Interpolate and differentiate directly on scattered point clouds. Local stencils from k-nearest neighbors scale to large problems.
   - icon: ∇
-    title: Differential Operators
+    title: Operators
     details: "Laplacian, gradient, partials, directional derivatives, and custom operators — with operator algebra to combine them."
   - icon: 🚀
     title: GPU Ready
     details: Weight computation parallelizes over stencils via KernelAbstractions.jl. Same code runs on CPU and GPU.
-  - icon: 🔬
+  - icon: ∂
     title: Fully Differentiable
     details: Native AD rules for Enzyme.jl and Mooncake.jl — differentiate through operators, interpolators, and weight construction.
 ---
@@ -35,7 +35,7 @@ features:
 ```julia
 using RadialBasisFunctions, StaticArrays
 
-# Scattered 2D points — no mesh needed
+# Scattered data
 points = [SVector{2}(rand(2)) for _ in 1:500]
 f(x) = sin(4x[1]) * cos(3x[2])
 values = f.(points)

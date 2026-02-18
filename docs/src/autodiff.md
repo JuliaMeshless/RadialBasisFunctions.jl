@@ -183,13 +183,13 @@ grad[1:6]
 | Component | Enzyme | Mooncake |
 |-----------|:------:|:--------:|
 | Operator evaluation (`op(values)`) | ✓ | ✓ |
-| Interpolator construction | ✓* | ✓ |
+| Interpolator construction | ✗* | ✓ |
 | Interpolator evaluation | ✓ | ✓ |
 | Basis functions (PHS, IMQ, Gaussian) | ✓ | ✓ |
 | Weight construction (`_build_weights`) | ✓ | ✓ |
 | Shape parameter (ε) differentiation | ✓ | ✓ |
 
-*Enzyme supports Interpolator construction via native `autodiff` but may fail through DifferentiationInterface due to `factorize` limitations. Use Mooncake for this use case.
+*Enzyme does not support differentiating through `Interpolator` construction via DifferentiationInterface due to `factorize` limitations. Use Mooncake for this use case.
 
 ## Using Enzyme Backend
 

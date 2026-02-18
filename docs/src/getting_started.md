@@ -1,6 +1,6 @@
 # Getting Started
 
-Data must be `Vector{AbstractVector}` — each point needs an inferrable dimension (e.g., `SVector{2,Float64}` from [StaticArrays.jl](https://github.com/JuliaArrays/StaticArrays.jl)).
+Data must be an `AbstractVector` of point vectors — each point needs an inferrable dimension (e.g., `SVector{2,Float64}` from [StaticArrays.jl](https://github.com/JuliaArrays/StaticArrays.jl)). This includes `CuVector` for GPU.
 
 ```@example overview
 using RadialBasisFunctions
@@ -26,7 +26,7 @@ interp = Interpolator(x, y)
 and evaluate it at a new point
 
 ```@example overview
-x_new = [rand(2) for _ in 1:5]
+x_new = [SVector{2}(rand(2)) for _ in 1:5]
 y_new = interp(x_new)
 y_true = f.(x_new)
 ```
@@ -40,7 +40,7 @@ abs.(y_true .- y_new)
 The error is numerically zero because the default basis — `PHS(3; poly_deg=2)` — includes quadratic polynomial augmentation, which can represent our 2nd-order polynomial `f` exactly. Reducing the polynomial degree shows the effect:
 
 ```@example overview
-interp = Interpolator(x, y, PHS(3, poly_deg=1))
+interp = Interpolator(x, y, PHS(3; poly_deg=1))
 y_new = interp(x_new)
 abs.(y_true .- y_new)
 ```
@@ -206,6 +206,6 @@ typeof(result)
 
 ## Current Limitations
 
-1. **Data format**: The package requires `Vector{AbstractVector}` input (not matrices). Each point must have inferrable dimension, e.g., `SVector{2,Float64}` from StaticArrays.jl. Matrix input support is planned.
+1. **Data format**: The package requires `AbstractVector{<:AbstractVector}` input (not matrices). Each point must have inferrable dimension, e.g., `SVector{2,Float64}` from StaticArrays.jl. Matrix input support is planned.
 
 2. **Global interpolation**: `Interpolator` currently uses all points globally. Local collocation support (like the operators use) is planned for future releases.

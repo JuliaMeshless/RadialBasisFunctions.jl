@@ -10,8 +10,7 @@ There are several types of RBFs to choose from, some with a tunable shape parame
 
 | Type                 | Function                               |
 | -------------------- | -------------------------------------- |
-| Polyharmonic Spline  | $\phi(r) = r^n$ where $n=1,3,5,7,\cdots$                      |
-| Multiquadric             |    $\phi(r)=\sqrt{ (r \varepsilon)^{2}+ 1 }$                                    |
+| Polyharmonic Spline  | $\phi(r) = r^n$ where $n \in \{1,3,5,7\}$                      |
 | Inverse Multiquadric | $\phi(r) = 1 / \sqrt{(r \varepsilon)^2+1}$ |
 | Gaussian             | $\phi(r) = e^{-(r \varepsilon)^2}$               |
 
