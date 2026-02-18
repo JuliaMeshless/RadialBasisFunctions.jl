@@ -1,6 +1,6 @@
 # Automatic Differentiation
 
-RadialBasisFunctions.jl supports automatic differentiation (AD) through two package extensions:
+Both operators and interpolators can be differentiated with reverse-mode AD. Two backends are supported through package extensions:
 
 - **Mooncake.jl** - Reverse-mode AD with support for mutation
 - **Enzyme.jl** - Native EnzymeRules for high-performance reverse-mode AD

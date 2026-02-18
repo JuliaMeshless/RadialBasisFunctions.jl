@@ -1,7 +1,5 @@
 # Quick Reference
 
-A compact cheat sheet for RadialBasisFunctions.jl.
-
 ## Data Format
 
 Data **must** be `Vector{AbstractVector}`, not a `Matrix`:

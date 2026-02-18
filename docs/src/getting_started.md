@@ -1,6 +1,6 @@
 # Getting Started
 
-First, let's load the package along with the [StaticArrays.jl](https://github.com/JuliaArrays/StaticArrays.jl) package which we use for each data point
+Data must be `Vector{AbstractVector}` — each point needs an inferrable dimension (e.g., `SVector{2,Float64}` from [StaticArrays.jl](https://github.com/JuliaArrays/StaticArrays.jl)).
 
 ```@example overview
 using RadialBasisFunctions
@@ -37,7 +37,7 @@ and compare the error
 abs.(y_true .- y_new)
 ```
 
-Wow! The error is numerically zero! Well... we set ourselves up for success here. `Interpolator` (along with `RadialBasisOperator`) has an optional argument to provide the type of radial basis including the degree of polynomial augmentation. The default basis is a cubic polyharmonic spline with 2nd degree polynomial augmentation (which the constructor is `PHS(3, poly_deg=2)`) and given the underlying function we are interpolating is a 2nd order polynomial itself, we are able to represent it exactly (up to machine precision). Let's see what happens when we only use 1st order polynomial augmentation
+The error is numerically zero because the default basis — `PHS(3; poly_deg=2)` — includes quadratic polynomial augmentation, which can represent our 2nd-order polynomial `f` exactly. Reducing the polynomial degree shows the effect:
 
 ```@example overview
 interp = Interpolator(x, y, PHS(3, poly_deg=1))
@@ -47,20 +47,9 @@ abs.(y_true .- y_new)
 
 ## Operators
 
-This package also provides an API for operators. There is support for several built-in operators along with support for user-defined operators:
-
-- partial derivative (1st and 2nd order)
-- laplacian
-- gradient / jacobian
-- directional derivative
-- custom (user-defined) operators
-- regridding (interpolation between point sets)
-
-Please make an issue or pull request for additional operators.
+Operators compute RBF-FD weights for differentiation on scattered data. They're lazy — weights are built on first evaluation and cached.
 
 ### Partial Derivative
-
-We can take the same data as above and build a partial derivative operator with a similar construction as the interpolator. For the partial we need to specify the order of differentiation we want along with the dimension for which to take the partial. We can also supply some optional arguments such as the basis and number of points in the stencil. The function inputs order is `partial(x, order, dim, basis; k=5)`
 
 ```@example overview
 df_x_rbf = partial(x, 1, 1)
@@ -73,8 +62,6 @@ all(abs.(df_x.(x) .- df_x_rbf(y)) .< 1e-10)
 ```
 
 ### Laplacian
-
-Building a laplacian operator is as easy as
 
 ```@example overview
 lap_rbf = laplacian(x)
