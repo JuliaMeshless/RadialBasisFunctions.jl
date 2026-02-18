@@ -1,6 +1,6 @@
 # Automatic Differentiation
 
-RadialBasisFunctions.jl supports automatic differentiation (AD) through two package extensions:
+Both operators and interpolators can be differentiated with reverse-mode AD. Two backends are supported through package extensions:
 
 - **Mooncake.jl** - Reverse-mode AD with support for mutation
 - **Enzyme.jl** - Native EnzymeRules for high-performance reverse-mode AD
@@ -15,7 +15,7 @@ See: [Enzyme.jl#2699](https://github.com/EnzymeAD/Enzyme.jl/issues/2699)
 
 ## Implementation Status
 
-Enzyme.jl has native `EnzymeRules` for all supported operations. Mooncake.jl support currently uses the `@from_rrule` macro to convert ChainRulesCore rules. Native Mooncake rules are planned for a future release.
+Both backends have native AD rule implementations. Enzyme.jl uses `EnzymeRules` (`augmented_primal`/`reverse`) and Mooncake.jl uses native `rrule!!` with `@is_primitive`.
 
 ## Differentiating Through Operators
 
@@ -77,6 +77,10 @@ grad[1:5]
 ## Differentiating Through Interpolators
 
 When differentiating through interpolation, the `Interpolator` must be constructed inside the loss function since changing the input values changes the interpolation weights.
+
+!!! note
+    Differentiating through `Interpolator` construction currently requires Mooncake.
+    Enzyme does not yet support this code path via DifferentiationInterface.
 
 ```@example autodiff
 N_interp = 30
@@ -179,10 +183,13 @@ grad[1:6]
 | Component | Enzyme | Mooncake |
 |-----------|:------:|:--------:|
 | Operator evaluation (`op(values)`) | ✓ | ✓ |
+| Interpolator construction | ✗* | ✓ |
 | Interpolator evaluation | ✓ | ✓ |
 | Basis functions (PHS, IMQ, Gaussian) | ✓ | ✓ |
 | Weight construction (`_build_weights`) | ✓ | ✓ |
 | Shape parameter (ε) differentiation | ✓ | ✓ |
+
+*Enzyme does not support differentiating through `Interpolator` construction via DifferentiationInterface due to `factorize` limitations. Use Mooncake for this use case.
 
 ## Using Enzyme Backend
 

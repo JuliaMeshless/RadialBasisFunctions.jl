@@ -4,8 +4,8 @@ layout: home
 
 hero:
   name: RadialBasisFunctions.jl
-  text: Meshless Methods Made Easy
-  tagline: RBF interpolation, differential operators, and PDE tools for Julia
+  text: Meshless Computing in Julia
+  tagline: Radial basis functions for operators, machine learning, and beyond.
   actions:
     - theme: brand
       text: Get Started
@@ -15,49 +15,60 @@ hero:
       link: https://github.com/JuliaMeshless/RadialBasisFunctions.jl
 
 features:
-  - icon: 📐
-    title: Interpolation
-    details: Scattered data interpolation with polynomial augmentation
+  - icon: ☁️
+    title: No Mesh Required
+    details: Interpolate and differentiate directly on scattered point clouds. Local stencils from k-nearest neighbors scale to large problems.
   - icon: ∇
-    title: Differential Operators
-    details: Convenience constructors for common operators such as partial derivatives, laplacian, and gradient
+    title: Operators
+    details: "Laplacian, gradient, partials, directional derivatives, and custom operators — with operator algebra to combine them."
   - icon: 🚀
     title: GPU Ready
-    details: KernelAbstractions.jl enables seamless CPU and GPU execution
-  - icon: 🔧
-    title: Extensible
-    details: Custom operators and Hermite boundary conditions for PDE applications
+    details: Weight computation parallelizes over stencils via KernelAbstractions.jl. Same code runs on CPU and GPU.
+  - icon: ∂
+    title: Fully Differentiable
+    details: Native AD rules for Enzyme.jl and Mooncake.jl — differentiate through operators, interpolators, and weight construction.
 ---
 ```
 
-## Quick Example
+## Quick Start
 
 ```julia
 using RadialBasisFunctions, StaticArrays
 
-# Create scattered data points
-x = [SVector{2}(rand(2)) for _ in 1:1000]
-y = sin.(norm.(x))
+# Scattered data
+points = [SVector{2}(rand(2)) for _ in 1:500]
+f(x) = sin(4x[1]) * cos(3x[2])
+values = f.(points)
 
-# Build an interpolator
-interp = Interpolator(x, y)
-interp(SVector{2}(rand(2)))  # Evaluate at points
+# Interpolation
+interp = Interpolator(points, values)
+interp(SVector(0.5, 0.5))
 
-# Build differential operators
-lap = laplacian(x)
-grad = gradient(x)
-∂x = partial(x, 1, 1)  # ∂/∂x₁
+# Differential operators on scattered data
+∇²  = laplacian(points)
+∇   = gradient(points)
+∂x  = partial(points, 1, 1)       # ∂/∂x₁
+∂²y = partial(points, 2, 2)       # ∂²/∂x₂²
+
+∇²(values)                         # apply to data
+∇(values)                          # Nx2 matrix
+
+# Combine operators
+mixed = ∂x + ∂²y                   # operator algebra
+
+# Transfer data between point sets
+target = [SVector{2}(rand(2)) for _ in 1:1000]
+rg = regrid(points, target)
+rg(values)                         # interpolated onto target
 ```
 
 ## Supported Radial Basis Functions
 
-| Type                 | Function                              |
-| -------------------- | ------------------------------------- |
-| Polyharmonic Spline  | $r^n$ where $n = 1, 3, 5, 7$          |
-| Inverse Multiquadric | $1 / \sqrt{(\varepsilon r)^2 + 1}$    |
-| Gaussian             | $e^{-(\varepsilon r)^2}$              |
-
-All basis functions support optional polynomial augmentation for enhanced accuracy near boundaries.
+| Type | Formula | Best For |
+|------|---------|----------|
+| Polyharmonic Spline (PHS) | $r^n$ where $n = 1, 3, 5, 7$ | General purpose, no shape parameter tuning |
+| Inverse Multiquadric (IMQ) | $1 / \sqrt{(\varepsilon r)^2 + 1}$ | Smooth interpolation with tunable accuracy |
+| Gaussian | $e^{-(\varepsilon r)^2}$ | Infinitely smooth functions |
 
 ## Installation
 
@@ -66,8 +77,4 @@ using Pkg
 Pkg.add("RadialBasisFunctions")
 ```
 
-Or in the REPL:
-
-```julia
-] add RadialBasisFunctions
-```
+Requires Julia 1.10 or later.

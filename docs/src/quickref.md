@@ -1,10 +1,8 @@
 # Quick Reference
 
-A compact cheat sheet for RadialBasisFunctions.jl.
-
 ## Data Format
 
-Data **must** be `Vector{AbstractVector}`, not a `Matrix`:
+Data **must** be an `AbstractVector` of point vectors, not a `Matrix`:
 
 ```julia
 using StaticArrays
@@ -25,8 +23,8 @@ points_3d = [SVector{3}(rand(3)) for _ in 1:100]
 | Type | Constructor | Formula | Shape Parameter |
 |------|-------------|---------|-----------------|
 | Polyharmonic Spline | `PHS(n)` | $r^n$ | None (scale-free) |
-| Inverse Multiquadric | `IMQ(ε)` | $\frac{1}{\sqrt{(\varepsilon r)^2 + 1}}$ | Required |
-| Gaussian | `Gaussian(ε)` | $e^{-(\varepsilon r)^2}$ | Required |
+| Inverse Multiquadric | `IMQ(ε)` | $\frac{1}{\sqrt{(\varepsilon r)^2 + 1}}$ | Optional (default: 1) |
+| Gaussian | `Gaussian(ε)` | $e^{-(\varepsilon r)^2}$ | Optional (default: 1) |
 
 ### PHS Orders
 
@@ -117,7 +115,7 @@ For PDE problems with boundary conditions:
 ```julia
 # Prepare boundary data
 is_boundary = [is_on_boundary(p) for p in points]
-bc = [Dirichlet() for _ in points]  # or Neumann(), Robin(α)
+bc = [Dirichlet() for _ in points]  # or Neumann(), Robin(α, β)
 normals = [compute_normal(p) for p in points]
 
 # Create operator with Hermite interpolation
@@ -133,7 +131,7 @@ lap = laplacian(
 |------|-------------|---------|
 | Dirichlet | `Dirichlet()` | Fixed value |
 | Neumann | `Neumann()` | Fixed normal derivative |
-| Robin | `Robin(α)` | $\alpha u + \frac{\partial u}{\partial n}$ |
+| Robin | `Robin(α, β)` | $\alpha u + \beta \frac{\partial u}{\partial n}$ |
 
 ## GPU Acceleration
 
