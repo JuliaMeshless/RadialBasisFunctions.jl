@@ -67,8 +67,8 @@ end
 # pretty printing
 function Base.show(io::IO, op::Interpolator)
     println(io, "Interpolator")
-    println(io, "├─Input type: ", typeof(first(op.x)))
-    println(io, "├─Output type: ", typeof(first(op.y)))
+    println(io, "├─Input type: ", eltype(op.x))
+    println(io, "├─Output type: ", eltype(op.y))
     println(io, "├─Number of points: ", length(op.x))
     return print(
         io,

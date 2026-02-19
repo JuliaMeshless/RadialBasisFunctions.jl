@@ -338,7 +338,7 @@ end
 function Base.show(io::IO, op::RadialBasisOperator)
     println(io, "RadialBasisOperator")
     println(io, "├─Operator: " * print_op(op.ℒ))
-    println(io, "├─Data type: ", typeof(first(op.data)))
+    println(io, "├─Data type: ", eltype(op.data))
     println(io, "├─Number of points: ", length(op.data))
     println(io, "├─Stencil size: ", length(first(op.adjl)))
     if !(op.device isa CPU)
