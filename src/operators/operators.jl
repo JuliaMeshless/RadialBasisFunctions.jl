@@ -7,13 +7,14 @@ abstract type VectorValuedOperator{Dim} <: AbstractOperator end
 
 Operator of data using a radial basis with potential monomial augmentation.
 """
-struct RadialBasisOperator{L, W, D, C, A, B <: AbstractRadialBasis}
+struct RadialBasisOperator{L, W, D, C, A, B <: AbstractRadialBasis, Dev}
     ℒ::L
     weights::W
     data::D
     eval_points::C
     adjl::A
     basis::B
+    device::Dev
     valid_cache::Base.RefValue{Bool}
     function RadialBasisOperator(
             ℒ::L,
@@ -22,10 +23,11 @@ struct RadialBasisOperator{L, W, D, C, A, B <: AbstractRadialBasis}
             eval_points::C,
             adjl::A,
             basis::B,
-            cache_status::Bool = false,
-        ) where {L, W, D, C, A, B <: AbstractRadialBasis}
-        return new{L, W, D, C, A, B}(
-            ℒ, weights, data, eval_points, adjl, basis, Ref(cache_status)
+            cache_status::Bool = false;
+            device::Dev = CPU(),
+        ) where {L, W, D, C, A, B <: AbstractRadialBasis, Dev}
+        return new{L, W, D, C, A, B, Dev}(
+            ℒ, weights, data, eval_points, adjl, basis, device, Ref(cache_status)
         )
     end
 end
@@ -35,7 +37,7 @@ end
 # ============================================================================
 
 """
-    RadialBasisOperator(ℒ, data; eval_points, basis, k, adjl, hermite)
+    RadialBasisOperator(ℒ, data; eval_points, basis, k, adjl, hermite, device)
 
 Unified constructor with keyword arguments.
 
@@ -52,6 +54,7 @@ Unified constructor with keyword arguments.
   - `is_boundary::Vector{Bool}`
   - `bc::Vector{<:BoundaryCondition}`
   - `normals::Vector{<:AbstractVector}`
+- `device`: KernelAbstractions backend for weight computation (default: auto-detected from `data` via `get_backend`)
 
 # Examples
 ```julia
@@ -67,6 +70,10 @@ op = RadialBasisOperator(Laplacian(), data; eval_points=eval_pts)
 # With Hermite boundary conditions
 op = RadialBasisOperator(Laplacian(), data;
     hermite=(is_boundary=is_bound, bc=boundary_conds, normals=normal_vecs))
+
+# With explicit device
+using KernelAbstractions
+op = RadialBasisOperator(Laplacian(), data; device=CPU())
 ```
 """
 function RadialBasisOperator(
@@ -77,9 +84,10 @@ function RadialBasisOperator(
         k::Int = autoselect_k(data, basis),
         adjl = find_neighbors(data, eval_points, k),
         hermite::Union{Nothing, NamedTuple} = nothing,
+        device = get_backend(data),
     )
     weights = if isnothing(hermite)
-        _build_weights(ℒ, data, eval_points, adjl, basis)
+        _build_weights(ℒ, data, eval_points, adjl, basis; device = device)
     else
         _build_weights(
             ℒ,
@@ -89,10 +97,11 @@ function RadialBasisOperator(
             basis,
             hermite.is_boundary,
             hermite.bc,
-            hermite.normals,
+            hermite.normals;
+            device = device,
         )
     end
-    return RadialBasisOperator(ℒ, weights, data, eval_points, adjl, basis, true)
+    return RadialBasisOperator(ℒ, weights, data, eval_points, adjl, basis, true; device = device)
 end
 
 # ============================================================================
@@ -106,8 +115,9 @@ function RadialBasisOperator(
         basis::AbstractRadialBasis;
         k::Int = autoselect_k(data, basis),
         adjl = find_neighbors(data, k),
+        device = get_backend(data),
     )
-    return RadialBasisOperator(ℒ, data; basis = basis, k = k, adjl = adjl)
+    return RadialBasisOperator(ℒ, data; basis = basis, k = k, adjl = adjl, device = device)
 end
 
 # Data + eval_points + basis (positional)
@@ -118,9 +128,10 @@ function RadialBasisOperator(
         basis::AbstractRadialBasis;
         k::Int = autoselect_k(data, basis),
         adjl = find_neighbors(data, eval_points, k),
+        device = get_backend(data),
     )
     return RadialBasisOperator(
-        ℒ, data; eval_points = eval_points, basis = basis, k = k, adjl = adjl
+        ℒ, data; eval_points = eval_points, basis = basis, k = k, adjl = adjl, device = device
     )
 end
 
@@ -135,10 +146,11 @@ function RadialBasisOperator(
         normals::Vector{<:AbstractVector};
         k::Int = autoselect_k(data, basis),
         adjl = find_neighbors(data, eval_points, k),
+        device = get_backend(data),
     )
     hermite = (is_boundary = is_boundary, bc = boundary_conditions, normals = normals)
     return RadialBasisOperator(
-        ℒ, data; eval_points = eval_points, basis = basis, k = k, adjl = adjl, hermite = hermite
+        ℒ, data; eval_points = eval_points, basis = basis, k = k, adjl = adjl, hermite = hermite, device = device
     )
 end
 
@@ -302,6 +314,26 @@ function update_weights!(op::RadialBasisOperator{<:VectorValuedOperator{Dim}}) w
     return nothing
 end
 
+# ============================================================================
+# Adapt.jl support (GPU array conversion)
+# ============================================================================
+
+function Adapt.adapt_structure(to, op::RadialBasisOperator)
+    adapted_weights = Adapt.adapt(to, op.weights)
+    return RadialBasisOperator(
+        op.ℒ, adapted_weights, op.data, op.eval_points, op.adjl, op.basis,
+        is_cache_valid(op); device = op.device,
+    )
+end
+
+function Adapt.adapt_structure(to, op::RadialBasisOperator{<:VectorValuedOperator})
+    adapted_weights = map(w -> Adapt.adapt(to, w), op.weights)
+    return RadialBasisOperator(
+        op.ℒ, adapted_weights, op.data, op.eval_points, op.adjl, op.basis,
+        is_cache_valid(op); device = op.device,
+    )
+end
+
 # pretty printing
 function Base.show(io::IO, op::RadialBasisOperator)
     println(io, "RadialBasisOperator")
@@ -309,6 +341,9 @@ function Base.show(io::IO, op::RadialBasisOperator)
     println(io, "├─Data type: ", typeof(first(op.data)))
     println(io, "├─Number of points: ", length(op.data))
     println(io, "├─Stencil size: ", length(first(op.adjl)))
+    if !(op.device isa CPU)
+        println(io, "├─Device: ", op.device)
+    end
     return println(
         io,
         "└─Basis: ",

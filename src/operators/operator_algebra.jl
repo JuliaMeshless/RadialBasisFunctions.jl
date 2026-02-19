@@ -3,7 +3,7 @@ for op in (:+, :-)
         _check_compatible(op1, op2)
         k = _update_stencil(op1, op2)
         ℒ = Base.$op(op1.ℒ, op2.ℒ)
-        return RadialBasisOperator(ℒ, op1.data, op1.basis; k = k, adjl = op1.adjl)
+        return RadialBasisOperator(ℒ, op1.data, op1.basis; k = k, adjl = op1.adjl, device = op1.device)
     end
 end
 

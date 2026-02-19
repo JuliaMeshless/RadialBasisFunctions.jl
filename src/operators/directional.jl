@@ -122,10 +122,10 @@ function _combine_directional_weights(weights, v, Dim::Int)
 end
 
 # Custom _build_weights: standard (non-Hermite) path
-function _build_weights(ℒ::Directional{Dim}, data, eval_points, adjl, basis) where {Dim}
+function _build_weights(ℒ::Directional{Dim}, data, eval_points, adjl, basis; device = CPU()) where {Dim}
     v = ℒ.v
     _validate_directional_vector(v, Dim, length(data))
-    weights = _build_weights(Jacobian{Dim}(), data, eval_points, adjl, basis)
+    weights = _build_weights(Jacobian{Dim}(), data, eval_points, adjl, basis; device = device)
     return _combine_directional_weights(weights, v, Dim)
 end
 
@@ -138,7 +138,8 @@ function _build_weights(
         basis::AbstractRadialBasis,
         is_boundary::Vector{Bool},
         boundary_conditions::Vector{<:BoundaryCondition},
-        normals::Vector{<:AbstractVector},
+        normals::Vector{<:AbstractVector};
+        device = CPU(),
     ) where {Dim}
     v = ℒ.v
     _validate_directional_vector(v, Dim, length(data))
@@ -160,7 +161,8 @@ function _build_weights(
         mon,
         is_boundary,
         boundary_conditions,
-        normals,
+        normals;
+        device = device,
     )
 
     return _combine_directional_weights(weights, v, Dim)

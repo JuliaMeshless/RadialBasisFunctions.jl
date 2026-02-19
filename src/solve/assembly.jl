@@ -1,5 +1,9 @@
 using LinearAlgebra: Symmetric, dot, bunchkaufman!, ldiv!
 
+# Helper to get writable matrix from Symmetric or plain matrix
+_get_writable(A::Symmetric) = parent(A)
+_get_writable(A) = A
+
 # Compute RBF matrix entry - dispatch on data type
 _rbf_entry(i, j, data::AbstractVector, basis) = basis(data[i], data[j])
 function _rbf_entry(i, j, data::HermiteStencilData, ops::BasisOperators)
@@ -66,7 +70,7 @@ For Hermite stencils with Neumann/Robin conditions, basis functions are modified
 via `_rbf_entry` and `_poly_entry!` dispatch to maintain matrix symmetry.
 """
 function _build_collocation_matrix!(
-        A::Symmetric, data, basis::AbstractRadialBasis, mon::MonomialBasis{Dim, Deg}, k::Int
+        A, data, basis::AbstractRadialBasis, mon::MonomialBasis{Dim, Deg}, k::Int
     ) where {Dim, Deg}
     # Construct appropriate operator form for the data type
     ops = _prepare_basis_ops(data, basis)
@@ -78,9 +82,9 @@ _prepare_basis_ops(::AbstractVector, basis) = basis
 _prepare_basis_ops(::HermiteStencilData, basis) = BasisOperators(basis)
 
 function _build_collocation_matrix_impl!(
-        A::Symmetric, data, ops, mon::MonomialBasis{Dim, Deg}, k::Int
+        A, data, ops, mon::MonomialBasis{Dim, Deg}, k::Int
     ) where {Dim, Deg}
-    AA = parent(A)
+    AA = _get_writable(A)
     N = size(A, 2)
 
     # RBF block (upper triangular, symmetric) - dispatches on data type
@@ -183,7 +187,7 @@ via dispatch helpers in `_build_collocation_matrix!` and `_build_rhs!`.
 Returns: weights (first k rows of solution, size k×num_ops)
 """
 function _build_stencil!(
-        A::Symmetric,
+        A,
         b,
         ℒrbf,
         ℒmon,
@@ -206,7 +210,7 @@ Avoids allocating the solution vector and the slice on every call.
 """
 function _build_stencil!(
         λ,
-        A::Symmetric,
+        A,
         b,
         ℒrbf,
         ℒmon,
@@ -218,8 +222,18 @@ function _build_stencil!(
     )
     _build_collocation_matrix!(A, data, basis, mon, k)
     _build_rhs!(b, ℒrbf, ℒmon, data, eval_point, basis, mon, k)
-    ldiv!(λ, bunchkaufman!(A, true), b)
+    _solve_system!(λ, A, b)
     return _weight_view(λ, k)
+end
+
+# CPU: Symmetric → bunchkaufman (optimal for symmetric indefinite)
+function _solve_system!(λ, A::Symmetric, b)
+    ldiv!(λ, bunchkaufman!(A, true), b)
+end
+
+# Generic fallback: uses \ which dispatches to cuSOLVER on GPU, LAPACK on CPU
+function _solve_system!(λ, A::AbstractMatrix, b)
+    λ .= A \ b
 end
 
 # Dispatch helpers: Vector gets 1D view, Matrix gets 2D slice view

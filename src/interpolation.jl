@@ -20,6 +20,7 @@ Construct a radial basis interpolator.
 See also: [`regrid`](@ref) for local stencil-based interpolation between point sets.
 """
 function Interpolator(x, y, basis::B = PHS()) where {B <: AbstractRadialBasis}
+    x = _to_cpu(x)
     dim = length(first(x))
     k = length(x)  # number of data in influence/support domain
     npoly = binomial(dim + basis.poly_deg, basis.poly_deg)
@@ -47,6 +48,21 @@ function (rbfi::Interpolator)(x::T) where {T}
 end
 
 (rbfi::Interpolator)(x::Vector{<:AbstractVector}) = [rbfi(val) for val in x]
+
+# ============================================================================
+# Adapt.jl support (GPU array conversion)
+# ============================================================================
+
+function Adapt.adapt_structure(to, interp::Interpolator)
+    return Interpolator(
+        Adapt.adapt(to, interp.x),
+        Adapt.adapt(to, interp.y),
+        Adapt.adapt(to, interp.rbf_weights),
+        Adapt.adapt(to, interp.monomial_weights),
+        interp.rbf_basis,
+        interp.monomial_basis,
+    )
+end
 
 # pretty printing
 function Base.show(io::IO, op::Interpolator)
