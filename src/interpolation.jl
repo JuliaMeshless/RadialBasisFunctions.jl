@@ -47,7 +47,7 @@ function (rbfi::Interpolator)(x::T) where {T}
     return rbf + poly
 end
 
-(rbfi::Interpolator)(x::Vector{<:AbstractVector}) = [rbfi(val) for val in x]
+(rbfi::Interpolator)(x::AbstractVector{<:AbstractVector}) = map(rbfi, x)
 
 # ============================================================================
 # Adapt.jl support (GPU array conversion)

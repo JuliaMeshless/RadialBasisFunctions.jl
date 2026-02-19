@@ -88,6 +88,11 @@ end
 # GPU Support Tests
 # ============================================================================
 
+@testset "non-CPU device throws ArgumentError" begin
+    struct FakeGPU end
+    @test_throws ArgumentError laplacian(x; device=FakeGPU())
+end
+
 @testset "_to_cpu" begin
     # No-op for plain Vector
     v = [SVector(1.0, 2.0), SVector(3.0, 4.0)]

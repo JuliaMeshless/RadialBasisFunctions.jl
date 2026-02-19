@@ -98,6 +98,7 @@ end
     _construct_sparse(I, J, V, N_eval, N_data, num_ops)
 
 Construct sparse matrix/vector from COO arrays.
+# Future GPU support: convert to device-sparse format here (see #88)
 """
 function _construct_sparse(I, J, V, N_eval, N_data, num_ops)
     if num_ops == 1
