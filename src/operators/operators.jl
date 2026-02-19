@@ -191,9 +191,9 @@ function _eval_op(
     ) where {D}
     N_eval = length(op.eval_points)
     T = promote_type(eltype(x), eltype(first(op.weights)))
-    out = Matrix{T}(undef, N_eval, D)
+    out = similar(x, T, N_eval, D)
     for d in 1:D
-        out[:, d] = op.weights[d] * x
+        mul!(view(out, :, d), op.weights[d], x)
     end
     return out
 end
@@ -205,9 +205,9 @@ function _eval_op(
     N_eval = length(op.eval_points)
     D_in = size(x, 2)
     T = promote_type(eltype(x), eltype(first(op.weights)))
-    out = Array{T, 3}(undef, N_eval, D_in, D)
+    out = similar(x, T, N_eval, D_in, D)
     for d_out in 1:D, d_in in 1:D_in
-        out[:, d_in, d_out] = op.weights[d_out] * view(x, :, d_in)
+        mul!(view(out, :, d_in, d_out), op.weights[d_out], view(x, :, d_in))
     end
     return out
 end
@@ -219,9 +219,9 @@ function _eval_op(
     N_eval = length(op.eval_points)
     trailing_dims = size(x)[2:end]
     T = promote_type(eltype(x), eltype(first(op.weights)))
-    out = Array{T}(undef, N_eval, trailing_dims..., D)
+    out = similar(x, T, N_eval, trailing_dims..., D)
     for idx in CartesianIndices(trailing_dims), d in 1:D
-        out[:, idx, d] = op.weights[d] * view(x, :, idx)
+        mul!(view(out, :, idx, d), op.weights[d], view(x, :, idx))
     end
     return out
 end
