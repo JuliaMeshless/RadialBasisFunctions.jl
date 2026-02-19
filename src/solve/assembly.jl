@@ -228,12 +228,12 @@ end
 
 # CPU: Symmetric → bunchkaufman (optimal for symmetric indefinite)
 function _solve_system!(λ, A::Symmetric, b)
-    ldiv!(λ, bunchkaufman!(A, true), b)
+    return ldiv!(λ, bunchkaufman!(A, true), b)
 end
 
 # Generic fallback: uses \ which dispatches to cuSOLVER on GPU, LAPACK on CPU
 function _solve_system!(λ, A::AbstractMatrix, b)
-    λ .= A \ b
+    return λ .= A \ b
 end
 
 # Dispatch helpers: Vector gets 1D view, Matrix gets 2D slice view

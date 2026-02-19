@@ -136,11 +136,13 @@ function build_weights_kernel(
         device = CPU(),
     )
     if !(device isa CPU)
-        throw(ArgumentError(
-            "GPU weight computation is not yet supported. " *
-            "A GPU-kernel-compatible dense solver for stencil matrices is required. " *
-            "See https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88"
-        ))
+        throw(
+            ArgumentError(
+                "GPU weight computation is not yet supported. " *
+                    "A GPU-kernel-compatible dense solver for stencil matrices is required. " *
+                    "See https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88"
+            )
+        )
     end
 
     TD = eltype(first(data))

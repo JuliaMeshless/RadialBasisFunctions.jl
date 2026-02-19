@@ -90,7 +90,7 @@ end
 
 @testset "non-CPU device throws ArgumentError" begin
     struct FakeGPU end
-    @test_throws ArgumentError laplacian(x; device=FakeGPU())
+    @test_throws ArgumentError laplacian(x; device = FakeGPU())
 end
 
 @testset "_to_cpu" begin
@@ -127,7 +127,7 @@ end
     A_plain = copy(A_data)
     λ_gen = similar(b_vec)
     RBF._solve_system!(λ_gen, A_plain, copy(b_vec))
-    @test λ_gen ≈ λ_ref atol = 1e-10
+    @test λ_gen ≈ λ_ref atol = 1.0e-10
 end
 
 @testset "_solve_system! with matrix RHS" begin
@@ -152,7 +152,7 @@ end
     A_plain = copy(A_data)
     λ_gen = similar(B_mat)
     RBF._solve_system!(λ_gen, A_plain, copy(B_mat))
-    @test λ_gen ≈ λ_ref atol = 1e-10
+    @test λ_gen ≈ λ_ref atol = 1.0e-10
 end
 
 @testset "Adapt.adapt_structure for RadialBasisOperator" begin
