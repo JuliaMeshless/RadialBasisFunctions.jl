@@ -6,6 +6,9 @@ hero:
   name: RadialBasisFunctions.jl
   text: Meshless Computing in Julia
   tagline: Radial basis functions for operators, machine learning, and beyond.
+  image:
+    src: /assets/logo.svg
+    alt: RadialBasisFunctions.jl
   actions:
     - theme: brand
       text: Get Started
@@ -15,15 +18,12 @@ hero:
       link: https://github.com/JuliaMeshless/RadialBasisFunctions.jl
 
 features:
-  - icon: ☁️
-    title: No Mesh Required
+  - icon: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><circle cx="3" cy="7" r="1.5" fill="#7c6cf0"/><circle cx="10" cy="3" r="1.5" fill="#7c6cf0"/><circle cx="19" cy="6" r="1.5" fill="#7c6cf0"/><circle cx="7" cy="14" r="1.5" fill="#7c6cf0"/><circle cx="15" cy="12" r="1.5" fill="#7c6cf0"/><circle cx="4" cy="21" r="1.5" fill="#7c6cf0"/><circle cx="20" cy="19" r="1.5" fill="#7c6cf0"/></svg>'
+    title: Scattered Data as a First Class Citizen
     details: Interpolate and differentiate directly on scattered point clouds. Local stencils from k-nearest neighbors scale to large problems.
-  - icon: ∇
-    title: Operators
+  - icon: ℒ
+    title: API for Operators
     details: "Laplacian, gradient, partials, directional derivatives, and custom operators — with operator algebra to combine them."
-  - icon: 🚀
-    title: GPU Ready
-    details: Weight computation parallelizes over stencils via KernelAbstractions.jl. Same code runs on CPU and GPU.
   - icon: ∂
     title: Fully Differentiable
     details: Native AD rules for Enzyme.jl and Mooncake.jl — differentiate through operators, interpolators, and weight construction.

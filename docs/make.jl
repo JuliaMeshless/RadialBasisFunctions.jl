@@ -20,11 +20,15 @@ makedocs(;
     pages = [
         "Home" => "index.md",
         "Getting Started" => "getting_started.md",
-        "Automatic Differentiation" => "autodiff.md",
-        "Quick Reference" => "quickref.md",
-        "Theory" => "theory.md",
-        "Internals" => "internals.md",
-        "API" => "api.md",
+        "Guides" => [
+            "Automatic Differentiation" => "guides/autodiff.md",
+            "Quick Reference" => "guides/quickref.md",
+        ],
+        "Reference" => [
+            "Theory" => "reference/theory.md",
+            "Internals" => "reference/internals.md",
+            "API" => "reference/api.md",
+        ],
     ],
     clean = false,
 )
