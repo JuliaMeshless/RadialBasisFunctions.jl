@@ -54,18 +54,25 @@ julia --project=benchmark benchmark/benchmarks.jl
    - `operator_algebra.jl` - Composition and algebraic operations on operators
    - Virtual operators for performance optimization
 
-3. **Solve System** (`src/solve/`): Core weight computation organized in 4 layers
+3. **Solve System** (`src/solve/`): Core weight computation and AD support
    - `api.jl` - Entry points and routing (`_build_weights()` functions)
    - `execution.jl` - Parallel execution via KernelAbstractions.jl, memory allocation, batch processing
    - `assembly.jl` - Pure mathematical operations (collocation matrix, RHS, stencil assembly)
    - `types.jl` - Shared data structures (boundary conditions, stencil classification, operator traits)
    - Hermite interpolation with boundary conditions via multiple dispatch
+   - AD backward pass: `backward.jl`, `backward_cache.jl`, `forward_cache.jl`, `ad_shared.jl`
+   - AD derivatives: `operator_second_derivatives.jl`, `shape_parameter_derivatives.jl`
 
-4. **Interpolation** (`src/interpolation.jl`): 
+4. **Interpolation** (`src/interpolation.jl`, `src/interpolation_backward.jl`):
    - `Interpolator` type for global interpolation (uses all data points)
    - Supports scattered data interpolation
+   - Backward pass support for AD in `interpolation_backward.jl`
 
-5. **Utilities** (`src/utils.jl`):
+5. **AD Extensions** (`ext/`):
+   - `RadialBasisFunctionsEnzymeExt` - Enzyme.jl autodiff support
+   - `RadialBasisFunctionsMooncakeExt` - Mooncake.jl autodiff support
+
+6. **Utilities** (`src/utils.jl`):
    - `find_neighbors()` - k-nearest neighbor search using NearestNeighbors.jl
    - `reorder_points!()` - Point ordering utilities
 
@@ -94,9 +101,9 @@ The package requires `Vector{AbstractVector}` input format (not matrices). Each 
 - `src/solve/assembly.jl` - Pure mathematical operations for weight computation
 - `src/solve/execution.jl` - GPU/CPU parallel execution kernels
 - `src/solve/api.jl` - Entry points for weight building
-- `src/operators/operators.jl:10-31` - Main operator type definition
+- `src/operators/operators.jl:10-33` - Main operator type definition
 - `src/basis/basis.jl` - Abstract basis type hierarchy
-- `docs/src/internals.md` - Detailed solve system architecture and pseudocode
+- `src/solve/backward.jl` - AD backward pass entry point
 
 ## Important Development Notes
 
@@ -340,6 +347,7 @@ Gaussian(0.5) # Smaller ε = wider basis function
 |------|----------|---------|
 | Sum of second derivatives | `laplacian(points)` | Vector (scalar per point) |
 | All partial derivatives | `gradient(points)` | Matrix (N × dim) |
+| Jacobian of vector field | `jacobian(points)` | Array (N × D × D) |
 | Single partial derivative | `partial(points, order, dim)` | Vector |
 | Directional derivative | `directional(points, v)` | Vector |
 | Interpolate to new points | `regrid(src, dst)` | Vector |
