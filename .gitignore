@@ -6,7 +6,6 @@ Manifest.toml
 # docs
 /docs/build/
 /docs/node_modules/
-/docs/package.json/
 
 
 /dev/
@@ -21,4 +20,3 @@ Manifest.toml
 # Flyer et al. script to test
 *.m
 
-docs/package-lock.json
