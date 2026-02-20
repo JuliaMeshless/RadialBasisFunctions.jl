@@ -1,4 +1,5 @@
 [deps]
+Cairo = "159f3aea-2a34-519c-b102-8c37f9878175"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 DifferentiationInterface = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"

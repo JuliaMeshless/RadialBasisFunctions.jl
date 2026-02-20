@@ -7,7 +7,7 @@ hero:
   text: Meshless Computing in Julia
   tagline: Radial basis functions for operators, machine learning, and beyond.
   image:
-    src: /assets/logo.svg
+    src: /logo.svg
     alt: RadialBasisFunctions.jl
   actions:
     - theme: brand
