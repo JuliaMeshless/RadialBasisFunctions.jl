@@ -1,6 +1,6 @@
 using KernelAbstractions
 using KernelAbstractions: @kernel, @index, CPU
-using SparseArrays: sparse
+using SparseArrays: sparse, sparsevec
 using LinearAlgebra: Symmetric
 
 # ============================================================================
@@ -91,6 +91,28 @@ function construct_global_to_boundary(is_boundary::Vector{Bool})
 end
 
 # ============================================================================
+# Sparse Matrix Construction
+# ============================================================================
+
+"""
+    _construct_sparse(I, J, V, N_eval, N_data, num_ops)
+
+Construct sparse matrix/vector from COO arrays.
+# Future GPU support: convert to device-sparse format here (see #88)
+"""
+function _construct_sparse(I, J, V, N_eval, N_data, num_ops)
+    if num_ops == 1
+        return sparse(I, J, V[:, 1], N_eval, N_data)
+    else
+        if N_eval == 1
+            return ntuple(i -> sparsevec(J, V[:, i], N_data), num_ops)
+        else
+            return ntuple(i -> sparse(I, J, V[:, i], N_eval, N_data), num_ops)
+        end
+    end
+end
+
+# ============================================================================
 # Kernel Orchestration
 # ============================================================================
 
@@ -98,7 +120,8 @@ end
     build_weights_kernel(data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
                         boundary_data; batch_size, device)
 
-Main orchestrator: allocate memory, launch kernel, construct sparse matrix.
+Main orchestrator for weight computation. Currently CPU-only.
+GPU stencil solve is not yet supported — see GitHub issue #88.
 """
 function build_weights_kernel(
         data,
@@ -112,6 +135,16 @@ function build_weights_kernel(
         batch_size::Int = 10,
         device = CPU(),
     )
+    if !(device isa CPU)
+        throw(
+            ArgumentError(
+                "GPU weight computation is not yet supported. " *
+                    "A GPU-kernel-compatible dense solver for stencil matrices is required. " *
+                    "See https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88"
+            )
+        )
+    end
+
     TD = eltype(first(data))
     k = length(first(adjl))
     nmon = binomial(length(first(data)) + basis.poly_deg, basis.poly_deg)
@@ -128,74 +161,28 @@ function build_weights_kernel(
 
     # Launch kernel
     launch_kernel!(
-        I,
-        J,
-        V,
-        data,
-        eval_points,
-        adjl,
-        basis,
-        ℒrbf,
-        ℒmon,
-        mon,
-        boundary_data,
-        row_offsets,
-        batch_size,
-        N_eval,
-        n_batches,
-        k,
-        nmon,
-        num_ops,
-        device,
+        I, J, V, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
+        boundary_data, row_offsets, batch_size, N_eval, n_batches,
+        k, nmon, num_ops, device,
     )
 
-    # Construct sparse matrix/vector based on dimensions
-    nrows, ncols = N_eval, length(data)
-    if num_ops == 1
-        # ScalarValuedOperator: always return sparse matrix
-        return sparse(I, J, V[:, 1], nrows, ncols)
-    else
-        # VectorValuedOperator: use sparse vectors for single eval point
-        if nrows == 1
-            return ntuple(i -> sparsevec(J, V[:, i], ncols), num_ops)
-        else
-            return ntuple(i -> sparse(I, J, V[:, i], nrows, ncols), num_ops)
-        end
-    end
+    return _construct_sparse(I, J, V, N_eval, length(data), num_ops)
 end
 
 # ============================================================================
-# Kernel Launchers
+# CPU Kernel
 # ============================================================================
 
 """
-    launch_kernel!(I, J, V, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
-                   boundary_data, row_offsets, batch_size, N_eval, n_batches,
-                   k, nmon, num_ops, device)
+    launch_kernel!(...)
 
-Launch parallel kernel for weight computation.
+Launch parallel CPU kernel for weight computation.
 Handles Dirichlet/Interior/Hermite stencil classification via dispatch.
 """
 function launch_kernel!(
-        I,
-        J,
-        V,
-        data,
-        eval_points,
-        adjl,
-        basis,
-        ℒrbf,
-        ℒmon,
-        mon,
-        boundary_data::BoundaryData,
-        row_offsets,
-        batch_size,
-        N_eval,
-        n_batches,
-        k,
-        nmon,
-        num_ops,
-        device,
+        I, J, V, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
+        boundary_data::BoundaryData, row_offsets,
+        batch_size, N_eval, n_batches, k, nmon, num_ops, device,
     )
     TD = eltype(first(data))
     dim = length(first(data))
@@ -205,28 +192,10 @@ function launch_kernel!(
     global_to_boundary = construct_global_to_boundary(boundary_data.is_boundary)
 
     @kernel function weight_kernel(
-            I,
-            J,
-            V,
-            data,
-            eval_points,
-            adjl,
-            basis,
-            ℒrbf,
-            ℒmon,
-            mon,
-            is_boundary,
-            boundary_conditions,
-            normals,
-            batch_hermite_datas,
-            global_to_boundary,
-            row_offsets,
-            batch_size,
-            N_eval,
-            nmon,
-            k,
-            num_ops,
-            TD,
+            I, J, V, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
+            is_boundary, boundary_conditions, normals,
+            batch_hermite_datas, global_to_boundary,
+            row_offsets, batch_size, N_eval, nmon, k, num_ops, TD,
         )
         batch_idx = @index(Global)
         hermite_data = batch_hermite_datas[batch_idx]
@@ -268,13 +237,8 @@ function launch_kernel!(
             else  # HermiteStencil
                 # Mixed interior/boundary stencil
                 update_hermite_stencil_data!(
-                    hermite_data,
-                    data,
-                    neighbors,
-                    is_boundary,
-                    boundary_conditions,
-                    normals,
-                    global_to_boundary,
+                    hermite_data, data, neighbors, is_boundary,
+                    boundary_conditions, normals, global_to_boundary,
                 )
                 weights = _build_stencil!(
                     λ, A, b, ℒrbf, ℒmon, hermite_data, eval_point, basis, mon, k
@@ -288,30 +252,11 @@ function launch_kernel!(
 
     kernel! = weight_kernel(device)
     kernel!(
-        I,
-        J,
-        V,
-        data,
-        eval_points,
-        adjl,
-        basis,
-        ℒrbf,
-        ℒmon,
-        mon,
-        boundary_data.is_boundary,
-        boundary_data.boundary_conditions,
-        boundary_data.normals,
-        batch_hermite_datas,
-        global_to_boundary,
-        row_offsets,
-        batch_size,
-        N_eval,
-        nmon,
-        k,
-        num_ops,
-        TD;
-        ndrange = n_batches,
-        workgroupsize = 1,
+        I, J, V, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
+        boundary_data.is_boundary, boundary_data.boundary_conditions,
+        boundary_data.normals, batch_hermite_datas, global_to_boundary,
+        row_offsets, batch_size, N_eval, nmon, k, num_ops, TD;
+        ndrange = n_batches, workgroupsize = 1,
     )
     return KernelAbstractions.synchronize(device)
 end

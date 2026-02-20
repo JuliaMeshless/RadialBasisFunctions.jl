@@ -1,5 +1,6 @@
 module RadialBasisFunctions
 
+using Adapt
 using ChunkSplitters
 using Combinatorics
 using Distances

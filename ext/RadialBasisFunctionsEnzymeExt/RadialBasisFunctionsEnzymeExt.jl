@@ -309,6 +309,12 @@ function _make_shadow_for_return(::Type{<:EnzymeCore.DuplicatedNoNeed}, y::Abstr
 end
 _make_shadow_for_return(::Type, _W) = nothing
 
+# Extract primal type T from Enzyme annotation types like Duplicated{T}, Active{T}, etc.
+_primal_type(::Type{<:EnzymeCore.Duplicated{T}}) where {T} = T
+_primal_type(::Type{<:EnzymeCore.DuplicatedNoNeed{T}}) where {T} = T
+_primal_type(::Type{<:EnzymeCore.Active{T}}) where {T} = T
+_primal_type(::Type{<:EnzymeCore.Const{T}}) where {T} = T
+
 # Helper to extract cotangent from dret (differs between Active and Duplicated return)
 _extract_dret_with_shadow(dret::EnzymeCore.Active, _shadow) = dret.val
 _extract_dret_with_shadow(::Type, shadow::AbstractArray) = shadow
@@ -346,7 +352,9 @@ function _enzyme_augmented_primal_body(ℒ_arg, data, eval_points, adjl, basis, 
     stored_data = copy_data ? deepcopy(data_val) : data_val
     stored_eval = copy_data ? deepcopy(eval_points_val) : eval_points_val
     tape = (op_val, cache, adjl_val, basis_val, mon, stored_data, stored_eval, shadow)
-    return EnzymeRules.AugmentedReturn(W, shadow, tape)
+    PT = _primal_type(RT)
+    ST = shadow === nothing ? Nothing : PT
+    return EnzymeRules.AugmentedReturn{PT, ST, typeof(tape)}(W, shadow, tape)
 end
 
 # Shared pullback core for all _build_weights reverse rules

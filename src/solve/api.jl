@@ -1,4 +1,4 @@
-using KernelAbstractions: CPU
+using KernelAbstractions: CPU, get_backend
 
 # ============================================================================
 # Entry Points from Operators
@@ -15,7 +15,7 @@ function _build_weights(ℒ, op)
     eval_points = op.eval_points
     adjl = op.adjl
     basis = op.basis
-    return _build_weights(ℒ, data, eval_points, adjl, basis)
+    return _build_weights(ℒ, data, eval_points, adjl, basis; device = op.device)
 end
 
 """
@@ -23,7 +23,7 @@ end
 
 Apply operator to basis functions and route to weight computation.
 """
-function _build_weights(ℒ, data, eval_points, adjl, basis)
+function _build_weights(ℒ, data, eval_points, adjl, basis; device = CPU())
     dim = length(first(data))
 
     # Build monomial basis and apply operator
@@ -31,7 +31,7 @@ function _build_weights(ℒ, data, eval_points, adjl, basis)
     ℒmon = ℒ(mon)
     ℒrbf = ℒ(basis)
 
-    return _build_weights(data, eval_points, adjl, basis, ℒrbf, ℒmon, mon)
+    return _build_weights(data, eval_points, adjl, basis, ℒrbf, ℒmon, mon; device = device)
 end
 
 # ============================================================================
@@ -50,7 +50,7 @@ function _build_weights(
     )
     # Create empty boundary data for interior-only case
     TD = eltype(first(data))
-    is_boundary = fill(false, length(data))
+    is_boundary = fill(false, max(length(data), length(eval_points)))
     boundary_conditions = BoundaryCondition{TD}[]
     normals = similar(data, 0)
     boundary_data = BoundaryData(is_boundary, boundary_conditions, normals)
@@ -128,7 +128,8 @@ function _build_weights(
         basis::AbstractRadialBasis,
         is_boundary::Vector{Bool},
         boundary_conditions::Vector{<:BoundaryCondition},
-        normals::Vector{<:AbstractVector},
+        normals::Vector{<:AbstractVector};
+        device = CPU(),
     )
     dim = length(first(data))
     mon = MonomialBasis(dim, basis.poly_deg)
@@ -145,6 +146,7 @@ function _build_weights(
         mon,
         is_boundary,
         boundary_conditions,
-        normals,
+        normals;
+        device = device,
     )
 end

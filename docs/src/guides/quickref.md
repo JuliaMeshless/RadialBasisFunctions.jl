@@ -133,21 +133,23 @@ lap = laplacian(
 | Neumann | `Neumann()` | Fixed normal derivative |
 | Robin | `Robin(α, β)` | $\alpha u + \beta \frac{\partial u}{\partial n}$ |
 
-## GPU Acceleration
+## GPU Evaluation
+
+Weight computation currently runs on CPU. Once built, operators can be moved to GPU for fast evaluation:
 
 ```julia
-using CUDA
+using CUDA, Adapt
 
-# Move data to GPU
-points_gpu = cu(points)
+# Build operator on CPU
+lap = laplacian(points)
 
-# Operators automatically use GPU
-lap_gpu = laplacian(points_gpu)
-
-# Apply on GPU
+# Move to GPU for evaluation
+lap_gpu = cu(lap)
 values_gpu = cu(values)
 result_gpu = lap_gpu(values_gpu)
 ```
+
+Full GPU weight computation is planned — see [#88](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88).
 
 ## Common Errors and Fixes
 
@@ -163,4 +165,4 @@ result_gpu = lap_gpu(values_gpu)
 1. **Reuse adjacency lists** for multiple operators on same points
 2. **Use StaticArrays** (`SVector`) for best performance
 3. **Batch operations** - create operator once, apply many times
-4. **GPU for large problems** - move data to GPU for automatic acceleration
+4. **GPU for large problems** — build operators on CPU, then `cu(operator)` for GPU evaluation

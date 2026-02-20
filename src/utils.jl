@@ -1,12 +1,19 @@
+# GPU → CPU conversion for KDTree compatibility
+_to_cpu(x::Vector) = x
+_to_cpu(x::AbstractVector) = Array(x)
+
 function find_neighbors(data::AbstractVector, k::Int)
-    tree = KDTree(data)
-    adjl, _ = knn(tree, data, k, true)
+    cpu_data = _to_cpu(data)
+    tree = KDTree(cpu_data)
+    adjl, _ = knn(tree, cpu_data, k, true)
     return adjl
 end
 
 function find_neighbors(data::AbstractVector, eval_points::AbstractVector, k::Int)
-    tree = KDTree(data)
-    adjl, _ = knn(tree, eval_points, k, true)
+    cpu_data = _to_cpu(data)
+    cpu_eval = _to_cpu(eval_points)
+    tree = KDTree(cpu_data)
+    adjl, _ = knn(tree, cpu_eval, k, true)
     return adjl
 end
 

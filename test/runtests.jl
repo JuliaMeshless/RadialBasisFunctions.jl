@@ -64,6 +64,10 @@ end
     include("operators/operator_algebra.jl")
 end
 
+@safetestset "Device Kwarg" begin
+    include("operators/device_kwarg.jl")
+end
+
 @safetestset "Monomial Operators" begin
     include("operators/monomial.jl")
 end

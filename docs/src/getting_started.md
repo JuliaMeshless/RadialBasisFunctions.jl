@@ -1,6 +1,6 @@
 # Getting Started
 
-Data must be an `AbstractVector` of point vectors — each point needs an inferrable dimension (e.g., `SVector{2,Float64}` from [StaticArrays.jl](https://github.com/JuliaArrays/StaticArrays.jl)). This includes `CuVector` for GPU.
+Data must be an `AbstractVector` of point vectors — each point needs an inferrable dimension (e.g., `SVector{2,Float64}` from [StaticArrays.jl](https://github.com/JuliaArrays/StaticArrays.jl)).
 
 ```@example overview
 using RadialBasisFunctions
@@ -209,3 +209,5 @@ typeof(result)
 1. **Data format**: The package requires `AbstractVector{<:AbstractVector}` input (not matrices). Each point must have inferrable dimension, e.g., `SVector{2,Float64}` from StaticArrays.jl. Matrix input support is planned.
 
 2. **Global interpolation**: `Interpolator` currently uses all points globally. Local collocation support (like the operators use) is planned for future releases.
+
+3. **GPU weight computation**: Operators and interpolators can be moved to GPU via `Adapt.jl` (e.g., `cu(operator)`) for evaluation, but weight computation (stencil assembly and solve) currently runs on CPU only. A GPU-compatible dense solver is needed for full GPU support ([#88](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88)).

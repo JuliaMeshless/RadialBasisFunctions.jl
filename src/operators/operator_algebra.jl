@@ -1,9 +1,14 @@
 for op in (:+, :-)
     @eval function Base.$op(op1::RadialBasisOperator, op2::RadialBasisOperator)
         _check_compatible(op1, op2)
-        k = _update_stencil(op1, op2)
+        !is_cache_valid(op1) && update_weights!(op1)
+        !is_cache_valid(op2) && update_weights!(op2)
         ℒ = Base.$op(op1.ℒ, op2.ℒ)
-        return RadialBasisOperator(ℒ, op1.data, op1.basis; k = k, adjl = op1.adjl)
+        new_weights = _combine_weights(Base.$op, op1.weights, op2.weights)
+        return RadialBasisOperator(
+            ℒ, new_weights, op1.data, op1.eval_points, op1.adjl, op1.basis, true;
+            device = op1.device,
+        )
     end
 end
 
@@ -33,9 +38,5 @@ function _check_compatible(op1::RadialBasisOperator, op2::RadialBasisOperator)
     end
 end
 
-function _update_stencil(op1::RadialBasisOperator, op2::RadialBasisOperator)
-    k1 = length(first((op1.adjl)))
-    k2 = length(first((op2.adjl)))
-    k = k1 > k2 ? k1 : k2
-    return k
-end
+_combine_weights(op, w1, w2) = op(w1, w2)
+_combine_weights(op, w1::Tuple, w2::Tuple) = map((a, b) -> op(a, b), w1, w2)
