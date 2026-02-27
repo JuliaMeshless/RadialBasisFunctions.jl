@@ -24,7 +24,8 @@ struct Gaussian{T, D <: Int} <: AbstractRadialBasis
     end
 end
 
-(rbf::Gaussian)(x, xᵢ) = exp(-(rbf.ε * euclidean(x, xᵢ))^2)
+(rbf::Gaussian)(r2) = exp(-rbf.ε^2 * r2)
+(rbf::Gaussian)(x, xᵢ) = rbf(sqeuclidean(x, xᵢ))
 
 # ∂ - first partial derivative
 function (op::∂{<:Gaussian})(x, xᵢ)

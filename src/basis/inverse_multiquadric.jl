@@ -27,7 +27,8 @@ struct IMQ{T, D <: Int} <: AbstractRadialBasis
     end
 end
 
-(rbf::IMQ)(x, xᵢ) = 1 / sqrt((euclidean(x, xᵢ) * rbf.ε)^2 + 1)
+(rbf::IMQ)(r2) = 1 / sqrt(rbf.ε^2 * r2 + 1)
+(rbf::IMQ)(x, xᵢ) = rbf(sqeuclidean(x, xᵢ))
 
 # ∂ - first partial derivative
 function (op::∂{<:IMQ})(x, xᵢ)

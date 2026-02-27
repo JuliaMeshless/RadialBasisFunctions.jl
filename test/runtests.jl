@@ -99,6 +99,10 @@ end
     include("solve/integration/partial_y_end_to_end.jl")
 end
 
+@safetestset "Lux RBFLayer" begin
+    include("lux.jl")
+end
+
 if Base.find_package("DifferentiationInterface") !== nothing
     @safetestset "Autodiff via DifferentiationInterface" begin
         include("extensions/autodiff_di.jl")
