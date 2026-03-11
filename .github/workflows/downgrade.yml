@@ -37,9 +37,7 @@ jobs:
             - uses: julia-actions/julia-buildpkg@v1
               env:
                   PYTHON: ""
-            - name: Run tests without coverage
-              uses: julia-actions/julia-runtest@v1
-              with:
-                  coverage: false
+            - name: Run tests
+              run: julia --project=test --check-bounds=yes --depwarn=yes --color=yes -e 'using Pkg; Pkg.instantiate(); include("test/runtests.jl")'
               env:
                   PYTHON: ""
