@@ -79,7 +79,7 @@ export Interpolator
 include("operators/regridding.jl")
 export Regrid, regrid
 
-include("lux.jl")
+include("lux_types.jl")
 export RBFLayer
 
 # Some consts and aliases

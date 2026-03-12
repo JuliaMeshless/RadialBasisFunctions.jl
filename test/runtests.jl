@@ -99,8 +99,10 @@ end
     include("solve/integration/partial_y_end_to_end.jl")
 end
 
-@safetestset "Lux RBFLayer" begin
-    include("lux.jl")
+if Base.find_package("LuxCore") !== nothing
+    @safetestset "Lux RBFLayer" begin
+        include("extensions/lux_ext.jl")
+    end
 end
 
 if Base.find_package("DifferentiationInterface") !== nothing
