@@ -13,7 +13,7 @@ struct Gaussian{T, D <: Int} <: AbstractRadialBasis
     ε::T
     poly_deg::D
     function Gaussian(ε::T = 1; poly_deg::D = 2) where {T, D <: Int}
-        if all(ε .< 0)
+        if ε <= 0
             throw(
                 ArgumentError(
                     "Shape parameter ε must be > 0 (got ε=$ε). Typical values range from 0.1 to 10.0.",
