@@ -32,7 +32,7 @@ jobs:
             - uses: julia-actions/cache@v2
             - uses: julia-actions/julia-downgrade-compat@v2
               with:
-                  skip: LinearAlgebra, Random, Statistics, SparseArrays, Test, Enzyme, EnzymeCore, Mooncake, LuxCore, DifferentiationInterface, ForwardDiff, FiniteDifferences, HaltonSequences, SafeTestsets, ChainRulesCore
+                  skip: LinearAlgebra, Random, Statistics, SparseArrays, Test, Enzyme, EnzymeCore, Mooncake, LuxCore, DifferentiationInterface, ForwardDiff, FiniteDifferences, HaltonSequences, SafeTestsets, ChainRulesCore, RadialBasisFunctions
                   projects: ., test
                   mode: deps
             - uses: julia-actions/julia-buildpkg@v1
