@@ -13,7 +13,6 @@ updates:
     directories:
       - "/"
       - "/docs"
-      - "/test"
     schedule:
       interval: "daily"
     groups:
