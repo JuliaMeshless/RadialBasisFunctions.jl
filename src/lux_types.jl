@@ -23,7 +23,7 @@ Architecture: `x ∈ R^d → φᵢ(x) = rbf(εᵢ, ||x - μᵢ||) → y = W * Φ
 - `init_weight`: Initialization function `(rng, dims...) -> Array` for output weights
 - `init_shape::Float64=1.0`: Initial value for shape parameter ε
 """
-struct RBFLayer{B<:AbstractRadialBasis, F1, F2}
+struct RBFLayer{B <: AbstractRadialBasis, F1, F2}
     in_dims::Int
     num_centers::Int
     out_dims::Int
@@ -41,17 +41,17 @@ _default_init_weight(rng, dims...) =
     (randn(rng, Float32, dims...) .* Float32(sqrt(2.0f0 / sum(dims))))
 
 function RBFLayer(
-    in_dims::Int,
-    num_centers::Int,
-    out_dims::Int;
-    basis_type::Type{<:AbstractRadialBasis}=Gaussian,
-    use_bias::Bool=true,
-    learn_centers::Bool=true,
-    learn_shape::Bool=true,
-    init_centers=_default_init_centers,
-    init_weight=_default_init_weight,
-    init_shape::Float64=1.0,
-)
+        in_dims::Int,
+        num_centers::Int,
+        out_dims::Int;
+        basis_type::Type{<:AbstractRadialBasis} = Gaussian,
+        use_bias::Bool = true,
+        learn_centers::Bool = true,
+        learn_shape::Bool = true,
+        init_centers = _default_init_centers,
+        init_weight = _default_init_weight,
+        init_shape::Float64 = 1.0,
+    )
     B = basis_type
     init_shape > 0 || throw(ArgumentError("init_shape must be > 0, got $init_shape"))
     in_dims > 0 || throw(ArgumentError("in_dims must be > 0, got $in_dims"))
@@ -78,5 +78,5 @@ function Base.show(io::IO, l::RBFLayer)
     l.use_bias || print(io, ", use_bias=false")
     l.learn_centers || print(io, ", learn_centers=false")
     _has_shape_parameter(l.basis_type) && !l.learn_shape && print(io, ", learn_shape=false")
-    print(io, ")")
+    return print(io, ")")
 end
