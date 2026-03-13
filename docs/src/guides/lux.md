@@ -92,7 +92,7 @@ problem so you can compare convergence, accuracy, and interpretability.
 
 ```@example lux
 using RadialBasisFunctions
-using Lux, Optimisers, Zygote, ComponentArrays
+using Lux, Optimisers, DifferentiationInterface, Mooncake, ComponentArrays
 using Random, Statistics
 using CairoMakie
 
@@ -141,19 +141,14 @@ for 1000 epochs on MSE loss.
 function train(model, ps, st; lr=0.01f0, epochs=1000)
     ps = ComponentArray(ps)
     opt_state = Optimisers.setup(Adam(lr), ps)
-
-    # Reshape data for Lux: (features, samples)
     X = reshape(x_train, 1, :)
     Y = reshape(y_train, 1, :)
-
+    backend = AutoMooncake(; config=nothing)
+    loss_fn(p) = mean((first(model(X, p, st)) .- Y) .^ 2)
     losses = Float32[]
     for epoch in 1:epochs
-        result = Zygote.withgradient(ps) do p
-            pred, _ = model(X, p, st)
-            mean((pred .- Y) .^ 2)
-        end
-        push!(losses, result.val)
-        grads = result.grad[1]
+        val, grads = DifferentiationInterface.value_and_gradient(loss_fn, backend, ps)
+        push!(losses, val)
         opt_state, ps = Optimisers.update(opt_state, ps, grads)
     end
     return ps, losses
