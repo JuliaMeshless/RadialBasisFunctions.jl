@@ -92,7 +92,7 @@ problem so you can compare convergence, accuracy, and interpretability.
 
 ```@example lux
 using RadialBasisFunctions
-using Lux, Optimisers, DifferentiationInterface, Mooncake, ComponentArrays
+using Lux, Optimisers, DifferentiationInterface, Enzyme, ComponentArrays
 using Random, Statistics
 using CairoMakie
 
@@ -143,7 +143,7 @@ function train(model, ps, st; lr=0.01f0, epochs=1000)
     opt_state = Optimisers.setup(Adam(lr), ps)
     X = reshape(x_train, 1, :)
     Y = reshape(y_train, 1, :)
-    backend = AutoMooncake(; config=nothing)
+    backend = AutoEnzyme(; function_annotation=Enzyme.Const)
     loss_fn(p) = mean((first(model(X, p, st)) .- Y) .^ 2)
     losses = Float32[]
     for epoch in 1:epochs
