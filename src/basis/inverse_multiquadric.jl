@@ -16,7 +16,7 @@ struct IMQ{T, D <: Int} <: AbstractRadialBasis
     ε::T
     poly_deg::D
     function IMQ(ε::T = 1; poly_deg::D = 2) where {T, D <: Int}
-        if all(ε .< 0)
+        if ε <= 0
             throw(
                 ArgumentError(
                     "Shape parameter ε must be > 0 (got ε=$ε). Typical values range from 0.1 to 10.0.",
@@ -27,7 +27,8 @@ struct IMQ{T, D <: Int} <: AbstractRadialBasis
     end
 end
 
-(rbf::IMQ)(x, xᵢ) = 1 / sqrt((euclidean(x, xᵢ) * rbf.ε)^2 + 1)
+(rbf::IMQ)(r2) = 1 / sqrt(rbf.ε^2 * r2 + 1)
+(rbf::IMQ)(x, xᵢ) = rbf(sqeuclidean(x, xᵢ))
 
 # ∂ - first partial derivative
 function (op::∂{<:IMQ})(x, xᵢ)

@@ -47,7 +47,8 @@ struct PHS1{T <: Int} <: AbstractPHS
         return new{T}(poly_deg)
     end
 end
-(phs::PHS1)(x, xᵢ) = euclidean(x, xᵢ)
+(phs::PHS1)(r2) = sqrt(r2)
+(phs::PHS1)(x, xᵢ) = phs(sqeuclidean(x, xᵢ))
 
 # ∂ - first partial derivative
 function (op::∂{<:PHS1})(x, xᵢ)
@@ -146,7 +147,8 @@ struct PHS3{T <: Int} <: AbstractPHS
         return new{T}(poly_deg)
     end
 end
-(phs::PHS3)(x, xᵢ) = euclidean(x, xᵢ)^3
+(phs::PHS3)(r2) = r2 * sqrt(r2)
+(phs::PHS3)(x, xᵢ) = phs(sqeuclidean(x, xᵢ))
 
 # ∂ - first partial derivative
 function (op::∂{<:PHS3})(x, xᵢ)
@@ -246,7 +248,8 @@ struct PHS5{T <: Int} <: AbstractPHS
         return new{T}(poly_deg)
     end
 end
-(phs::PHS5)(x, xᵢ) = euclidean(x, xᵢ)^5
+(phs::PHS5)(r2) = r2^2 * sqrt(r2)
+(phs::PHS5)(x, xᵢ) = phs(sqeuclidean(x, xᵢ))
 
 # ∂ - first partial derivative
 function (op::∂{<:PHS5})(x, xᵢ)
@@ -346,7 +349,8 @@ struct PHS7{T <: Int} <: AbstractPHS
     end
 end
 
-(phs::PHS7)(x, xᵢ) = euclidean(x, xᵢ)^7
+(phs::PHS7)(r2) = r2^3 * sqrt(r2)
+(phs::PHS7)(x, xᵢ) = phs(sqeuclidean(x, xᵢ))
 
 # ∂ - first partial derivative
 function (op::∂{<:PHS7})(x, xᵢ)

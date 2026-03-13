@@ -1,6 +1,6 @@
 name = "RadialBasisFunctions"
 uuid = "79ee0514-adf7-4479-8807-6f72ea8967e8"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Kyle Beggs"]
 
 [deps]
@@ -11,10 +11,12 @@ Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
 KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 NearestNeighbors = "b8a86587-4115-5ab1-83bc-aa920d37bbce"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StaticArraysCore = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
+LuxCore = "bb33d45b-7691-41d6-9220-0943567d0623"
 SymRCM = "286e6d88-80af-4590-acc9-0001b223b9bd"
 
 [weakdeps]
@@ -35,7 +37,8 @@ Enzyme = "0.13"
 EnzymeCore = "0.8"
 KernelAbstractions = "0.9.34"
 LinearAlgebra = "1"
-Mooncake = "0.4, 0.5"
+LuxCore = "1"
+Mooncake = "0.5"
 NearestNeighbors = "0.4.8"
 PrecompileTools = "1.2"
 StaticArrays = "1.9.15"
