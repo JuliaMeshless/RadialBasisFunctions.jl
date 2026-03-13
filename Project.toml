@@ -16,17 +16,16 @@ PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StaticArraysCore = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
+LuxCore = "bb33d45b-7691-41d6-9220-0943567d0623"
 SymRCM = "286e6d88-80af-4590-acc9-0001b223b9bd"
 
 [weakdeps]
 Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
 EnzymeCore = "f151be2c-9106-41f4-ab19-57ee4f262869"
-LuxCore = "bb33d45b-7691-41d6-9220-0943567d0623"
 Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
 
 [extensions]
 RadialBasisFunctionsEnzymeExt = ["Enzyme", "EnzymeCore"]
-RadialBasisFunctionsLuxExt = "LuxCore"
 RadialBasisFunctionsMooncakeExt = "Mooncake"
 
 [compat]

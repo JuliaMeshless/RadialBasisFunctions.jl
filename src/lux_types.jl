@@ -23,7 +23,7 @@ Architecture: `x ∈ R^d → φᵢ(x) = rbf(εᵢ, ||x - μᵢ||) → y = W * Φ
 - `init_weight`: Initialization function `(rng, dims...) -> Array` for output weights
 - `init_shape::Float64=1.0`: Initial value for shape parameter ε
 """
-struct RBFLayer{B <: AbstractRadialBasis, F1, F2}
+struct RBFLayer{B <: AbstractRadialBasis, F1, F2} <: AbstractLuxLayer
     in_dims::Int
     num_centers::Int
     out_dims::Int

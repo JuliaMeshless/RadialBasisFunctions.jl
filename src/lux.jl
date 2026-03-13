@@ -1,11 +1,4 @@
-module RadialBasisFunctionsLuxExt
-
-using RadialBasisFunctions
-using RadialBasisFunctions: RBFLayer, AbstractRadialBasis, AbstractPHS,
-    PHS1, PHS3, PHS5, PHS7, Gaussian, IMQ,
-    _has_shape_parameter, _default_init_centers, _default_init_weight
 using LuxCore
-using LuxCore: AbstractLuxLayer
 using Random: AbstractRNG
 
 # --- Initialization ---
@@ -105,5 +98,3 @@ end
 
 _softplus(x) = x > 20 ? x : log1p(exp(x))
 _inverse_softplus(y) = y > 20 ? y : log(expm1(y))
-
-end # module
