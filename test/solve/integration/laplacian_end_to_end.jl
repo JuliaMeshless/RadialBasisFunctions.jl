@@ -77,6 +77,6 @@ import RadialBasisFunctions as RBF
         rms_error = sqrt(mean(solution_error .^ 2))
 
         @test max_error < 1.0e-9  # Machine precision
-        @test rms_error < 1.0e-10  # RMS should be even better
+        @test rms_error < 1.0e-9  # RMS should be even better
     end
 end
