@@ -13,7 +13,7 @@ struct Gaussian{T, D <: Int} <: AbstractRadialBasis
     ε::T
     poly_deg::D
     function Gaussian(ε::T = 1; poly_deg::D = 2) where {T, D <: Int}
-        if all(ε .< 0)
+        if ε <= 0
             throw(
                 ArgumentError(
                     "Shape parameter ε must be > 0 (got ε=$ε). Typical values range from 0.1 to 10.0.",
@@ -24,7 +24,8 @@ struct Gaussian{T, D <: Int} <: AbstractRadialBasis
     end
 end
 
-(rbf::Gaussian)(x, xᵢ) = exp(-(rbf.ε * euclidean(x, xᵢ))^2)
+(rbf::Gaussian)(r2) = exp(-rbf.ε^2 * r2)
+(rbf::Gaussian)(x, xᵢ) = rbf(sqeuclidean(x, xᵢ))
 
 # ∂ - first partial derivative
 function (op::∂{<:Gaussian})(x, xᵢ)

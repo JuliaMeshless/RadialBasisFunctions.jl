@@ -22,6 +22,7 @@ makedocs(;
         "Getting Started" => "getting_started.md",
         "Guides" => [
             "Automatic Differentiation" => "guides/autodiff.md",
+            "RBF Neural Networks" => "guides/lux.md",
             "Quick Reference" => "guides/quickref.md",
         ],
         "Reference" => [
