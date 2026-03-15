@@ -1,9 +1,9 @@
 """
-    Laplacian <: ScalarValuedOperator
+    Laplacian <: AbstractOperator{0}
 
 Operator for the sum of the second derivatives w.r.t. each independent variable (∇²f).
 """
-struct Laplacian <: ScalarValuedOperator end
+struct Laplacian <: AbstractOperator{0} end
 (::Laplacian)(basis) = ∇²(basis)
 
 # Primary interface using unified keyword constructor

@@ -24,7 +24,7 @@ using SparseArrays: SparseMatrixCSC
 # Import types and functions we need
 import RadialBasisFunctions: _eval_op, RadialBasisOperator, Interpolator
 import RadialBasisFunctions: AbstractPHS, IMQ, Gaussian
-import RadialBasisFunctions: AbstractRadialBasis, VectorValuedOperator
+import RadialBasisFunctions: AbstractRadialBasis, Jacobian
 import RadialBasisFunctions: _build_weights, Partial, Laplacian, MonomialBasis, _optype
 import RadialBasisFunctions: _interpolator_point_gradient!
 import RadialBasisFunctions: _interpolator_constructor_backward, _build_collocation_matrix!
@@ -117,11 +117,11 @@ end
 # =============================================================================
 # Output is Matrix{Float64} → fdata is Matrix{Float64}, rdata is NoRData.
 
-Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{typeof(_eval_op), RadialBasisOperator{<:VectorValuedOperator}, Vector{Float64}}
+Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{typeof(_eval_op), RadialBasisOperator{<:Jacobian}, Vector{Float64}}
 
 function Mooncake.rrule!!(
         ::CoDual{typeof(_eval_op)},
-        op::CoDual{<:RadialBasisOperator{<:VectorValuedOperator{D}}},
+        op::CoDual{<:RadialBasisOperator{<:Jacobian{D}}},
         x::CoDual{Vector{Float64}},
     ) where {D}
     operator = primal(op)
@@ -163,10 +163,10 @@ function Mooncake.rrule!!(
 end
 
 # Vector-valued operator call syntax
-Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{RadialBasisOperator{<:VectorValuedOperator}, Vector{Float64}}
+Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{RadialBasisOperator{<:Jacobian}, Vector{Float64}}
 
 function Mooncake.rrule!!(
-        op::CoDual{<:RadialBasisOperator{<:VectorValuedOperator{D}}},
+        op::CoDual{<:RadialBasisOperator{<:Jacobian{D}}},
         x::CoDual{Vector{Float64}},
     ) where {D}
     operator = primal(op)

@@ -169,7 +169,7 @@ end
     @test is_cache_valid(adapted)
 end
 
-@testset "Adapt.adapt_structure for VectorValuedOperator" begin
+@testset "Adapt.adapt_structure for NTuple weights" begin
     op = gradient(x)
     result = op(z)
 

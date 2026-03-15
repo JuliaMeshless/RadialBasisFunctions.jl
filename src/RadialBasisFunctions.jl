@@ -41,7 +41,7 @@ include("solve/backward.jl")
 include("solve/forward_cache.jl")
 
 include("operators/operators.jl")
-export RadialBasisOperator, ScalarValuedOperator, VectorValuedOperator
+export RadialBasisOperator, AbstractOperator
 export update_weights!, is_cache_valid
 
 include("operators/custom.jl")

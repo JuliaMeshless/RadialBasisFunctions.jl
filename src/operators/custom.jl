@@ -1,12 +1,17 @@
 """
-    Custom{F<:Function} <: AbstractOperator
+    Custom{N, F<:Function} <: AbstractOperator{N}
 
 Custom operator that applies a user-defined function to basis functions.
 The function `ℒ` should accept a basis and return a callable `(x, xᵢ) -> value`.
+
+`N` is the tensor rank added to the output (default 0 = rank-preserving).
+Use `Custom(ℒ)` for rank-0 (backward compatible) or `Custom{N}(ℒ)` for explicit rank.
 """
-struct Custom{F <: Function} <: AbstractOperator
+struct Custom{N, F <: Function} <: AbstractOperator{N}
     ℒ::F
 end
+Custom(ℒ::F) where {F <: Function} = Custom{0, F}(ℒ)
+Custom{N}(ℒ::F) where {N, F <: Function} = Custom{N, F}(ℒ)
 (op::Custom)(basis) = op.ℒ(basis)
 
 # Primary interface using unified keyword constructor
