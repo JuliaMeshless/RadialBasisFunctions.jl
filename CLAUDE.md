@@ -393,12 +393,12 @@ end
 ### Adding a New Operator
 
 1. Create file `src/operators/my_operator.jl`
-2. Define operator struct inheriting from `ScalarValuedOperator` or `VectorValuedOperator`
+2. Define operator struct inheriting from `AbstractOperator{N}` (`N=0` for rank-preserving, `N=1` for rank+1)
 3. Implement the operator-basis interaction
 
 ```julia
 # Example: Mixed partial derivative ∂²f/∂x∂y
-struct MixedPartial{T<:Int} <: ScalarValuedOperator
+struct MixedPartial{T<:Int} <: AbstractOperator{0}
     dim1::T
     dim2::T
 end

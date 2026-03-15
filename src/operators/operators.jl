@@ -1,6 +1,4 @@
-abstract type AbstractOperator end
-abstract type ScalarValuedOperator <: AbstractOperator end
-abstract type VectorValuedOperator{Dim} <: AbstractOperator end
+abstract type AbstractOperator{N} end
 
 """
     struct RadialBasisOperator
@@ -185,9 +183,9 @@ end
 _eval_op(op::RadialBasisOperator, x) = op.weights * x
 _eval_op(op::RadialBasisOperator, y, x) = mul!(y, op.weights, x)
 
-# VectorValuedOperator: Scalar field input → Matrix output (N×D)
+# NTuple weights: Scalar field input → Matrix output (N×D)
 function _eval_op(
-        op::RadialBasisOperator{<:VectorValuedOperator{D}}, x::AbstractVector
+        op::RadialBasisOperator{<:Any, <:NTuple{D}}, x::AbstractVector
     ) where {D}
     N_eval = length(op.eval_points)
     T = promote_type(eltype(x), eltype(first(op.weights)))
@@ -198,9 +196,9 @@ function _eval_op(
     return out
 end
 
-# VectorValuedOperator: Vector field input (N×D_in) → 3-tensor output (N×D_in×D)
+# NTuple weights: Vector field input (N×D_in) → 3-tensor output (N×D_in×D)
 function _eval_op(
-        op::RadialBasisOperator{<:VectorValuedOperator{D}}, x::AbstractMatrix
+        op::RadialBasisOperator{<:Any, <:NTuple{D}}, x::AbstractMatrix
     ) where {D}
     N_eval = length(op.eval_points)
     D_in = size(x, 2)
@@ -212,9 +210,9 @@ function _eval_op(
     return out
 end
 
-# VectorValuedOperator: General tensor input → tensor output with extra dimension
+# NTuple weights: General tensor input → tensor output with extra dimension
 function _eval_op(
-        op::RadialBasisOperator{<:VectorValuedOperator{D}}, x::AbstractArray
+        op::RadialBasisOperator{<:Any, <:NTuple{D}}, x::AbstractArray
     ) where {D}
     N_eval = length(op.eval_points)
     trailing_dims = size(x)[2:end]
@@ -226,10 +224,9 @@ function _eval_op(
     return out
 end
 
-# VectorValuedOperator with SparseVector weights (single eval point)
-# W is 2nd type param in RadialBasisOperator{L,W,D,C,A,B}
+# NTuple SparseVector weights (single eval point)
 function _eval_op(
-        op::RadialBasisOperator{<:VectorValuedOperator{D}, <:NTuple{D, <:SparseVector}},
+        op::RadialBasisOperator{<:Any, <:NTuple{D, <:SparseVector}},
         x::AbstractVector,
     ) where {D}
     T = promote_type(eltype(x), eltype(first(op.weights)))
@@ -241,7 +238,7 @@ function _eval_op(
 end
 
 function _eval_op(
-        op::RadialBasisOperator{<:VectorValuedOperator{D}, <:NTuple{D, <:SparseVector}},
+        op::RadialBasisOperator{<:Any, <:NTuple{D, <:SparseVector}},
         x::AbstractMatrix,
     ) where {D}
     D_in = size(x, 2)
@@ -254,7 +251,7 @@ function _eval_op(
 end
 
 function _eval_op(
-        op::RadialBasisOperator{<:VectorValuedOperator{D}, <:NTuple{D, <:SparseVector}},
+        op::RadialBasisOperator{<:Any, <:NTuple{D, <:SparseVector}},
         x::AbstractArray,
     ) where {D}
     trailing_dims = size(x)[2:end]
@@ -268,7 +265,7 @@ end
 
 # In-place: Scalar field → Matrix
 function _eval_op(
-        op::RadialBasisOperator{<:VectorValuedOperator{D}}, y::AbstractMatrix, x::AbstractVector
+        op::RadialBasisOperator{<:Any, <:NTuple{D}}, y::AbstractMatrix, x::AbstractVector
     ) where {D}
     for d in 1:D
         mul!(view(y, :, d), op.weights[d], x)
@@ -278,7 +275,7 @@ end
 
 # In-place: Vector field → 3-tensor
 function _eval_op(
-        op::RadialBasisOperator{<:VectorValuedOperator{D}},
+        op::RadialBasisOperator{<:Any, <:NTuple{D}},
         y::AbstractArray{<:Any, 3},
         x::AbstractMatrix,
     ) where {D}
@@ -291,7 +288,7 @@ end
 
 # LinearAlgebra methods - divergence (dot with gradient operator)
 function LinearAlgebra.:⋅(
-        op::RadialBasisOperator{<:VectorValuedOperator}, x::AbstractVector
+        op::RadialBasisOperator{<:Any, <:NTuple}, x::AbstractVector
     )
     !is_cache_valid(op) && update_weights!(op)
     result = op(x)  # Now Matrix (N×D)
@@ -305,9 +302,9 @@ function update_weights!(op::RadialBasisOperator)
     return nothing
 end
 
-function update_weights!(op::RadialBasisOperator{<:VectorValuedOperator{Dim}}) where {Dim}
+function update_weights!(op::RadialBasisOperator{<:Any, <:NTuple})
     new_weights = _build_weights(op.ℒ, op)
-    for i in 1:Dim
+    for i in eachindex(op.weights)
         op.weights[i] .= new_weights[i]
     end
     validate_cache!(op)
@@ -326,7 +323,7 @@ function Adapt.adapt_structure(to, op::RadialBasisOperator)
     )
 end
 
-function Adapt.adapt_structure(to, op::RadialBasisOperator{<:VectorValuedOperator})
+function Adapt.adapt_structure(to, op::RadialBasisOperator{<:Any, <:NTuple})
     adapted_weights = map(w -> Adapt.adapt(to, w), op.weights)
     return RadialBasisOperator(
         op.ℒ, adapted_weights, op.data, op.eval_points, op.adjl, op.basis,

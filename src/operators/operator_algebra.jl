@@ -13,7 +13,7 @@ for op in (:+, :-)
 end
 
 for op in (:+, :-)
-    @eval function Base.$op(op1::AbstractOperator, op2::AbstractOperator)
+    @eval function Base.$op(op1::AbstractOperator{N}, op2::AbstractOperator{N}) where {N}
         function additive_ℒ(basis)
             return additive_ℒrbf(x1, x2) = Base.$op(op1(basis)(x1, x2), op2(basis)(x1, x2))
         end
@@ -23,7 +23,7 @@ for op in (:+, :-)
                 return nothing
             end
         end
-        return Custom(additive_ℒ)
+        return Custom{N}(additive_ℒ)
     end
 end
 

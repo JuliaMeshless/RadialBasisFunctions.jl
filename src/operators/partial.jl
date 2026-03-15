@@ -1,9 +1,9 @@
 """
-    Partial{T<:Int} <: ScalarValuedOperator
+    Partial{T<:Int} <: AbstractOperator{0}
 
 Operator for a partial derivative of specified order with respect to a dimension.
 """
-struct Partial{T <: Int} <: ScalarValuedOperator
+struct Partial{T <: Int} <: AbstractOperator{0}
     order::T
     dim::T
 end
