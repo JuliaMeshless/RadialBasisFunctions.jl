@@ -1,8 +1,11 @@
 using RadialBasisFunctions
-using RadialBasisFunctions: _rbf_activate, _softplus, _inverse_softplus, _pairwise_sq_euclidean
 using LuxCore
 using Random
 using Test
+
+const LuxExt = Base.get_extension(RadialBasisFunctions, :RadialBasisFunctionsLuxCoreExt)
+using .LuxExt: RBFLayer, _rbf_activate, _softplus, _inverse_softplus, _pairwise_sq_euclidean
+
 const rng = Random.MersenneTwister(42)
 
 @testset "Construction" begin
@@ -173,13 +176,13 @@ end
     log_shape = Float32[0.5, 0.5]
 
     @testset "Gaussian bounded in (0, 1]" begin
-        Phi = RadialBasisFunctions._rbf_activate(Gaussian, D2, log_shape)
+        Phi = LuxExt._rbf_activate(Gaussian, D2, log_shape)
         @test all(0 .< Phi .<= 1)
         @test Phi[1, 1] ≈ 1.0 atol = 1.0e-6
     end
 
     @testset "IMQ bounded in (0, 1]" begin
-        Phi = RadialBasisFunctions._rbf_activate(IMQ, D2, log_shape)
+        Phi = LuxExt._rbf_activate(IMQ, D2, log_shape)
         @test all(0 .< Phi .<= 1)
         @test Phi[1, 1] ≈ 1.0 atol = 1.0e-6
     end
@@ -188,7 +191,7 @@ end
         D2_sorted = Float32[0.01 0.25 1.0 4.0]
 
         for basis_type in (PHS1, PHS3, PHS5, PHS7)
-            Phi = RadialBasisFunctions._rbf_activate(basis_type, D2_sorted, nothing)
+            Phi = LuxExt._rbf_activate(basis_type, D2_sorted, nothing)
             for j in 1:(size(Phi, 2) - 1)
                 @test Phi[1, j] < Phi[1, j + 1]
             end
@@ -209,8 +212,8 @@ end
 
     @testset "Softplus invertibility" begin
         for val in [0.01f0, 0.5f0, 1.0f0, 5.0f0, 25.0f0]
-            inv = RadialBasisFunctions._inverse_softplus(val)
-            recovered = RadialBasisFunctions._softplus(inv)
+            inv = LuxExt._inverse_softplus(val)
+            recovered = LuxExt._softplus(inv)
             @test recovered ≈ val atol = 1.0e-5
         end
     end
@@ -220,7 +223,7 @@ end
     C = Float32[1.0 0.0; 0.0 1.0; 0.0 0.0]
     X = Float32[1.0 0.0; 0.0 1.0; 0.0 0.0]
 
-    D2 = RadialBasisFunctions._pairwise_sq_euclidean(C, X)
+    D2 = LuxExt._pairwise_sq_euclidean(C, X)
     @test size(D2) == (2, 2)
     @test D2[1, 1] ≈ 0.0 atol = 1.0e-6
     @test D2[2, 2] ≈ 0.0 atol = 1.0e-6

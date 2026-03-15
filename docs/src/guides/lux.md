@@ -96,6 +96,9 @@ using Lux, Optimisers, DifferentiationInterface, Enzyme, ComponentArrays
 using Random, Statistics
 using CairoMakie
 
+const LuxExt = Base.get_extension(RadialBasisFunctions, :RadialBasisFunctionsLuxCoreExt)
+using .LuxExt: RBFLayer
+
 rng = Random.MersenneTwister(0)
 
 # Target function with low- and high-frequency components

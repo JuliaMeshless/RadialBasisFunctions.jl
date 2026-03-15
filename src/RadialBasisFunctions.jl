@@ -1,7 +1,6 @@
 module RadialBasisFunctions
 
 using Adapt
-using LuxCore: AbstractLuxLayer
 using ChunkSplitters
 using Combinatorics
 using Distances
@@ -79,10 +78,6 @@ export Interpolator
 
 include("operators/regridding.jl")
 export Regrid, regrid
-
-include("lux_types.jl")
-include("lux.jl")
-export RBFLayer
 
 # Some consts and aliases
 const Δ = ∇² # some people like this notation for the Laplacian
