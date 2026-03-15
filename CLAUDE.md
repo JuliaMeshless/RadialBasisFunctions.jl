@@ -68,9 +68,10 @@ julia --project=benchmark benchmark/benchmarks.jl
    - Supports scattered data interpolation
    - Backward pass support for AD in `interpolation_backward.jl`
 
-5. **AD Extensions** (`ext/`):
+5. **Package Extensions** (`ext/`):
    - `RadialBasisFunctionsEnzymeExt` - Enzyme.jl autodiff support
    - `RadialBasisFunctionsMooncakeExt` - Mooncake.jl autodiff support
+   - `RadialBasisFunctionsLuxCoreExt` - Lux.jl neural network layer (`RBFLayer`), triggered by loading LuxCore or Lux
 
 6. **Utilities** (`src/utils.jl`):
    - `find_neighbors()` - k-nearest neighbor search using NearestNeighbors.jl

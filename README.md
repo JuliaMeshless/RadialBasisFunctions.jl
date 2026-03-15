@@ -28,6 +28,7 @@ Beyond interpolation, it provides differential operators (Laplacian, gradient, p
 Other things that might matter to you:
 - GPU evaluation support via [Adapt.jl](https://github.com/JuliaGPU/Adapt.jl) — build on CPU, evaluate on GPU ([full GPU tracking issue](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88))
 - Native autodiff rules for [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl) and [Mooncake.jl](https://github.com/compintell/Mooncake.jl) (no generic fallbacks)
+- [Lux.jl](https://github.com/LuxDL/Lux.jl) integration — `RBFLayer` for neural networks with radial basis function activations
 - Operator algebra — combine operators with `+`, `-`, `*`
 
 <p align="center">
@@ -92,6 +93,7 @@ Requires Julia 1.10 or later.
 
 - **[Getting Started](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/getting_started)** — tutorials covering interpolation, operators, and boundary conditions
 - **[Autodiff](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/autodiff)** — differentiating through operators with Enzyme and Mooncake
+- **[RBF Neural Networks](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/guides/lux)** — training RBF layers with Lux.jl
 - **[Theory](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/theory)** — mathematical background on RBF methods
 - **[API Reference](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/api)** — full function documentation
 
