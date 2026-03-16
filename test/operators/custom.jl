@@ -11,44 +11,44 @@ N = 1000
 x = SVector{2}.(HaltonPoint(2)[1:N])
 
 @testset "Custom struct" begin
-    c = Custom(identity)
+    c = Custom{0}(identity)
     @test c(1) == 1
 end
 
 @testset "Printing" begin
-    c = Custom(identity)
+    c = Custom{0}(identity)
     @test RadialBasisFunctions.print_op(c) == "Custom Operator"
 end
 
 @testset "custom() Keyword Constructor" begin
     # Test custom.jl lines 38-40: primary keyword constructor
-    op = custom(x, basis -> (x, xᵢ) -> basis(x, xᵢ))
+    op = custom(x, basis -> (x, xᵢ) -> basis(x, xᵢ); rank = 0)
     @test op isa RadialBasisOperator
 
     # Test with explicit keyword arguments
-    op2 = custom(x, basis -> (x, xᵢ) -> basis(x, xᵢ); basis = PHS(5; poly_deg = 3))
+    op2 = custom(x, basis -> (x, xᵢ) -> basis(x, xᵢ); rank = 0, basis = PHS(5; poly_deg = 3))
     @test op2 isa RadialBasisOperator
 end
 
 @testset "custom() Positional Basis Constructor" begin
     # Test custom.jl lines 43-45: backward compatible positional basis
-    op = custom(x, basis -> (x, xᵢ) -> basis(x, xᵢ), PHS(3; poly_deg = 2))
+    op = custom(x, basis -> (x, xᵢ) -> basis(x, xᵢ), PHS(3; poly_deg = 2); rank = 0)
     @test op isa RadialBasisOperator
 
     # Test with different basis types
-    op_imq = custom(x, basis -> (x, xᵢ) -> basis(x, xᵢ), IMQ(1; poly_deg = 2))
+    op_imq = custom(x, basis -> (x, xᵢ) -> basis(x, xᵢ), IMQ(1; poly_deg = 2); rank = 0)
     @test op_imq isa RadialBasisOperator
 end
 
 @testset "custom() Different Eval Points" begin
     # Test custom.jl lines 47-55: separate evaluation points
     x2 = SVector{2}.(HaltonPoint(2)[(N + 1):(N + 100)])
-    op = custom(x, x2, basis -> (x, xᵢ) -> basis(x, xᵢ))
+    op = custom(x, x2, basis -> (x, xᵢ) -> basis(x, xᵢ); rank = 0)
     @test op isa RadialBasisOperator
     @test length(op.eval_points) == 100
 
     # With explicit basis
-    op2 = custom(x, x2, basis -> (x, xᵢ) -> basis(x, xᵢ), PHS(5; poly_deg = 3))
+    op2 = custom(x, x2, basis -> (x, xᵢ) -> basis(x, xᵢ), PHS(5; poly_deg = 3); rank = 0)
     @test op2 isa RadialBasisOperator
 end
 
@@ -78,7 +78,8 @@ end
         PHS(3; poly_deg = 2),
         is_boundary,
         boundary_conditions,
-        normals,
+        normals;
+        rank = 0,
     )
     @test op isa RadialBasisOperator
 end

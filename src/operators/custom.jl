@@ -4,19 +4,18 @@
 Custom operator that applies a user-defined function to basis functions.
 The function `ℒ` should accept a basis and return a callable `(x, xᵢ) -> value`.
 
-`N` is the tensor rank added to the output (default 0 = rank-preserving).
-Use `Custom(ℒ)` for rank-0 (backward compatible) or `Custom{N}(ℒ)` for explicit rank.
+`N` is the tensor rank added to the output and must be specified explicitly,
+e.g. `Custom{0}(ℒ)` for rank-preserving or `Custom{1}(ℒ)` for rank+1.
 """
 struct Custom{N, F <: Function} <: AbstractOperator{N}
     ℒ::F
 end
-Custom(ℒ::F) where {F <: Function} = Custom{0, F}(ℒ)
 Custom{N}(ℒ::F) where {N, F <: Function} = Custom{N, F}(ℒ)
 (op::Custom)(basis) = op.ℒ(basis)
 
 # Primary interface using unified keyword constructor
 """
-    custom(data, ℒ; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl, hermite)
+    custom(data, ℒ; rank, basis=PHS(3; poly_deg=2), eval_points=data, k, adjl, hermite)
 
 Build a `RadialBasisOperator` with a custom operator function.
 
@@ -25,6 +24,7 @@ Build a `RadialBasisOperator` with a custom operator function.
 - `ℒ`: Custom function that accepts a basis and returns a callable `(x, xᵢ) -> value`
 
 # Keyword Arguments
+- `rank::Int` (required): Tensor rank added to the output (0 = rank-preserving, 1 = rank+1)
 - `basis`: RBF basis (default: `PHS(3; poly_deg=2)`)
 - `eval_points`: Evaluation points (default: `data`)
 - `k`: Stencil size (default: `autoselect_k(data, basis)`)
@@ -33,20 +33,20 @@ Build a `RadialBasisOperator` with a custom operator function.
 
 # Examples
 ```julia
-# Custom operator that returns the basis function itself
-op = custom(data, basis -> (x, xᵢ) -> basis(x, xᵢ))
+# Custom operator that returns the basis function itself (rank-preserving)
+op = custom(data, basis -> (x, xᵢ) -> basis(x, xᵢ); rank=0)
 
 # Custom biharmonic operator (∇⁴)
-op = custom(data, basis -> ∇²(basis) ∘ ∇²(basis))
+op = custom(data, basis -> ∇²(basis) ∘ ∇²(basis); rank=0)
 ```
 """
-function custom(data::AbstractVector, ℒ::Function; kw...)
-    return RadialBasisOperator(Custom(ℒ), data; kw...)
+function custom(data::AbstractVector, ℒ::Function; rank::Int, kw...)
+    return RadialBasisOperator(Custom{rank}(ℒ), data; kw...)
 end
 
 # Backward compatible positional signatures
-function custom(data::AbstractVector, ℒ::Function, basis::AbstractRadialBasis; kw...)
-    return RadialBasisOperator(Custom(ℒ), data; basis = basis, kw...)
+function custom(data::AbstractVector, ℒ::Function, basis::AbstractRadialBasis; rank::Int, kw...)
+    return RadialBasisOperator(Custom{rank}(ℒ), data; basis = basis, kw...)
 end
 
 function custom(
@@ -54,9 +54,10 @@ function custom(
         eval_points::AbstractVector,
         ℒ::Function,
         basis::AbstractRadialBasis = PHS(3; poly_deg = 2);
+        rank::Int,
         kw...,
     )
-    return RadialBasisOperator(Custom(ℒ), data; eval_points = eval_points, basis = basis, kw...)
+    return RadialBasisOperator(Custom{rank}(ℒ), data; eval_points = eval_points, basis = basis, kw...)
 end
 
 # Hermite backward compatibility (positional boundary arguments)
@@ -68,11 +69,12 @@ function custom(
         is_boundary::Vector{Bool},
         boundary_conditions::Vector{<:BoundaryCondition},
         normals::Vector{<:AbstractVector};
+        rank::Int,
         kw...,
     )
     hermite = (is_boundary = is_boundary, bc = boundary_conditions, normals = normals)
     return RadialBasisOperator(
-        Custom(ℒ), data; eval_points = eval_points, basis = basis, hermite = hermite, kw...
+        Custom{rank}(ℒ), data; eval_points = eval_points, basis = basis, hermite = hermite, kw...
     )
 end
 
