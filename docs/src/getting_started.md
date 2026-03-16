@@ -123,7 +123,7 @@ Define your own differential operators using `custom`. The function should accep
 
 ```@example overview
 # Custom operator that evaluates the basis function
-op = custom(x, basis -> (x, xc) -> basis(x, xc))
+op = custom(x, basis -> (x, xc) -> basis(x, xc); rank=0)
 typeof(op)
 ```
 

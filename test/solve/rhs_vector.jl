@@ -23,8 +23,8 @@ import RadialBasisFunctions as RBF
 
     @testset "Standard RHS - Identity Operator" begin
         # Test with identity operator (simplest case)
-        identity_op_rbf = RBF.Custom(b -> (x1, x2) -> b(x1, x2))
-        identity_op_mon = RBF.Custom(m -> (arr, x) -> m(arr, x))
+        identity_op_rbf = RBF.Custom{0}(b -> (x1, x2) -> b(x1, x2))
+        identity_op_mon = RBF.Custom{0}(m -> (arr, x) -> m(arr, x))
 
         ℒrbf = identity_op_rbf(basis)
         ℒmon = identity_op_mon(mon)
@@ -51,8 +51,8 @@ import RadialBasisFunctions as RBF
 
     @testset "Standard RHS - Partial Derivative" begin
         # Test with partial derivative operator
-        partial_op_rbf = RBF.Custom(b -> RBF.∂(b, 1))
-        partial_op_mon = RBF.Custom(m -> RBF.∂(m, 1))
+        partial_op_rbf = RBF.Custom{0}(b -> RBF.∂(b, 1))
+        partial_op_mon = RBF.Custom{0}(m -> RBF.∂(m, 1))
 
         ℒrbf = partial_op_rbf(basis)
         ℒmon = partial_op_mon(mon)
@@ -109,8 +109,8 @@ import RadialBasisFunctions as RBF
         hermite_data = RBF.HermiteStencilData(data_2d, is_boundary, bcs, normals)
 
         # Use identity operator for simplicity
-        identity_op_rbf = RBF.Custom(b -> (x1, x2) -> b(x1, x2))
-        identity_op_mon = RBF.Custom(m -> (arr, x) -> m(arr, x))
+        identity_op_rbf = RBF.Custom{0}(b -> (x1, x2) -> b(x1, x2))
+        identity_op_mon = RBF.Custom{0}(m -> (arr, x) -> m(arr, x))
 
         ℒrbf = identity_op_rbf(basis)
         ℒmon = identity_op_mon(mon)
