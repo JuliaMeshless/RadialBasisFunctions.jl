@@ -222,28 +222,14 @@ struct NeumannRobinPoint <: BoundaryPointType end
 end
 
 # ============================================================================
-# Operator Arity Traits (for type-stable buffer allocation)
+# Operator Arity Helpers (direct Tuple dispatch)
 # ============================================================================
 
-"""Operator arity traits for compile-time dispatch"""
-abstract type OperatorArity end
-struct SingleOperator <: OperatorArity end
-struct MultiOperator{N} <: OperatorArity end
+_num_ops(::Tuple{Vararg{Any, N}}) where {N} = N
+_num_ops(_) = 1
 
-"""Extract operator arity at compile time"""
-operator_arity(::T) where {T} = operator_arity(T)
-operator_arity(::Type{<:Tuple{Vararg{Any, N}}}) where {N} = MultiOperator{N}()
-operator_arity(::Type) = SingleOperator()
-
-"""Get number of operators (type-stable)"""
-_num_ops(::SingleOperator) = 1
-_num_ops(::MultiOperator{N}) where {N} = N
-_num_ops(ℒ) = _num_ops(operator_arity(ℒ))
-
-"""Prepare RHS buffer with correct type (type-stable)"""
-_prepare_buffer(::SingleOperator, T, n) = zeros(T, n)
-_prepare_buffer(::MultiOperator{N}, T, n) where {N} = zeros(T, n, N)
-_prepare_buffer(ℒ, T, n) = _prepare_buffer(operator_arity(ℒ), T, n)
+_prepare_buffer(::Tuple{Vararg{Any, N}}, T, n) where {N} = zeros(T, n, N)
+_prepare_buffer(_, T, n) = zeros(T, n)
 
 # ============================================================================
 # Basis Operators Bundle (for hot loop optimization)

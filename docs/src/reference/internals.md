@@ -103,7 +103,7 @@ The system builds sparse weight matrices by computing stencil weights in paralle
 Defines shared types used throughout the solve system.
 
 **Key types:**
-- `SingleOperator`, `MultiOperator{N}` — Operator arity traits for pre-allocating RHS buffers
+- `_num_ops`, `_prepare_buffer` — Operator arity helpers for pre-allocating RHS buffers (dispatch on `Tuple` vs non-Tuple)
 
 **When to modify:** Adding new operator traits or shared data structures.
 
