@@ -1,3 +1,14 @@
+"""
+    AbstractOperator{N}
+
+Abstract supertype for differential operators.
+
+The parameter `N` is the tensor rank added to the output:
+- `N=0`: rank-preserving (e.g., [`Partial`](@ref), [`Laplacian`](@ref), [`Directional`](@ref))
+- `N=1`: adds a trailing dimension (e.g., [`Jacobian`](@ref))
+
+Subtypes must implement `(op::MyOp)(basis)` to return a callable applied to the basis.
+"""
 abstract type AbstractOperator{N} end
 
 """
