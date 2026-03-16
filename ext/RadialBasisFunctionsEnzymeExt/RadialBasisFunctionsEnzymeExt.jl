@@ -25,7 +25,7 @@ using SparseArrays
 # Import internal functions
 import RadialBasisFunctions: _eval_op, RadialBasisOperator, Interpolator
 import RadialBasisFunctions: IMQ, Gaussian
-import RadialBasisFunctions: AbstractRadialBasis, VectorValuedOperator
+import RadialBasisFunctions: AbstractRadialBasis, Jacobian
 import RadialBasisFunctions: _build_weights, Partial, Laplacian, _optype
 import RadialBasisFunctions: MonomialBasis
 
@@ -137,7 +137,7 @@ function EnzymeRules.augmented_primal(
         config::EnzymeRules.RevConfigWidth{1},
         func::EnzymeCore.Const{typeof(_eval_op)},
         ::Type{RT},
-        op::EnzymeCore.Const{<:RadialBasisOperator{<:VectorValuedOperator{D}}},
+        op::EnzymeCore.Const{<:RadialBasisOperator{<:Jacobian{D}}},
         x::EnzymeCore.Duplicated,
     ) where {D, RT}
     y = _eval_op(op.val, x.val)
@@ -150,7 +150,7 @@ function EnzymeRules.reverse(
         func::EnzymeCore.Const{typeof(_eval_op)},
         dret,
         tape,
-        op::EnzymeCore.Const{<:RadialBasisOperator{<:VectorValuedOperator}},
+        op::EnzymeCore.Const{<:RadialBasisOperator{<:Jacobian}},
         x::EnzymeCore.Duplicated,
     )
     operator = op.val
@@ -197,7 +197,7 @@ end
 # Vector-valued operator call
 function EnzymeRules.augmented_primal(
         config::EnzymeRules.RevConfigWidth{1},
-        op::EnzymeCore.Const{<:RadialBasisOperator{<:VectorValuedOperator{D}}},
+        op::EnzymeCore.Const{<:RadialBasisOperator{<:Jacobian{D}}},
         ::Type{RT},
         x::EnzymeCore.Duplicated,
     ) where {D, RT}
@@ -209,7 +209,7 @@ end
 
 function EnzymeRules.reverse(
         config::EnzymeRules.RevConfigWidth{1},
-        op::EnzymeCore.Const{<:RadialBasisOperator{<:VectorValuedOperator}},
+        op::EnzymeCore.Const{<:RadialBasisOperator{<:Jacobian}},
         dret,
         tape,
         x::EnzymeCore.Duplicated,

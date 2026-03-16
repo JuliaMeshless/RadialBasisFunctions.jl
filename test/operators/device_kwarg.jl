@@ -40,7 +40,7 @@ end
     op_rg = regrid(x, x2; device = cpu)
     @test op_rg.device isa CPU
 
-    op_custom = custom(x, (b) -> (x, xi) -> b(x, xi); device = cpu)
+    op_custom = custom(x, (b) -> (x, xi) -> b(x, xi); rank = 0, device = cpu)
     @test op_custom.device isa CPU
 end
 
@@ -169,7 +169,7 @@ end
     @test is_cache_valid(adapted)
 end
 
-@testset "Adapt.adapt_structure for VectorValuedOperator" begin
+@testset "Adapt.adapt_structure for NTuple weights" begin
     op = gradient(x)
     result = op(z)
 

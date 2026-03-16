@@ -191,3 +191,56 @@ end
     @test abs(J[2, 1] - 1.0) < 0.1  # ∂u₂/∂x = 2x
     @test abs(J[2, 2] - 1.0) < 0.1  # ∂u₂/∂y = 2y
 end
+
+@testset "General tensor input (3D array)" begin
+    # 3D input: (N, 2, 3) representing a rank-2 tensor field
+    # Use simple polynomial fields so Jacobian is exact
+    x_coords = getindex.(points, 1)
+    y_coords = getindex.(points, 2)
+
+    tensor_input = Array{Float64, 3}(undef, N, 2, 3)
+    # Fill with polynomial functions: f_{i,j}(x,y) = (i+j)*x + (i-j)*y
+    for i in 1:2, j in 1:3
+        tensor_input[:, i, j] = (i + j) .* x_coords .+ (i - j) .* y_coords
+    end
+
+    op = jacobian(points, PHS(3; poly_deg = 2))
+    result = op(tensor_input)
+
+    # Output shape: trailing dims preserved, D=2 appended → (N, 2, 3, 2)
+    @test result isa Array{<:Any, 4}
+    @test size(result) == (N, 2, 3, 2)
+
+    # Linear polynomials are exactly representable with poly_deg=2
+    for i in 1:2, j in 1:3
+        @test maximum(abs.(result[:, i, j, 1] .- Float64(i + j))) < 0.1  # ∂f/∂x
+        @test maximum(abs.(result[:, i, j, 2] .- Float64(i - j))) < 0.1  # ∂f/∂y
+    end
+end
+
+@testset "Single eval point - General tensor input (3D array)" begin
+    eval_pt = [SVector{2}(0.5, 0.5)]
+    x_coords = getindex.(points, 1)
+    y_coords = getindex.(points, 2)
+
+    tensor_input = Array{Float64, 3}(undef, N, 2, 3)
+    for i in 1:2, j in 1:3
+        tensor_input[:, i, j] = (i + j) .* x_coords .+ (i - j) .* y_coords
+    end
+
+    op = jacobian(points, eval_pt, PHS(3; poly_deg = 2))
+
+    @test op.weights[1] isa SparseVector
+    @test op.weights[2] isa SparseVector
+
+    result = op(tensor_input)
+
+    # Single eval point: no N_eval dimension → (2, 3, 2)
+    @test result isa Array{<:Any, 3}
+    @test size(result) == (2, 3, 2)
+
+    for i in 1:2, j in 1:3
+        @test abs(result[i, j, 1] - Float64(i + j)) < 0.1  # ∂f/∂x
+        @test abs(result[i, j, 2] - Float64(i - j)) < 0.1  # ∂f/∂y
+    end
+end

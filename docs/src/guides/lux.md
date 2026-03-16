@@ -92,7 +92,7 @@ problem so you can compare convergence, accuracy, and interpretability.
 
 ```@example lux
 using RadialBasisFunctions
-using Lux, Optimisers, DifferentiationInterface, Enzyme, ComponentArrays
+using Lux, Optimisers, DifferentiationInterface, Mooncake
 using Random, Statistics
 using CairoMakie
 
@@ -143,19 +143,19 @@ for 1000 epochs on MSE loss.
 
 ```@example lux
 function train(model, ps, st; lr=0.01f0, epochs=1000)
-    ps = ComponentArray(ps)
-    opt_state = Optimisers.setup(Adam(lr), ps)
+    ps_flat, restructure = Optimisers.destructure(ps)
+    opt_state = Optimisers.setup(Adam(lr), ps_flat)
     X = reshape(x_train, 1, :)
     Y = reshape(y_train, 1, :)
-    backend = AutoEnzyme(; function_annotation=Enzyme.Const)
-    loss_fn(p) = mean((first(model(X, p, st)) .- Y) .^ 2)
+    backend = AutoMooncake(; config=nothing)
+    loss_fn(p) = mean((first(model(X, restructure(p), st)) .- Y) .^ 2)
     losses = Float32[]
     for epoch in 1:epochs
-        val, grads = DifferentiationInterface.value_and_gradient(loss_fn, backend, ps)
+        val, grads = DifferentiationInterface.value_and_gradient(loss_fn, backend, ps_flat)
         push!(losses, val)
-        opt_state, ps = Optimisers.update(opt_state, ps, grads)
+        opt_state, ps_flat = Optimisers.update(opt_state, ps_flat, grads)
     end
-    return ps, losses
+    return restructure(ps_flat), losses
 end
 
 ps_rbf_trained, losses_rbf = train(rbf_model, ps_rbf, st_rbf)

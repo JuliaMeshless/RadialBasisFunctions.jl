@@ -1,9 +1,9 @@
 """
-    Directional{Dim,T} <: ScalarValuedOperator
+    Directional{Dim,T} <: AbstractOperator{0}
 
 Operator for the directional derivative (∇f⋅v), the inner product of the gradient and a direction vector.
 """
-struct Directional{Dim, T} <: ScalarValuedOperator
+struct Directional{Dim, T} <: AbstractOperator{0}
     v::T
 end
 Directional{Dim}(v) where {Dim} = Directional{Dim, typeof(v)}(v)

@@ -117,7 +117,7 @@ import RadialBasisFunctions as RBF
                 adjl = RBF.find_neighbors(data, eval_points, k)
 
                 # Create identity operator
-                ℒ = RBF.Custom(basis -> (x1, x2) -> basis(x1, x2))
+                ℒ = RBF.Custom{0}(basis -> (x1, x2) -> basis(x1, x2))
 
                 # Test that basic weight building works
                 @test_nowarn weights = RBF._build_weights(ℒ, data, eval_points, adjl, basis)

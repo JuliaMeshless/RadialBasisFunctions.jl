@@ -70,7 +70,7 @@ src/solve/
 | 3 | `api.jl` | Entry points from operators |
 | 2 | `execution.jl` | Memory allocation, parallel kernel execution, sparse matrix construction |
 | 1 | `assembly.jl` | Pure mathematics: collocation matrix, RHS, stencil assembly |
-| 0 | `types.jl` | Shared types and operator traits |
+| 0 | `types.jl` | Shared types and arity helpers |
 
 ---
 
@@ -103,9 +103,9 @@ The system builds sparse weight matrices by computing stencil weights in paralle
 Defines shared types used throughout the solve system.
 
 **Key types:**
-- `SingleOperator`, `MultiOperator{N}` — Operator arity traits for pre-allocating RHS buffers
+- `_num_ops`, `_prepare_buffer` — Operator arity helpers for pre-allocating RHS buffers (dispatch on `Tuple` vs non-Tuple)
 
-**When to modify:** Adding new operator traits or shared data structures.
+**When to modify:** Adding new shared data structures or arity helpers.
 
 ---
 
