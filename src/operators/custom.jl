@@ -36,8 +36,8 @@ Build a `RadialBasisOperator` with a custom operator function.
 # Custom operator that returns the basis function itself (rank-preserving)
 op = custom(data, basis -> (x, xᵢ) -> basis(x, xᵢ); rank=0)
 
-# Custom biharmonic operator (∇⁴)
-op = custom(data, basis -> ∇²(basis) ∘ ∇²(basis); rank=0)
+# Custom second partial derivative ∂²f/∂x₁² using the ∂² functor
+op = custom(data, basis -> ∂²(basis, 1); rank=0)
 ```
 """
 function custom(data::AbstractVector, ℒ::Function; rank::Int, kw...)

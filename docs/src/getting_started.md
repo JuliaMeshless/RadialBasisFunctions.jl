@@ -117,7 +117,7 @@ normal_deriv = directional(x, normals)
 typeof(normal_deriv(y))
 ```
 
-### Custom Operators
+### Custom Operator Basics
 
 Define your own differential operators using `custom`. The function should accept a basis and return a callable `(x, xc) -> value`. Here's an example that creates an interpolation-like operator:
 
@@ -127,7 +127,7 @@ op = custom(x, basis -> (x, xc) -> basis(x, xc); rank=0)
 typeof(op)
 ```
 
-For more complex differential operators, use `operator algebra` (see below) to combine built-in operators.
+For more complex differential operators, use `operator algebra` (see below) to combine built-in operators. See [Operators & Type Hierarchy](@ref) for an in-depth guide to the operator system and [Custom Operators](@ref "Custom Operators") for advanced examples.
 
 ### Regridding
 
