@@ -3,8 +3,8 @@
 
 Operator for interpolating from one set of points to another.
 """
-struct Regrid
-    ℒ
+struct Regrid <: AbstractOperator{0}
+    ℒ::typeof(identity)
     Regrid() = new(identity)
 end
 (op::Regrid)(x) = op.ℒ(x)

@@ -5,7 +5,7 @@ abstract type AbstractOperator{N} end
 
 Operator of data using a radial basis with potential monomial augmentation.
 """
-struct RadialBasisOperator{L, W, D, C, A, B <: AbstractRadialBasis, Dev}
+struct RadialBasisOperator{L <: AbstractOperator, W, D, C, A, B <: AbstractRadialBasis, Dev}
     ℒ::L
     weights::W
     data::D
@@ -23,7 +23,7 @@ struct RadialBasisOperator{L, W, D, C, A, B <: AbstractRadialBasis, Dev}
             basis::B,
             cache_status::Bool = false;
             device::Dev = CPU(),
-        ) where {L, W, D, C, A, B <: AbstractRadialBasis, Dev}
+        ) where {L <: AbstractOperator, W, D, C, A, B <: AbstractRadialBasis, Dev}
         return new{L, W, D, C, A, B, Dev}(
             ℒ, weights, data, eval_points, adjl, basis, device, Ref(cache_status)
         )
@@ -75,7 +75,7 @@ op = RadialBasisOperator(Laplacian(), data; device=CPU())
 ```
 """
 function RadialBasisOperator(
-        ℒ,
+        ℒ::AbstractOperator,
         data::AbstractVector;
         eval_points::AbstractVector = data,
         basis::AbstractRadialBasis = PHS(3; poly_deg = 2),
@@ -108,7 +108,7 @@ end
 
 # Data + basis (positional)
 function RadialBasisOperator(
-        ℒ,
+        ℒ::AbstractOperator,
         data::AbstractVector,
         basis::AbstractRadialBasis;
         k::Int = autoselect_k(data, basis),
@@ -120,7 +120,7 @@ end
 
 # Data + eval_points + basis (positional)
 function RadialBasisOperator(
-        ℒ,
+        ℒ::AbstractOperator,
         data::AbstractVector,
         eval_points::AbstractVector,
         basis::AbstractRadialBasis;
@@ -135,7 +135,7 @@ end
 
 # Hermite-compatible constructor (positional boundary arguments)
 function RadialBasisOperator(
-        ℒ,
+        ℒ::AbstractOperator,
         data::AbstractVector,
         eval_points::AbstractVector,
         basis::AbstractRadialBasis,
