@@ -56,30 +56,48 @@ maximum(abs, custom_∂x(u) .- builtin_∂x(u))
 
 The `∂` functor returned by `∂(basis, dim)` is already a callable `(x, xᵢ) -> scalar`, so it can be passed directly.
 
-## Example: Higher-Order via Functors
+## Composing Functors
 
-The `∂²` and `∇²` functors provide second-order operators:
+When your operator function returns a single functor directly (like `basis -> ∂(basis, 1)` above), both the RBF and monomial paths are handled automatically. But when you **compose multiple functors with arithmetic** inside the lambda, you need two methods — one for the RBF basis and one for `MonomialBasis`.
 
-```@example custom
-# Custom Laplacian using ∇² functor
-custom_lap = custom(x, basis -> ∇²(basis); rank=0)
+**Why:** The system calls `ℒ` with both the RBF basis (e.g., `PHS(3)`) and a [`MonomialBasis`](@ref) (for polynomial augmentation). RBF functors like `∇²(basis)` return `(x, xᵢ) -> scalar`, but monomial functors return `(b, x) -> nothing` (in-place buffer fill). When you compose functors with arithmetic — e.g., `∇²(basis)(x, xᵢ) + k² * basis(x, xᵢ)` — the monomial path fails because you can't do arithmetic on `nothing`.
 
-# Compare with built-in
-builtin_lap = laplacian(x)
-
-maximum(abs, custom_lap(u) .- builtin_lap(u))
-```
-
-You can also compose first-order functors for mixed derivatives or other combinations:
+**The fix:** Define a function with two methods using Julia's multiple dispatch. The monomial path uses the allocating form `functor(x)` (returns a vector) instead of the in-place form:
 
 ```@example custom
-# ∂²f/∂x₁² using the ∂² functor directly
-custom_∂²x = custom(x, basis -> ∂²(basis, 1); rank=0)
+using RadialBasisFunctions: MonomialBasis  # hide
 
-builtin_∂²x = partial(x, 2, 1)
+k² = 4.0
 
-maximum(abs, custom_∂²x(u) .- builtin_∂²x(u))
+# Two-method operator function
+function helmholtz_op(basis)
+    lap = ∇²(basis)
+    (x, xc) -> lap(x, xc) + k² * basis(x, xc)
+end
+function helmholtz_op(basis::MonomialBasis)
+    lap = ∇²(basis)
+    function (b, x)
+        b .= lap(x) .+ k² .* basis(x)
+        return nothing
+    end
+end
+
+helm = custom(x, helmholtz_op; rank=0)
+
+# Verify against separate built-in operators
+expected = laplacian(x)(u) .+ k² .* u
+maximum(abs, helm(u) .- expected)
 ```
+
+This follows the same pattern used internally by [operator algebra](@ref "Combining Operators") (see `operator_algebra.jl`).
+
+!!! note
+    Simple cases that return a single functor directly — like `basis -> ∂(basis, 1)` — don't need dual dispatch. The built-in functors already handle both basis types internally. Two methods are only needed when you compose multiple functors with arithmetic.
+
+## Example: PDE Operators
+
+For more worked examples using this dual-dispatch pattern — Helmholtz, anisotropic diffusion,
+advection-diffusion — see the [PDE Operators Cookbook](@ref).
 
 ## Example: Rank-1 Custom Operator
 
