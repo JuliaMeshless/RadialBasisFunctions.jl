@@ -34,6 +34,7 @@ maximum(abs, helm(u) .- expected)
 | `∇²`, `Δ` | [`Laplacian`](@ref) |
 | `∂(dim)` | First partial derivative in dimension `dim` |
 | `∂²(dim)` | Second partial derivative in dimension `dim` |
+| `∇ ⋅ (κ * ∇)` | Diffusion operator (scalar or vector `κ`) |
 | `f`, `I` | [`Identity`](@ref) operator |
 | Everything else | Scalar coefficient |
 
@@ -48,6 +49,15 @@ aniso = custom(x, @operator(κx * ∂²(1) + κy * ∂²(2)); rank=0)
 
 expected = κx .* partial(x, 2, 1)(u) .+ κy .* partial(x, 2, 2)(u)
 maximum(abs, aniso(u) .- expected)
+```
+
+```@example custom
+# Anisotropic diffusion: ∇⋅(κ∇f) using textbook notation
+κ = [2.0, 0.5]
+diff = custom(x, @operator(∇ ⋅ (κ * ∇)); rank=0)
+
+expected = κ[1] .* partial(x, 2, 1)(u) .+ κ[2] .* partial(x, 2, 2)(u)
+maximum(abs, diff(u) .- expected)
 ```
 
 ```@example custom
