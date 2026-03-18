@@ -14,6 +14,84 @@ f(p) = sin(p[1]) * cos(p[2])
 u = f.(x)
 ```
 
+## `@operator` Macro (Recommended)
+
+The [`@operator`](@ref) macro lets you write PDE operators in mathematical notation. It translates symbolic expressions into composable operator objects:
+
+```@example custom
+k² = 4.0
+helm = custom(x, @operator(∇² + k² * f); rank=0)
+
+# Verify against separate built-in operators
+expected = laplacian(x)(u) .+ k² .* u
+maximum(abs, helm(u) .- expected)
+```
+
+### Recognized symbols
+
+| Symbol | Meaning |
+|:-------|:--------|
+| `∇²`, `Δ` | [`Laplacian`](@ref) |
+| `∂(dim)` | First partial derivative in dimension `dim` |
+| `∂²(dim)` | Second partial derivative in dimension `dim` |
+| `f`, `I` | [`Identity`](@ref) operator |
+| Everything else | Scalar coefficient |
+
+Standard arithmetic (`+`, `-`, `*`) and unary negation work as expected. Scalars can be literals, variables, or expressions like `k^2` or `c[1]`.
+
+### More examples
+
+```@example custom
+# Anisotropic diffusion: κx ∂²f/∂x² + κy ∂²f/∂y²
+κx = 2.0; κy = 0.5
+aniso = custom(x, @operator(κx * ∂²(1) + κy * ∂²(2)); rank=0)
+
+expected = κx .* partial(x, 2, 1)(u) .+ κy .* partial(x, 2, 2)(u)
+maximum(abs, aniso(u) .- expected)
+```
+
+```@example custom
+# Advection-diffusion: ν∇²f - c⋅∇f
+ν = 0.01; c = SVector(1.0, 0.5)
+advdiff = custom(x, @operator(ν * ∇² - c[1] * ∂(1) - c[2] * ∂(2)); rank=0)
+
+expected = ν .* laplacian(x)(u) .- c[1] .* partial(x, 1, 1)(u) .- c[2] .* partial(x, 1, 2)(u)
+maximum(abs, advdiff(u) .- expected)
+```
+
+## Operator Algebra (No Macro)
+
+If you prefer explicit construction, use operator types with arithmetic directly:
+
+```@example custom
+# Same Helmholtz operator without the macro
+helm2 = custom(x, Laplacian() + k² * Identity(); rank=0)
+
+maximum(abs, helm2(u) .- helm(u))
+```
+
+Operator algebra supports `+`, `-`, scalar `*`, and unary `-`:
+
+```@example custom
+# Combining operators
+combined = Laplacian() + Partial(1, 1)
+op = RadialBasisOperator(combined, x)
+
+lap_result = laplacian(x)(u)
+∂x_result = partial(x, 1, 1)(u)
+maximum(abs, op(u) .- (lap_result .+ ∂x_result))
+```
+
+```@example custom
+# Subtraction and scaling
+diff_op = 2.0 * Partial(2, 1) - Partial(2, 2)
+op = RadialBasisOperator(diff_op, x)
+result = op(u)
+typeof(result)
+```
+
+Both operands of `+`/`-` must share the same rank `N`.
+
 ## The Contract
 
 The [`custom`](@ref) function builds a `RadialBasisOperator` from a user-defined operator function:
@@ -30,9 +108,7 @@ The function `ℒ` must follow a three-layer structure:
 
 This callable fills the right-hand side of the stencil system that determines the weights. For a rank-0 operator it returns a scalar; for rank-1 it returns a tuple of callables (one per spatial dimension).
 
-## Example: Identity Operator
-
-The simplest custom operator just evaluates the basis function itself — equivalent to [`regrid`](@ref):
+### Identity operator via function form
 
 ```@example custom
 op = custom(x, basis -> (x, xc) -> basis(x, xc); rank=0)
@@ -40,9 +116,7 @@ result = op(u)
 typeof(result)
 ```
 
-## Example: Reproducing a Built-in
-
-Use the `∂` functor to build a first partial derivative manually:
+### Reproducing a built-in
 
 ```@example custom
 # Custom ∂f/∂x₁ using the ∂ functor
@@ -50,26 +124,19 @@ custom_∂x = custom(x, basis -> ∂(basis, 1); rank=0)
 
 # Compare with built-in
 builtin_∂x = partial(x, 1, 1)
-
 maximum(abs, custom_∂x(u) .- builtin_∂x(u))
 ```
 
-The `∂` functor returned by `∂(basis, dim)` is already a callable `(x, xᵢ) -> scalar`, so it can be passed directly.
+## Advanced: Composing Functors with Dual Dispatch
 
-## Composing Functors
+When you **compose multiple functors with arithmetic** inside a lambda, you need two methods — one for the RBF basis and one for `MonomialBasis`. For most use cases, prefer `@operator` or operator algebra instead, which handle this automatically.
 
-When your operator function returns a single functor directly (like `basis -> ∂(basis, 1)` above), both the RBF and monomial paths are handled automatically. But when you **compose multiple functors with arithmetic** inside the lambda, you need two methods — one for the RBF basis and one for `MonomialBasis`.
-
-**Why:** The system calls `ℒ` with both the RBF basis (e.g., `PHS(3)`) and a [`MonomialBasis`](@ref) (for polynomial augmentation). RBF functors like `∇²(basis)` return `(x, xᵢ) -> scalar`, but monomial functors return `(b, x) -> nothing` (in-place buffer fill). When you compose functors with arithmetic — e.g., `∇²(basis)(x, xᵢ) + k² * basis(x, xᵢ)` — the monomial path fails because you can't do arithmetic on `nothing`.
-
-**The fix:** Define a function with two methods using Julia's multiple dispatch. The monomial path uses the allocating form `functor(x)` (returns a vector) instead of the in-place form:
+**Why dual dispatch is needed:** The system calls `ℒ` with both the RBF basis (e.g., `PHS(3)`) and a [`MonomialBasis`](@ref) (for polynomial augmentation). RBF functors like `∇²(basis)` return `(x, xᵢ) -> scalar`, but monomial functors return `(b, x) -> nothing` (in-place buffer fill). Arithmetic on `nothing` fails.
 
 ```@example custom
 using RadialBasisFunctions: MonomialBasis  # hide
 
-k² = 4.0
-
-# Two-method operator function
+# Two-method operator function (advanced — prefer @operator for this)
 function helmholtz_op(basis)
     lap = ∇²(basis)
     (x, xc) -> lap(x, xc) + k² * basis(x, xc)
@@ -82,22 +149,16 @@ function helmholtz_op(basis::MonomialBasis)
     end
 end
 
-helm = custom(x, helmholtz_op; rank=0)
-
-# Verify against separate built-in operators
-expected = laplacian(x)(u) .+ k² .* u
-maximum(abs, helm(u) .- expected)
+helm3 = custom(x, helmholtz_op; rank=0)
+maximum(abs, helm3(u) .- helm(u))
 ```
-
-This follows the same pattern used internally by [operator algebra](@ref "Combining Operators") (see `operator_algebra.jl`).
 
 !!! note
     Simple cases that return a single functor directly — like `basis -> ∂(basis, 1)` — don't need dual dispatch. The built-in functors already handle both basis types internally. Two methods are only needed when you compose multiple functors with arithmetic.
 
 ## Example: PDE Operators
 
-For more worked examples using this dual-dispatch pattern — Helmholtz, anisotropic diffusion,
-advection-diffusion — see the [PDE Operators Cookbook](@ref).
+For more worked examples — Helmholtz, anisotropic diffusion, advection-diffusion — see the [PDE Operators Cookbook](@ref).
 
 ## Example: Rank-1 Custom Operator
 
@@ -109,7 +170,6 @@ custom_grad = custom(x, basis -> (∂(basis, 1), ∂(basis, 2)); rank=1)
 
 # Compare with built-in jacobian
 builtin_jac = jacobian(x)
-
 maximum(abs, custom_grad(u) .- builtin_jac(u))
 ```
 
@@ -124,33 +184,6 @@ Each element of the tuple produces one column of the output matrix.
 | Laplacian, partial derivative, directional derivative | Gradient, Jacobian, Hessian-like operators |
 
 **Rule of thumb:** if your operator differentiates with respect to all spatial dimensions simultaneously and keeps them separate, use `rank=1`. Otherwise, use `rank=0`.
-
-## Combining Operators
-
-Operator algebra is the practical way to compose operators rather than function composition:
-
-```@example custom
-# ∇²f + ∂f/∂x₁ as a combined operator
-combined = Laplacian() + Partial(1, 1)
-op = RadialBasisOperator(combined, x)
-
-# Equivalent to computing separately and adding
-lap_result = laplacian(x)(u)
-∂x_result = partial(x, 1, 1)(u)
-
-maximum(abs, op(u) .- (lap_result .+ ∂x_result))
-```
-
-Subtraction works too:
-
-```@example custom
-diff_op = Partial(2, 1) - Partial(2, 2)
-op = RadialBasisOperator(diff_op, x)
-result = op(u)
-typeof(result)
-```
-
-Both operands must share the same rank `N`.
 
 ## Hermite Boundary Conditions
 
