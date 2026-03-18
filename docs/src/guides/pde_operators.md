@@ -27,10 +27,39 @@ expected = laplacian(x)(u) .+ k² .* u
 maximum(abs, helm_op(u) .- expected)
 ```
 
-## Anisotropic Diffusion
+## Diffusion — Textbook Notation
 
-Anisotropic diffusion ``\kappa_x \, \partial^2 f / \partial x^2 + \kappa_y \, \partial^2 f / \partial y^2``
-models heat conduction in materials with direction-dependent conductivity.
+The diffusion operator ``\nabla \cdot (\kappa \nabla f)`` appears in heat conduction, mass transfer,
+and many other physical models. The `@operator` macro recognizes the textbook form directly:
+
+```@example pde
+κ = [2.0, 0.5]
+
+diff_op = custom(x, @operator(∇ ⋅ (κ * ∇)); rank=0)
+
+# Verify against separate built-in operators
+expected = κ[1] .* partial(x, 2, 1)(u) .+ κ[2] .* partial(x, 2, 2)(u)
+maximum(abs, diff_op(u) .- expected)
+```
+
+A convenience function [`diffusion`](@ref) is also available:
+
+```@example pde
+diff_op2 = diffusion(x, κ)
+maximum(abs, diff_op2(u) .- diff_op(u))
+```
+
+Scalar ``\kappa`` produces an isotropic operator (scaled Laplacian):
+
+```@example pde
+diff_iso = diffusion(x, 3.0)  # equivalent to 3∇²f
+expected = 3.0 .* laplacian(x)(u)
+maximum(abs, diff_iso(u) .- expected)
+```
+
+## Anisotropic Diffusion — Explicit Partials
+
+The same anisotropic diffusion can also be written with explicit per-dimension coefficients:
 
 ```@example pde
 κ_x = 2.0

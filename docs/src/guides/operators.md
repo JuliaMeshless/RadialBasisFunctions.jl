@@ -32,14 +32,16 @@ All operators inherit from [`AbstractOperator`](@ref), where the parameter `N` i
 ```
 AbstractOperator{N}
 ├── N=0 (rank-preserving)
-│   ├── Partial        ∂ⁿf/∂xᵢⁿ
-│   ├── Laplacian      ∇²f
-│   ├── Directional    ∇f⋅v
-│   ├── Regrid         interpolation to new points
-│   └── Custom{0}      user-defined
+│   ├── Partial          ∂ⁿf/∂xᵢⁿ
+│   ├── Laplacian        ∇²f
+│   ├── Directional      ∇f⋅v
+│   ├── Identity         f (function itself)
+│   ├── ScaledOperator   α * op
+│   ├── Regrid           interpolation to new points
+│   └── Custom{0}        user-defined / algebra result
 └── N=1 (rank-adding)
-    ├── Jacobian        [∂fᵢ/∂xⱼ]
-    └── Custom{1}       user-defined
+    ├── Jacobian          [∂fᵢ/∂xⱼ]
+    └── Custom{1}         user-defined
 ```
 
 ## Understanding Rank (`N`)
