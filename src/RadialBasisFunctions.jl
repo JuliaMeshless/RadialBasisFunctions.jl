@@ -68,6 +68,8 @@ export ∂virtual
 include("operators/monomial/monomial.jl")
 
 include("operators/operator_algebra.jl")
+include("operators/operator_macro.jl")
+export Identity, ScaledOperator, @operator
 
 # Shared AD utilities (depends on Partial/Laplacian types defined above)
 include("solve/ad_shared.jl")

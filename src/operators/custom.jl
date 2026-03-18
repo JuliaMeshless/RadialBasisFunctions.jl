@@ -44,6 +44,11 @@ function custom(data::AbstractVector, ℒ::Function; rank::Int, kw...)
     return RadialBasisOperator(Custom{rank}(ℒ), data; kw...)
 end
 
+# Accept AbstractOperator directly (from operator algebra or @operator macro)
+function custom(data::AbstractVector, op::AbstractOperator; rank::Int, kw...)
+    return RadialBasisOperator(op, data; kw...)
+end
+
 # Backward compatible positional signatures
 function custom(data::AbstractVector, ℒ::Function, basis::AbstractRadialBasis; rank::Int, kw...)
     return RadialBasisOperator(Custom{rank}(ℒ), data; basis = basis, kw...)
