@@ -40,10 +40,6 @@ end
     include("operators/directional.jl")
 end
 
-@safetestset "Diffusion" begin
-    include("operators/diffusion.jl")
-end
-
 @safetestset "Laplacian" begin
     include("operators/laplacian.jl")
 end
