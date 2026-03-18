@@ -42,17 +42,10 @@ expected = κ[1] .* partial(x, 2, 1)(u) .+ κ[2] .* partial(x, 2, 2)(u)
 maximum(abs, diff_op(u) .- expected)
 ```
 
-A convenience function [`diffusion`](@ref) is also available:
-
-```@example pde
-diff_op2 = diffusion(x, κ)
-maximum(abs, diff_op2(u) .- diff_op(u))
-```
-
 Scalar ``\kappa`` produces an isotropic operator (scaled Laplacian):
 
 ```@example pde
-diff_iso = diffusion(x, 3.0)  # equivalent to 3∇²f
+diff_iso = custom(x, @operator(∇ ⋅ (3.0 * ∇)); rank=0)  # equivalent to 3∇²f
 expected = 3.0 .* laplacian(x)(u)
 maximum(abs, diff_iso(u) .- expected)
 ```

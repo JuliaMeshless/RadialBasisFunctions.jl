@@ -52,7 +52,7 @@ julia --project=benchmark benchmark/benchmarks.jl
    - `RadialBasisOperator` - Main operator type with lazy weight computation
    - Specific operators: `Partial`, `Jacobian`, `Laplacian`, `Directional`, `Custom{N}`
    - `operator_algebra.jl` - `Identity`, `ScaledOperator`, and algebraic operations (`+`, `-`, `*`) on operators
-   - `operator_macro.jl` - `@operator` macro for textbook notation, `diffusion()` convenience constructor
+   - `operator_macro.jl` - `@operator` macro for textbook notation
    - Virtual operators for performance optimization
 
 3. **Solve System** (`src/solve/`): Core weight computation and AD support
@@ -104,7 +104,7 @@ The package requires `Vector{AbstractVector}` input format (not matrices). Each 
 - `src/solve/execution.jl` - GPU/CPU parallel execution kernels
 - `src/solve/api.jl` - Entry points for weight building
 - `src/operators/operators.jl:1-31` - Abstract type hierarchy and main operator type definition
-- `src/operators/operator_macro.jl` - `@operator` macro and `diffusion()` convenience function
+- `src/operators/operator_macro.jl` - `@operator` macro for textbook notation
 - `src/basis/basis.jl` - Abstract basis type hierarchy
 - `src/solve/backward.jl` - AD backward pass entry point
 
@@ -353,7 +353,7 @@ Gaussian(0.5) # Smaller ε = wider basis function
 | Jacobian of vector field | `jacobian(points)` | Array (N × D × D) |
 | Single partial derivative | `partial(points, order, dim)` | Vector |
 | Directional derivative | `directional(points, v)` | Vector |
-| Diffusion ∇⋅(κ∇f) | `diffusion(points, κ)` | Vector |
+| Diffusion ∇⋅(κ∇f) | `custom(points, @operator(∇ ⋅ (κ * ∇)); rank=0)` | Vector |
 | Interpolate to new points | `regrid(src, dst)` | Vector |
 | Global interpolation | `Interpolator(points, values)` | Callable object |
 

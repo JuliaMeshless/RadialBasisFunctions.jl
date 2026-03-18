@@ -112,31 +112,3 @@ Expand `∇⋅(κ∇)` with per-dimension diffusivity into `∑ κ[i] * ∂²(i)
 function _expand_div_grad(κ::AbstractVector)
     return sum(κ[i] * Partial(2, i) for i in 1:length(κ))
 end
-
-# ============================================================================
-# Convenience constructor
-# ============================================================================
-
-"""
-    diffusion(data, κ; kw...)
-
-Build a `RadialBasisOperator` for the diffusion operator `∇⋅(κ∇f)`.
-
-Scalar `κ` produces `κ * Laplacian()`. Vector `κ` (length must match data
-dimension) produces `∑ κ[i] * ∂²f/∂xᵢ²`.
-
-# Examples
-```julia
-op = diffusion(points, 0.5)            # isotropic: 0.5 * ∇²f
-op = diffusion(points, [1.0, 2.0])     # anisotropic: ∂²f/∂x² + 2∂²f/∂y²
-```
-"""
-function diffusion(data::AbstractVector, κ; kw...)
-    if κ isa AbstractVector && length(κ) != length(first(data))
-        throw(DimensionMismatch(
-            "diffusivity vector length ($(length(κ))) must match data dimension ($(length(first(data))))"
-        ))
-    end
-    op = _expand_div_grad(κ)
-    return RadialBasisOperator(op, data; kw...)
-end
