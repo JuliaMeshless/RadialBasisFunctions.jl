@@ -14,7 +14,7 @@ Suppose we have a set of data ``\mathbf{x}`` where ``\mathbf{x}_i \in \mathbb{R}
 ```@example overview
 f(x) = 2*x[1]^2 + 3*x[2]
 x = [SVector{2}(rand(2)) for _ in 1:1000]
-y = f.(x)
+y = f.(x);
 ```
 
 and now we can build the interpolator
@@ -26,9 +26,9 @@ interp = Interpolator(x, y)
 and evaluate it at a new point
 
 ```@example overview
-x_new = [SVector{2}(rand(2)) for _ in 1:5]
-y_new = interp(x_new)
-y_true = f.(x_new)
+x_new = [SVector{2}(rand(2)) for _ in 1:5];
+y_new = interp(x_new);
+y_true = f.(x_new);
 ```
 
 and compare the error
@@ -41,7 +41,7 @@ The error is numerically zero because the default basis — `PHS(3; poly_deg=2)`
 
 ```@example overview
 interp = Interpolator(x, y, PHS(3; poly_deg=1))
-y_new = interp(x_new)
+y_new = interp(x_new);
 abs.(y_true .- y_new)
 ```
 
@@ -119,15 +119,16 @@ typeof(normal_deriv(y))
 
 ### Custom Operator Basics
 
-Define your own differential operators using `custom`. The function should accept a basis and return a callable `(x, xc) -> value`. Here's an example that creates an interpolation-like operator:
+The [`@operator`](@ref) macro lets you write PDE operators in mathematical notation and pass them to [`custom`](@ref):
 
 ```@example overview
-# Custom operator that evaluates the basis function
-op = custom(x, basis -> (x, xc) -> basis(x, xc); rank=0)
-typeof(op)
+k² = 4.0
+op = @operator ∇² + k² * f
+helm = custom(x, op; rank=0)
+typeof(helm)
 ```
 
-For more complex differential operators, use `operator algebra` (see below) to combine built-in operators. See [Operators & Type Hierarchy](@ref) for an in-depth guide to the operator system and [Custom Operators](@ref "Custom Operators") for advanced examples.
+See [Operators & Type Hierarchy](@ref) for an in-depth guide to the operator system and [Custom Operators](@ref "Custom Operators") for advanced examples.
 
 ### Regridding
 
