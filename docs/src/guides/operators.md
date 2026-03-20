@@ -52,7 +52,7 @@ The parameter `N` captures whether differentiation adds a tensor index to the ou
 
 ```@example operators
 x = [SVector{2}(rand(2)) for _ in 1:100]
-u = sin.(getindex.(x, 1))
+u = sin.(getindex.(x, 1));
 
 lap = laplacian(x)
 result = lap(u)
@@ -179,20 +179,5 @@ typeof(result)
 ```
 
 Both operands must share the same data, stencils, and rank `N`.
-
-Bare `AbstractOperator` types can also be combined — this creates a `Custom{N}`:
-
-```@example operators
-combined_op = Laplacian() + Partial(1, 1)
-typeof(combined_op)
-```
-
-This `Custom{0}` operator can then be used to build a `RadialBasisOperator`:
-
-```@example operators
-op = RadialBasisOperator(combined_op, x)
-result = op(u)
-typeof(result)
-```
 
 See [Custom Operators](@ref "Custom Operators") for more on building your own operators.
