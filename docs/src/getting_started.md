@@ -124,7 +124,7 @@ The [`@operator`](@ref) macro lets you write PDE operators in mathematical notat
 ```@example overview
 k² = 4.0
 op = @operator ∇² + k² * f
-helm = custom(x, op; rank=0)
+helm = custom(x, op)
 typeof(helm)
 ```
 

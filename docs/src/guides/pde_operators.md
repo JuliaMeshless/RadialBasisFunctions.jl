@@ -21,7 +21,7 @@ and quantum mechanics. The operator combines a Laplacian with a scaled identity.
 k² = 4.0
 
 op = @operator ∇² + k² * f
-helm_op = custom(x, op; rank=0)
+helm_op = custom(x, op)
 
 # Verify against separate built-in operators
 expected = laplacian(x)(u) .+ k² .* u
@@ -37,7 +37,7 @@ and many other physical models. The `@operator` macro recognizes the textbook fo
 κ = [2.0, 0.5]
 
 op = @operator ∇ ⋅ (κ * ∇)
-diff_op = custom(x, op; rank=0)
+diff_op = custom(x, op)
 
 # Verify against separate built-in operators
 expected = κ[1] .* partial(x, 2, 1)(u) .+ κ[2] .* partial(x, 2, 2)(u)
@@ -48,7 +48,7 @@ Scalar ``\kappa`` produces an isotropic operator (scaled Laplacian):
 
 ```@example pde
 op = @operator ∇ ⋅ (3.0 * ∇)
-diff_iso = custom(x, op; rank=0)  # equivalent to 3∇²f
+diff_iso = custom(x, op)  # equivalent to 3∇²f
 expected = 3.0 .* laplacian(x)(u)
 maximum(abs, diff_iso(u) .- expected)
 ```
@@ -62,7 +62,7 @@ The same anisotropic diffusion can also be written with explicit per-dimension c
 κ_y = 0.5
 
 op = @operator κ_x * ∂²(1) + κ_y * ∂²(2)
-aniso_op = custom(x, op; rank=0)
+aniso_op = custom(x, op)
 
 # Verify against separate built-in operators
 expected = κ_x .* partial(x, 2, 1)(u) .+ κ_y .* partial(x, 2, 2)(u)
@@ -82,7 +82,7 @@ pollutant transport, and thermal convection.
 c = SVector(1.0, 0.5)
 
 op = @operator ν * ∇² - c[1] * ∂(1) - c[2] * ∂(2)
-advdiff_op = custom(x, op; rank=0)
+advdiff_op = custom(x, op)
 
 # Verify against separate built-in operators
 expected = ν .* laplacian(x)(u) .- c[1] .* partial(x, 1, 1)(u) .- c[2] .* partial(x, 1, 2)(u)
@@ -98,8 +98,8 @@ once and pass it to avoid redundant nearest-neighbor searches:
 adjl = find_neighbors(x, 30)
 
 op = @operator ∇² + k² * f
-helm_op  = custom(x, op; rank=0, adjl=adjl)
+helm_op  = custom(x, op; adjl=adjl)
 
 op = @operator κ_x * ∂²(1) + κ_y * ∂²(2)
-aniso_op = custom(x, op; rank=0, adjl=adjl)
+aniso_op = custom(x, op; adjl=adjl)
 ```

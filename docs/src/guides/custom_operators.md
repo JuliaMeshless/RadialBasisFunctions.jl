@@ -21,7 +21,7 @@ The [`@operator`](@ref) macro lets you write PDE operators in mathematical notat
 ```@example custom
 k² = 4.0
 op = @operator ∇² + k² * f
-helm = custom(x, op; rank=0)
+helm = custom(x, op)
 
 # Verify against separate built-in operators
 expected = laplacian(x)(u) .+ k² .* u
@@ -47,7 +47,7 @@ Standard arithmetic (`+`, `-`, `*`) and unary negation work as expected. Scalars
 # Anisotropic diffusion: κx ∂²f/∂x² + κy ∂²f/∂y²
 κx = 2.0; κy = 0.5
 op = @operator κx * ∂²(1) + κy * ∂²(2)
-aniso = custom(x, op; rank=0)
+aniso = custom(x, op)
 
 expected = κx .* partial(x, 2, 1)(u) .+ κy .* partial(x, 2, 2)(u)
 maximum(abs, aniso(u) .- expected)
@@ -57,7 +57,7 @@ maximum(abs, aniso(u) .- expected)
 # Anisotropic diffusion: ∇⋅(κ∇f) using textbook notation
 κ = [2.0, 0.5]
 op = @operator ∇ ⋅ (κ * ∇)
-diff = custom(x, op; rank=0)
+diff = custom(x, op)
 
 expected = κ[1] .* partial(x, 2, 1)(u) .+ κ[2] .* partial(x, 2, 2)(u)
 maximum(abs, diff(u) .- expected)
@@ -67,28 +67,30 @@ maximum(abs, diff(u) .- expected)
 # Advection-diffusion: ν∇²f - c⋅∇f
 ν = 0.01; c = SVector(1.0, 0.5)
 op = @operator ν * ∇² - c[1] * ∂(1) - c[2] * ∂(2)
-advdiff = custom(x, op; rank=0)
+advdiff = custom(x, op)
 
 expected = ν .* laplacian(x)(u) .- c[1] .* partial(x, 1, 1)(u) .- c[2] .* partial(x, 1, 2)(u)
 maximum(abs, advdiff(u) .- expected)
 ```
 
-## Choosing `rank=0` vs `rank=1`
+## Understanding Rank
 
-| Use `rank=0` when... | Use `rank=1` when... |
+The rank is auto-inferred — you don't need to specify it. This table explains what each rank means:
+
+| Rank 0 (scalar output) | Rank 1 (vector output) |
 |:---|:---|
 | Output has same shape as input | Output gains a spatial dimension |
 | Single weight matrix `W` | Tuple of `D` weight matrices |
 | Laplacian, partial derivative, directional derivative | Gradient, Jacobian, Hessian-like operators |
 
-**Rule of thumb:** if your operator differentiates with respect to all spatial dimensions simultaneously and keeps them separate, use `rank=1`. Otherwise, use `rank=0`.
+For `AbstractOperator` inputs (from `@operator` or algebra), the rank is encoded in the type parameter. For `Function` closures, it's inferred by probing: a tuple return means rank 1, a single callable means rank 0. You can still pass `rank` explicitly as an override if needed.
 
 ## Hermite Boundary Conditions
 
 Custom operators support Hermite interpolation via the `hermite` keyword, just like built-in operators:
 
 ```julia
-op = custom(data, my_ℒ; rank=0, hermite=(
+op = custom(data, my_ℒ; hermite=(
     is_boundary=is_boundary,
     bc=bcs,
     normals=normals
@@ -102,7 +104,7 @@ See the [Boundary Conditions](@ref "Getting Started") section of Getting Started
 The [`custom`](@ref) function builds a `RadialBasisOperator` from a user-defined operator function:
 
 ```julia
-custom(data, ℒ; rank=N)
+custom(data, ℒ)
 ```
 
 The function `ℒ` must follow a three-layer structure:
@@ -123,7 +125,7 @@ For a rank-1 operator (one that adds a trailing dimension), return a **tuple** o
 
 ```@example custom
 # Custom gradient: tuple of ∂/∂x₁ and ∂/∂x₂
-custom_grad = custom(x, basis -> (∂(basis, 1), ∂(basis, 2)); rank=1)
+custom_grad = custom(x, basis -> (∂(basis, 1), ∂(basis, 2)))
 
 # Compare with built-in jacobian
 builtin_jac = jacobian(x)
@@ -154,7 +156,7 @@ function helmholtz_op(basis::MonomialBasis)
     end
 end
 
-helm3 = custom(x, helmholtz_op; rank=0)
+helm3 = custom(x, helmholtz_op)
 maximum(abs, helm3(u) .- helm(u))
 ```
 
