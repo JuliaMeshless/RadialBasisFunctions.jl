@@ -353,7 +353,7 @@ Gaussian(0.5) # Smaller ε = wider basis function
 | Jacobian of vector field | `jacobian(points)` | Array (N × D × D) |
 | Single partial derivative | `partial(points, order, dim)` | Vector |
 | Directional derivative | `directional(points, v)` | Vector |
-| Diffusion ∇⋅(κ∇f) | `custom(points, @operator(∇ ⋅ (κ * ∇)); rank=0)` | Vector |
+| Diffusion ∇⋅(κ∇f) | `custom(points, @operator(∇ ⋅ (κ * ∇)))` | Vector |
 | Interpolate to new points | `regrid(src, dst)` | Vector |
 | Global interpolation | `Interpolator(points, values)` | Callable object |
 

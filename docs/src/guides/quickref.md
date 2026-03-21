@@ -64,7 +64,7 @@ grad = gradient(points)           # ∇f (vector output)
 ∂²y = partial(points, 2, 2)       # ∂²f/∂y² (2nd order, dim 2)
 ∂v = directional(points, v)       # ∇f·v
 op = @operator ∇ ⋅ (κ * ∇)
-diff = custom(points, op; rank=0)              # ∇⋅(κ∇f)
+diff = custom(points, op)                      # ∇⋅(κ∇f)
 
 # Interpolation operators
 rg = regrid(source, target)       # Local interpolation
