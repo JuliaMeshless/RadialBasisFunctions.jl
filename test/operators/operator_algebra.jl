@@ -32,3 +32,18 @@ adjl[1] = dx.adjl[2]
 adjl[2] = dx.adjl[1]
 dy = partial(x, 1, 2; adjl = adjl)
 @test_throws ArgumentError dx + dy
+
+# ScaledOperator algebra
+@testset "ScaledOperator" begin
+    p = Partial(1, 1)
+    # right-multiply: op * α
+    s = p * 3.0
+    @test s isa RadialBasisFunctions.ScaledOperator
+    @test s.α == 3.0
+    # unary negation
+    n = -p
+    @test n isa RadialBasisFunctions.ScaledOperator
+    @test n.α == -1
+    # print_op
+    @test RadialBasisFunctions.print_op(s) == "3.0 × ∂ⁿf/∂xᵢ (n = 1, i = 1)"
+end
