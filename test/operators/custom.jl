@@ -174,9 +174,9 @@ end
     op3 = @operator(∇² / 2)
     @test op3 isa RBF.ScaledOperator
     @test op3.α ≈ 0.5
-    # Invalid ∂ arity
-    @test_throws ArgumentError @eval @operator(∂(1, 2))
-    @test_throws ArgumentError @eval @operator(∂²(1, 2))
+    # Invalid ∂ arity (LoadError wraps the ArgumentError from macro expansion)
+    @test_throws LoadError @eval @operator(∂(1, 2))
+    @test_throws LoadError @eval @operator(∂²(1, 2))
 end
 
 @testset "@operator subtraction and negation" begin
