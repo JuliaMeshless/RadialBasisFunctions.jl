@@ -44,6 +44,11 @@ dy = partial(x, 1, 2; adjl = adjl)
     n = -p
     @test n isa RadialBasisFunctions.ScaledOperator
     @test n.α == -1
+    # division by scalar
+    d = p / 4.0
+    @test d isa RadialBasisFunctions.ScaledOperator
+    @test d.α ≈ 0.25
     # print_op
     @test RadialBasisFunctions.print_op(s) == "3.0 × ∂ⁿf/∂xᵢ (n = 1, i = 1)"
+    @test RadialBasisFunctions.print_op(Identity()) == "Identity (f)"
 end

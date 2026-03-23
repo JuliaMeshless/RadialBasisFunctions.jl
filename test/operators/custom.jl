@@ -152,9 +152,31 @@ end
 @testset "@operator symbol variants" begin
     @test @operator(∇²) isa Laplacian
     @test @operator(Δ) isa Laplacian
+    @test @operator(∇ ⋅ ∇) isa Laplacian
     @test @operator(I) isa Identity
     @test @operator(∂(1)) isa Partial
     @test @operator(∂²(2)) isa Partial
+end
+
+@testset "@operator edge cases" begin
+    # Scalar literal fallback (_transform_operator_expr line 34)
+    @test @operator(3 * ∇²) isa RBF.ScaledOperator
+    # Unrecognized call fallback (_transform_operator_call line 76)
+    k = 2.0
+    op = @operator(k^2 * f)
+    @test op isa RBF.ScaledOperator
+    # Multi-coefficient ∇⋅(a*b*∇) (_extract_nabla_coefficient else branch, line 99)
+    a = 2.0
+    b = 3.0
+    op2 = @operator(∇ ⋅ (a * b * ∇))
+    @test op2 isa RBF.ScaledOperator
+    # Division by scalar
+    op3 = @operator(∇² / 2)
+    @test op3 isa RBF.ScaledOperator
+    @test op3.α ≈ 0.5
+    # Invalid ∂ arity
+    @test_throws ArgumentError @eval @operator(∂(1, 2))
+    @test_throws ArgumentError @eval @operator(∂²(1, 2))
 end
 
 @testset "@operator subtraction and negation" begin
