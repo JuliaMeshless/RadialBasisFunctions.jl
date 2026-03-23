@@ -20,7 +20,7 @@ Infer the tensor rank of a custom operator function by probing it with a default
 Returns `1` if `ℒ(basis)` produces a `Tuple` (one callable per dimension), `0` otherwise.
 """
 function _infer_rank(ℒ)
-    probe = ℒ(PHS(3; poly_deg=2))
+    probe = ℒ(PHS(3; poly_deg = 2))
     return probe isa Tuple ? 1 : 0
 end
 
@@ -58,17 +58,17 @@ op = custom(data, basis -> ∂²(basis, 1))
 op = custom(data, @operator ∇² + k² * f)
 ```
 """
-function custom(data::AbstractVector, ℒ::Function; rank::Int=_infer_rank(ℒ), kw...)
+function custom(data::AbstractVector, ℒ::Function; rank::Int = _infer_rank(ℒ), kw...)
     return RadialBasisOperator(Custom{rank}(ℒ), data; kw...)
 end
 
 # Accept AbstractOperator directly (from operator algebra or @operator macro)
-function custom(data::AbstractVector, op::AbstractOperator; rank=nothing, kw...)
+function custom(data::AbstractVector, op::AbstractOperator; rank = nothing, kw...)
     return RadialBasisOperator(op, data; kw...)
 end
 
 # Backward compatible positional signatures
-function custom(data::AbstractVector, ℒ::Function, basis::AbstractRadialBasis; rank::Int=_infer_rank(ℒ), kw...)
+function custom(data::AbstractVector, ℒ::Function, basis::AbstractRadialBasis; rank::Int = _infer_rank(ℒ), kw...)
     return RadialBasisOperator(Custom{rank}(ℒ), data; basis = basis, kw...)
 end
 
@@ -77,7 +77,7 @@ function custom(
         eval_points::AbstractVector,
         ℒ::Function,
         basis::AbstractRadialBasis = PHS(3; poly_deg = 2);
-        rank::Int=_infer_rank(ℒ),
+        rank::Int = _infer_rank(ℒ),
         kw...,
     )
     return RadialBasisOperator(Custom{rank}(ℒ), data; eval_points = eval_points, basis = basis, kw...)
@@ -92,7 +92,7 @@ function custom(
         is_boundary::Vector{Bool},
         boundary_conditions::Vector{<:BoundaryCondition},
         normals::Vector{<:AbstractVector};
-        rank::Int=_infer_rank(ℒ),
+        rank::Int = _infer_rank(ℒ),
         kw...,
     )
     hermite = (is_boundary = is_boundary, bc = boundary_conditions, normals = normals)
