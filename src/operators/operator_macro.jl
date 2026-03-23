@@ -81,15 +81,17 @@ function _transform_dot(lhs, rhs)
         coeff = _extract_nabla_coefficient(rhs)
         return Expr(:call, GlobalRef(@__MODULE__, :_expand_div_grad), coeff)
     elseif rhs === :∇
-        return Expr(:call, GlobalRef(@__MODULE__, :_expand_dot_grad),
-                     _transform_operator_expr(lhs))
+        return Expr(
+            :call, GlobalRef(@__MODULE__, :_expand_dot_grad),
+            _transform_operator_expr(lhs)
+        )
     end
     return Expr(:call, :⋅, _transform_operator_expr(lhs), _transform_operator_expr(rhs))
 end
 
 function _is_scaled_nabla(expr)
     return expr isa Expr && expr.head == :call && expr.args[1] === :* &&
-           any(a -> a === :∇, expr.args[2:end])
+        any(a -> a === :∇, expr.args[2:end])
 end
 
 function _extract_nabla_coefficient(expr)

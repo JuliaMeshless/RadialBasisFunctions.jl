@@ -100,10 +100,10 @@ end
     N_macro = 10_000
     x_macro = SVector{2}.(HaltonPoint(2)[1:N_macro])
     y_macro = f.(x_macro)
-    basis_macro = PHS(5; poly_deg=3)
+    basis_macro = PHS(5; poly_deg = 3)
 
     κ = [3.0, 0.5]
-    op = custom(x_macro, @operator(∇ ⋅ (κ * ∇)); rank=0, basis=basis_macro)
+    op = custom(x_macro, @operator(∇ ⋅ (κ * ∇)); rank = 0, basis = basis_macro)
     exact = κ[1] .* d2f_dxx.(x_macro) .+ κ[2] .* d2f_dyy.(x_macro)
     @test mean_percent_error(op(y_macro), exact) < 5
 end
@@ -116,10 +116,10 @@ end
     N_macro = 10_000
     x_macro = SVector{2}.(HaltonPoint(2)[1:N_macro])
     y_macro = f.(x_macro)
-    basis_macro = PHS(5; poly_deg=3)
+    basis_macro = PHS(5; poly_deg = 3)
 
     c = SVector(1.0, 0.5)
-    op = custom(x_macro, @operator(c ⋅ ∇); basis=basis_macro)
+    op = custom(x_macro, @operator(c ⋅ ∇); basis = basis_macro)
     exact = c[1] .* df_dx.(x_macro) .+ c[2] .* df_dy.(x_macro)
     @test mean_percent_error(op(y_macro), exact) < 5
 end
@@ -132,11 +132,11 @@ end
     N_macro = 10_000
     x_macro = SVector{2}.(HaltonPoint(2)[1:N_macro])
     y_macro = f.(x_macro)
-    basis_macro = PHS(5; poly_deg=3)
+    basis_macro = PHS(5; poly_deg = 3)
 
     κ = 2.0
     k² = 1.0
-    op = custom(x_macro, @operator(∇ ⋅ (κ * ∇) + k² * f); rank=0, basis=basis_macro)
+    op = custom(x_macro, @operator(∇ ⋅ (κ * ∇) + k² * f); rank = 0, basis = basis_macro)
     exact = κ .* (d2f_dxx.(x_macro) .+ d2f_dyy.(x_macro)) .+ k² .* f.(x_macro)
     @test mean_percent_error(op(y_macro), exact) < 5
 end
