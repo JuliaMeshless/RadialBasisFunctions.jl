@@ -48,6 +48,7 @@ print_op(s::ScaledOperator) = "$(s.α) × $(print_op(s.op))"
 Base.:*(α::Number, op::AbstractOperator{N}) where {N} = ScaledOperator{N}(α, op)
 Base.:*(op::AbstractOperator{N}, α::Number) where {N} = ScaledOperator{N}(α, op)
 Base.:-(op::AbstractOperator{N}) where {N} = ScaledOperator{N}(-1, op)
+Base.:/(op::AbstractOperator{N}, α::Number) where {N} = ScaledOperator{N}(inv(α), op)
 
 # ============================================================================
 # Operator Algebra on RadialBasisOperator (precomputed weights)

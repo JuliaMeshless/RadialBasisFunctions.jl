@@ -25,14 +25,12 @@ macro operator(expr)
     return esc(_transform_operator_expr(expr))
 end
 
-function _transform_operator_expr(expr)
-    if expr isa Symbol
-        return _resolve_operator_symbol(expr)
-    elseif expr isa Expr && expr.head == :call
-        return _transform_operator_call(expr)
-    end
-    return expr  # scalar literal or other expression (e.g., array indexing)
+_transform_operator_expr(s::Symbol) = _resolve_operator_symbol(s)
+function _transform_operator_expr(expr::Expr)
+    expr.head == :call && return _transform_operator_call(expr)
+    return expr
 end
+_transform_operator_expr(expr) = expr  # scalar literal or other expression
 
 function _resolve_operator_symbol(s::Symbol)
     s === :∇² && return :(Laplacian())
@@ -42,32 +40,33 @@ function _resolve_operator_symbol(s::Symbol)
     return s  # scalar variable
 end
 
+function _fold_left(op_sym::Symbol, args)
+    result = _transform_operator_expr(args[1])
+    for i in 2:length(args)
+        result = Expr(:call, op_sym, result, _transform_operator_expr(args[i]))
+    end
+    return result
+end
+
 function _transform_operator_call(expr)
     op = expr.args[1]
     args = expr.args[2:end]
 
     if op === :+ && length(args) >= 2
-        result = _transform_operator_expr(args[1])
-        for i in 2:length(args)
-            result = Expr(:call, :+, result, _transform_operator_expr(args[i]))
-        end
-        return result
+        return _fold_left(:+, args)
     elseif op === :- && length(args) == 2
-        a = _transform_operator_expr(args[1])
-        b = _transform_operator_expr(args[2])
-        return Expr(:call, :-, a, b)
+        return Expr(:call, :-, _transform_operator_expr(args[1]), _transform_operator_expr(args[2]))
     elseif op === :- && length(args) == 1
-        a = _transform_operator_expr(args[1])
-        return Expr(:call, :-, a)
+        return Expr(:call, :-, _transform_operator_expr(args[1]))
     elseif op === :* && length(args) >= 2
-        result = _transform_operator_expr(args[1])
-        for i in 2:length(args)
-            result = Expr(:call, :*, result, _transform_operator_expr(args[i]))
-        end
-        return result
-    elseif op === :∂ && length(args) == 1
+        return _fold_left(:*, args)
+    elseif op === :/ && length(args) == 2
+        return Expr(:call, :/, _transform_operator_expr(args[1]), _transform_operator_expr(args[2]))
+    elseif op === :∂
+        length(args) == 1 || throw(ArgumentError("∂(dim) expects exactly 1 argument, got $(length(args))"))
         return :(Partial(1, $(args[1])))
-    elseif op === :∂² && length(args) == 1
+    elseif op === :∂²
+        length(args) == 1 || throw(ArgumentError("∂²(dim) expects exactly 1 argument, got $(length(args))"))
         return :(Partial(2, $(args[1])))
     elseif op === :⋅ && length(args) == 2
         return _transform_dot(args[1], args[2])
@@ -77,7 +76,9 @@ function _transform_operator_call(expr)
 end
 
 function _transform_dot(lhs, rhs)
-    if lhs === :∇ && _is_scaled_nabla(rhs)
+    if lhs === :∇ && rhs === :∇
+        return :(Laplacian())
+    elseif lhs === :∇ && _is_scaled_nabla(rhs)
         coeff = _extract_nabla_coefficient(rhs)
         return Expr(:call, GlobalRef(@__MODULE__, :_expand_div_grad), coeff)
     elseif rhs === :∇
