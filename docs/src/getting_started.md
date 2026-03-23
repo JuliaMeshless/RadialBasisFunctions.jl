@@ -14,7 +14,8 @@ Suppose we have a set of data ``\mathbf{x}`` where ``\mathbf{x}_i \in \mathbb{R}
 ```@example overview
 f(x) = 2*x[1]^2 + 3*x[2]
 x = [SVector{2}(rand(2)) for _ in 1:1000]
-y = f.(x);
+y = f.(x)
+nothing # hide
 ```
 
 and now we can build the interpolator
@@ -26,9 +27,10 @@ interp = Interpolator(x, y)
 and evaluate it at a new point
 
 ```@example overview
-x_new = [SVector{2}(rand(2)) for _ in 1:5];
-y_new = interp(x_new);
-y_true = f.(x_new);
+x_new = [SVector{2}(rand(2)) for _ in 1:5]
+y_new = interp(x_new)
+y_true = f.(x_new)
+nothing # hide
 ```
 
 and compare the error
@@ -41,7 +43,7 @@ The error is numerically zero because the default basis — `PHS(3; poly_deg=2)`
 
 ```@example overview
 interp = Interpolator(x, y, PHS(3; poly_deg=1))
-y_new = interp(x_new);
+y_new = interp(x_new)
 abs.(y_true .- y_new)
 ```
 
@@ -159,6 +161,17 @@ result = combined(y)
 typeof(result)
 ```
 
+## Advanced: Virtual Operators
+
+Virtual operators (`∂virtual`) use finite difference formulas on interpolated values at offset points. This can be useful for certain numerical schemes:
+
+```@example overview
+# Virtual partial derivative in x-direction with spacing Δ=0.01
+virtual_dx = ∂virtual(x, 1, 0.01)
+result = virtual_dx(y)
+typeof(result)
+```
+
 ## Boundary Conditions (Hermite Interpolation)
 
 For PDE applications, operators support Hermite interpolation with boundary conditions. This is useful when you need to enforce Dirichlet, Neumann, or Robin conditions at boundary nodes.
@@ -192,17 +205,6 @@ lap_hermite = laplacian(x; hermite=(
     normals=normals
 ))
 typeof(lap_hermite)
-```
-
-## Advanced: Virtual Operators
-
-Virtual operators (`∂virtual`) use finite difference formulas on interpolated values at offset points. This can be useful for certain numerical schemes:
-
-```@example overview
-# Virtual partial derivative in x-direction with spacing Δ=0.01
-virtual_dx = ∂virtual(x, 1, 0.01)
-result = virtual_dx(y)
-typeof(result)
 ```
 
 ## Current Limitations

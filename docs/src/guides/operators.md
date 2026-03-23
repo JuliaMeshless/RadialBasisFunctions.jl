@@ -52,7 +52,8 @@ The parameter `N` captures whether differentiation adds a tensor index to the ou
 
 ```@example operators
 x = [SVector{2}(rand(2)) for _ in 1:100]
-u = sin.(getindex.(x, 1));
+u = sin.(getindex.(x, 1))
+nothing # hide
 
 lap = laplacian(x)
 result = lap(u)

@@ -108,6 +108,22 @@ end
     @test mean_percent_error(op(y_macro), exact) < 5
 end
 
+@testset "@operator c ⋅ ∇ (advection)" begin
+    f(x) = 1 + sin(4 * x[1]) + cos(3 * x[1]) + sin(2 * x[2])
+    df_dx(x) = 4 * cos(4 * x[1]) - 3 * sin(3 * x[1])
+    df_dy(x) = 2 * cos(2 * x[2])
+
+    N_macro = 10_000
+    x_macro = SVector{2}.(HaltonPoint(2)[1:N_macro])
+    y_macro = f.(x_macro)
+    basis_macro = PHS(5; poly_deg=3)
+
+    c = SVector(1.0, 0.5)
+    op = custom(x_macro, @operator(c ⋅ ∇); basis=basis_macro)
+    exact = c[1] .* df_dx.(x_macro) .+ c[2] .* df_dy.(x_macro)
+    @test mean_percent_error(op(y_macro), exact) < 5
+end
+
 @testset "@operator Macro Composition" begin
     f(x) = 1 + sin(4 * x[1]) + cos(3 * x[1]) + sin(2 * x[2])
     d2f_dxx(x) = -16 * sin(4 * x[1]) - 9 * cos(3 * x[1])

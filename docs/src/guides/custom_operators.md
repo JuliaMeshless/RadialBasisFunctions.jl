@@ -11,7 +11,8 @@ using StaticArrays
 
 x = [SVector{2}(rand(2)) for _ in 1:100]
 f(p) = sin(p[1]) * cos(p[2])
-u = f.(x);
+u = f.(x)
+nothing # hide
 ```
 
 ## `@operator` Macro (Recommended)
@@ -36,6 +37,7 @@ maximum(abs, helm(u) .- expected)
 | `∂(dim)` | First partial derivative in dimension `dim` |
 | `∂²(dim)` | Second partial derivative in dimension `dim` |
 | `∇ ⋅ (κ * ∇)` | Diffusion operator (scalar or vector `κ`) |
+| `c ⋅ ∇` | Advection operator (vector `c`) |
 | `f`, `I` | [`Identity`](@ref) operator |
 | Everything else | Scalar coefficient |
 
@@ -66,7 +68,7 @@ maximum(abs, diff(u) .- expected)
 ```@example custom
 # Advection-diffusion: ν∇²f - c⋅∇f
 ν = 0.01; c = SVector(1.0, 0.5)
-op = @operator ν * ∇² - c[1] * ∂(1) - c[2] * ∂(2)
+op = @operator ν * ∇² - c ⋅ ∇
 advdiff = custom(x, op)
 
 expected = ν .* laplacian(x)(u) .- c[1] .* partial(x, 1, 1)(u) .- c[2] .* partial(x, 1, 2)(u)

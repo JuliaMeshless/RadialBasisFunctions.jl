@@ -9,15 +9,16 @@ suitable for passing to [`custom`](@ref) or [`RadialBasisOperator`](@ref).
 - `∂(dim)` — first partial derivative in dimension `dim`
 - `∂²(dim)` — second partial derivative in dimension `dim`
 - `∇ ⋅ (κ * ∇)` — anisotropic diffusion (scalar or vector `κ`)
+- `c ⋅ ∇` — advection operator (vector `c`)
 - `f` / `I` — [`Identity`](@ref) operator
 - Everything else — scalar coefficient
 
 # Examples
 ```julia
-helm = custom(x, @operator(∇² + k^2 * f); rank=0)
-aniso = custom(x, @operator(κx * ∂²(1) + κy * ∂²(2)); rank=0)
-advdiff = custom(x, @operator(ν * ∇² - c[1] * ∂(1) - c[2] * ∂(2)); rank=0)
-diff = custom(x, @operator(∇ ⋅ (κ * ∇)); rank=0)
+helm = custom(x, @operator(∇² + k^2 * f))
+aniso = custom(x, @operator(κx * ∂²(1) + κy * ∂²(2)))
+advdiff = custom(x, @operator(ν * ∇² - c ⋅ ∇))
+diff = custom(x, @operator(∇ ⋅ (κ * ∇)))
 ```
 """
 macro operator(expr)
@@ -79,6 +80,9 @@ function _transform_dot(lhs, rhs)
     if lhs === :∇ && _is_scaled_nabla(rhs)
         coeff = _extract_nabla_coefficient(rhs)
         return Expr(:call, GlobalRef(@__MODULE__, :_expand_div_grad), coeff)
+    elseif rhs === :∇
+        return Expr(:call, GlobalRef(@__MODULE__, :_expand_dot_grad),
+                     _transform_operator_expr(lhs))
     end
     return Expr(:call, :⋅, _transform_operator_expr(lhs), _transform_operator_expr(rhs))
 end
@@ -96,6 +100,13 @@ end
 # ============================================================================
 # Expansion functions for textbook notation
 # ============================================================================
+
+"""
+    _expand_dot_grad(c::AbstractVector)
+
+Expand `c ⋅ ∇` into `∑ c[i] * ∂/∂xᵢ` (advection operator).
+"""
+_expand_dot_grad(c::AbstractVector) = sum(c[i] * Partial(1, i) for i in 1:length(c))
 
 """
     _expand_div_grad(κ::Number)
