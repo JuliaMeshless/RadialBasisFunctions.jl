@@ -141,6 +141,42 @@ end
     @test mean_percent_error(op(y_macro), exact) < 5
 end
 
+@testset "_infer_rank" begin
+    @test RBF._infer_rank(basis -> (x, xᵢ) -> basis(x, xᵢ)) == 0
+    @test RBF._infer_rank(basis -> ntuple(dim -> RBF.∂(basis, dim), 2)) == 1
+    # rank auto-inferred when keyword omitted
+    op = custom(x, basis -> (x, xᵢ) -> basis(x, xᵢ))
+    @test op isa RadialBasisOperator
+end
+
+@testset "@operator symbol variants" begin
+    @test @operator(∇²) isa Laplacian
+    @test @operator(Δ) isa Laplacian
+    @test @operator(I) isa Identity
+    @test @operator(∂(1)) isa Partial
+    @test @operator(∂²(2)) isa Partial
+end
+
+@testset "@operator subtraction and negation" begin
+    f(x) = 2 * x[1] + 3 * x[2]
+    df_dx(x) = 2
+    df_dy(x) = 3
+
+    N_macro = 10_000
+    x_macro = SVector{2}.(HaltonPoint(2)[1:N_macro])
+    y_macro = f.(x_macro)
+    basis_macro = PHS(5; poly_deg = 3)
+
+    # Binary subtraction
+    op = custom(x_macro, @operator(∂(1) - ∂(2)); basis = basis_macro)
+    exact = df_dx.(x_macro) .- df_dy.(x_macro)
+    @test mean_percent_error(op(y_macro), exact) < 5
+
+    # Unary negation
+    op_neg = custom(x_macro, @operator(-∂(1)); basis = basis_macro)
+    @test mean_percent_error(op_neg(y_macro), -df_dx.(x_macro)) < 5
+end
+
 @testset "custom() Hermite Boundary Conditions" begin
     # Test custom.jl lines 58-72: Hermite interpolation with boundary conditions
     # Create a simple 1D domain for testing
