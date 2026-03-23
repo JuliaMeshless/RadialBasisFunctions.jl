@@ -63,7 +63,7 @@ function custom(data::AbstractVector, ℒ::Function; rank::Int=_infer_rank(ℒ),
 end
 
 # Accept AbstractOperator directly (from operator algebra or @operator macro)
-function custom(data::AbstractVector, op::AbstractOperator; kw...)
+function custom(data::AbstractVector, op::AbstractOperator; rank=nothing, kw...)
     return RadialBasisOperator(op, data; kw...)
 end
 
