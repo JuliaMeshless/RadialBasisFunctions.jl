@@ -30,7 +30,8 @@ import Mooncake
 # Create points and operator (outside loss function)
 N = 49
 points = [SVector{2}(0.1 + 0.8 * i / 7, 0.1 + 0.8 * j / 7) for i in 1:7 for j in 1:7]
-values = sin.(getindex.(points, 1)) .+ cos.(getindex.(points, 2));
+values = sin.(getindex.(points, 1)) .+ cos.(getindex.(points, 2))
+nothing # hide
 
 lap = laplacian(points)
 
@@ -85,8 +86,9 @@ When differentiating through interpolation, the `Interpolator` must be construct
 ```@example autodiff
 N_interp = 30
 points_interp = [SVector{2}(0.5 + 0.4 * cos(2π * i / N_interp), 0.5 + 0.4 * sin(2π * i / N_interp)) for i in 1:N_interp]
-values_interp = sin.(getindex.(points_interp, 1));
+values_interp = sin.(getindex.(points_interp, 1))
 eval_points = [SVector{2}(0.5, 0.5), SVector{2}(0.6, 0.6)]
+nothing # hide
 
 # Loss function - must rebuild interpolator inside
 function loss_interp(v)
