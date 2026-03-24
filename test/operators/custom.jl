@@ -92,6 +92,120 @@ end
     @test mean_percent_error(result_vec[:, 2, 2], 2 .* getindex.(x, 2)) < 10
 end
 
+@testset "@operator Macro Syntax" begin
+    f(x) = 1 + sin(4 * x[1]) + cos(3 * x[1]) + sin(2 * x[2])
+    d2f_dxx(x) = -16 * sin(4 * x[1]) - 9 * cos(3 * x[1])
+    d2f_dyy(x) = -4 * sin(2 * x[2])
+
+    N_macro = 10_000
+    x_macro = SVector{2}.(HaltonPoint(2)[1:N_macro])
+    y_macro = f.(x_macro)
+    basis_macro = PHS(5; poly_deg = 3)
+
+    κ = [3.0, 0.5]
+    op = custom(x_macro, @operator(∇ ⋅ (κ * ∇)); rank = 0, basis = basis_macro)
+    exact = κ[1] .* d2f_dxx.(x_macro) .+ κ[2] .* d2f_dyy.(x_macro)
+    @test mean_percent_error(op(y_macro), exact) < 5
+end
+
+@testset "@operator c ⋅ ∇ (advection)" begin
+    f(x) = 1 + sin(4 * x[1]) + cos(3 * x[1]) + sin(2 * x[2])
+    df_dx(x) = 4 * cos(4 * x[1]) - 3 * sin(3 * x[1])
+    df_dy(x) = 2 * cos(2 * x[2])
+
+    N_macro = 10_000
+    x_macro = SVector{2}.(HaltonPoint(2)[1:N_macro])
+    y_macro = f.(x_macro)
+    basis_macro = PHS(5; poly_deg = 3)
+
+    c = SVector(1.0, 0.5)
+    op = custom(x_macro, @operator(c ⋅ ∇); basis = basis_macro)
+    exact = c[1] .* df_dx.(x_macro) .+ c[2] .* df_dy.(x_macro)
+    @test mean_percent_error(op(y_macro), exact) < 5
+end
+
+@testset "@operator Macro Composition" begin
+    f(x) = 1 + sin(4 * x[1]) + cos(3 * x[1]) + sin(2 * x[2])
+    d2f_dxx(x) = -16 * sin(4 * x[1]) - 9 * cos(3 * x[1])
+    d2f_dyy(x) = -4 * sin(2 * x[2])
+
+    N_macro = 10_000
+    x_macro = SVector{2}.(HaltonPoint(2)[1:N_macro])
+    y_macro = f.(x_macro)
+    basis_macro = PHS(5; poly_deg = 3)
+
+    κ = 2.0
+    k² = 1.0
+    op = custom(x_macro, @operator(∇ ⋅ (κ * ∇) + k² * f); rank = 0, basis = basis_macro)
+    exact = κ .* (d2f_dxx.(x_macro) .+ d2f_dyy.(x_macro)) .+ k² .* f.(x_macro)
+    @test mean_percent_error(op(y_macro), exact) < 5
+end
+
+@testset "_infer_rank" begin
+    @test RBF._infer_rank(basis -> (x, xᵢ) -> basis(x, xᵢ)) == 0
+    @test RBF._infer_rank(basis -> ntuple(dim -> RBF.∂(basis, dim), 2)) == 1
+    # rank auto-inferred when keyword omitted
+    op = custom(x, basis -> (x, xᵢ) -> basis(x, xᵢ))
+    @test op isa RadialBasisOperator
+end
+
+@testset "@operator symbol variants" begin
+    @test @operator(∇²) isa Laplacian
+    @test @operator(Δ) isa Laplacian
+    @test @operator(∇ ⋅ ∇) isa Laplacian
+    @test @operator(I) isa Identity
+    @test @operator(∂(1)) isa Partial
+    @test @operator(∂²(2)) isa Partial
+end
+
+@testset "@operator edge cases" begin
+    # Scalar literal fallback (_transform_operator_expr line 34)
+    @test @operator(3 * ∇²) isa RBF.ScaledOperator
+    # Unrecognized call fallback (_transform_operator_call line 76)
+    k = 2.0
+    op = @operator(k^2 * f)
+    @test op isa RBF.ScaledOperator
+    # Multi-coefficient ∇⋅(a*b*∇) (_extract_nabla_coefficient else branch, line 99)
+    a = 2.0
+    b = 3.0
+    op2 = @operator(∇ ⋅ (a * b * ∇))
+    @test op2 isa RBF.ScaledOperator
+    # Division by scalar
+    op3 = @operator(∇² / 2)
+    @test op3 isa RBF.ScaledOperator
+    @test op3.α ≈ 0.5
+    # Invalid ∂ arity (LoadError wraps the ArgumentError from macro expansion)
+    @test_throws LoadError @eval @operator(∂(1, 2))
+    @test_throws LoadError @eval @operator(∂²(1, 2))
+    # Non-:call Expr fallthrough (_transform_operator_expr line 31)
+    ref_expr = Expr(:ref, :κ, 1)
+    @test RBF._transform_operator_expr(ref_expr) === ref_expr
+    # Generic dot passthrough (_transform_dot line 90, neither side is ∇)
+    dot_result = RBF._transform_dot(:a, :b)
+    @test dot_result.head == :call
+    @test dot_result.args[1] === :⋅
+end
+
+@testset "@operator subtraction and negation" begin
+    f(x) = 2 * x[1] + 3 * x[2]
+    df_dx(x) = 2
+    df_dy(x) = 3
+
+    N_macro = 10_000
+    x_macro = SVector{2}.(HaltonPoint(2)[1:N_macro])
+    y_macro = f.(x_macro)
+    basis_macro = PHS(5; poly_deg = 3)
+
+    # Binary subtraction
+    op = custom(x_macro, @operator(∂(1) - ∂(2)); basis = basis_macro)
+    exact = df_dx.(x_macro) .- df_dy.(x_macro)
+    @test mean_percent_error(op(y_macro), exact) < 5
+
+    # Unary negation
+    op_neg = custom(x_macro, @operator(-∂(1)); basis = basis_macro)
+    @test mean_percent_error(op_neg(y_macro), -df_dx.(x_macro)) < 5
+end
+
 @testset "custom() Hermite Boundary Conditions" begin
     # Test custom.jl lines 58-72: Hermite interpolation with boundary conditions
     # Create a simple 1D domain for testing
