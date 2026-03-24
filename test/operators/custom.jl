@@ -177,6 +177,13 @@ end
     # Invalid ∂ arity (LoadError wraps the ArgumentError from macro expansion)
     @test_throws LoadError @eval @operator(∂(1, 2))
     @test_throws LoadError @eval @operator(∂²(1, 2))
+    # Non-:call Expr fallthrough (_transform_operator_expr line 31)
+    ref_expr = Expr(:ref, :κ, 1)
+    @test RBF._transform_operator_expr(ref_expr) === ref_expr
+    # Generic dot passthrough (_transform_dot line 90, neither side is ∇)
+    dot_result = RBF._transform_dot(:a, :b)
+    @test dot_result.head == :call
+    @test dot_result.args[1] === :⋅
 end
 
 @testset "@operator subtraction and negation" begin
