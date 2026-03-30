@@ -34,7 +34,7 @@ end
 @testset "Symmetry in output" begin
     op = hessian(points, PHS(3; poly_deg = 4))
     Hu = op(u)
-    @test Hu[:, 1, 2] ≈ Hu[:, 2, 1] atol = 1e-12
+    @test Hu[:, 1, 2] ≈ Hu[:, 2, 1] atol = 1.0e-12
 end
 
 @testset "Symmetric weight storage" begin
@@ -100,7 +100,7 @@ end
     Hu = op(u)
     @test Hu isa Matrix
     @test size(Hu) == (2, 2)
-    @test Hu[1, 2] ≈ Hu[2, 1] atol = 1e-12
+    @test Hu[1, 2] ≈ Hu[2, 1] atol = 1.0e-12
     @test abs(Hu[1, 1] - H11(SVector(0.5, 0.5))) < 0.5
     @test abs(Hu[1, 2] - H12(SVector(0.5, 0.5))) < 0.5
 end
@@ -127,9 +127,9 @@ end
     @test maximum(abs.(Hu[:, 2, 3])) < 0.5
     @test maximum(abs.(Hu[:, 3, 3] .- 2.0)) < 0.5
     # Symmetry
-    @test Hu[:, 1, 2] ≈ Hu[:, 2, 1] atol = 1e-12
-    @test Hu[:, 1, 3] ≈ Hu[:, 3, 1] atol = 1e-12
-    @test Hu[:, 2, 3] ≈ Hu[:, 3, 2] atol = 1e-12
+    @test Hu[:, 1, 2] ≈ Hu[:, 2, 1] atol = 1.0e-12
+    @test Hu[:, 1, 3] ≈ Hu[:, 3, 1] atol = 1.0e-12
+    @test Hu[:, 2, 3] ≈ Hu[:, 3, 2] atol = 1.0e-12
 end
 
 @testset "Printing" begin

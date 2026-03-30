@@ -40,13 +40,13 @@ end
 @testset "Symmetry: ∂²f/∂x∂y == ∂²f/∂y∂x" begin
     ∂²xy = mixed_partial(x, 1, 2, PHS(3; poly_deg = 4))
     ∂²yx = mixed_partial(x, 2, 1, PHS(3; poly_deg = 4))
-    @test ∂²xy(y) ≈ ∂²yx(y) atol = 1e-10
+    @test ∂²xy(y) ≈ ∂²yx(y) atol = 1.0e-10
 end
 
 @testset "Degenerates to second partial when dim1 == dim2" begin
     ∂²xx_mixed = mixed_partial(x, 1, 1, PHS(3; poly_deg = 4))
     ∂²xx_partial = partial(x, 2, 1, PHS(3; poly_deg = 4))
-    @test ∂²xx_mixed(y) ≈ ∂²xx_partial(y) atol = 1e-10
+    @test ∂²xx_mixed(y) ≈ ∂²xx_partial(y) atol = 1.0e-10
 end
 
 @testset "Different evaluation points" begin
