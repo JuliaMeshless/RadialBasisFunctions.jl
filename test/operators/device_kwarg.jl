@@ -180,6 +180,16 @@ end
     @test adapted.adjl === op.adjl
 end
 
+@testset "Adapt.adapt_structure for NTuple weights (rank-2)" begin
+    op = hessian(x)
+    result = op(z)
+    adapted = Adapt.adapt(CPU(), op)
+    @test adapted isa RadialBasisOperator
+    @test adapted(z) ≈ result
+    @test adapted.data === op.data
+    @test adapted.adjl === op.adjl
+end
+
 @testset "Adapt.adapt_structure for Interpolator" begin
     interp = Interpolator(x, z)
     test_pts = [SVector{2}(rand(2)) for _ in 1:5]

@@ -44,6 +44,14 @@ end
     include("operators/laplacian.jl")
 end
 
+@safetestset "Mixed Partial" begin
+    include("operators/mixed_partial.jl")
+end
+
+@safetestset "Hessian" begin
+    include("operators/hessian.jl")
+end
+
 @safetestset "Custom" begin
     include("operators/custom.jl")
 end

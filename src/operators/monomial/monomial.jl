@@ -25,6 +25,39 @@ include("partial.jl")
 ∂(basis::MonomialBasis, ::Val{N}) where {N} = _∂(basis, 1, Val(N))
 ∂²(basis::MonomialBasis, ::Val{N}) where {N} = _∂(basis, 2, Val(N))
 
+function ∂mixed(m::MonomialBasis, dim1::Int, dim2::Int)
+    dim1 == dim2 && return ∂²(m, dim1)
+    return _∂mixed(m, dim1, dim2)
+end
+
+function _∂mixed(m::MonomialBasis{Dim, Deg}, dim1::Int, dim2::Int) where {Dim, Deg}
+    me = ∂exponents_mixed(m, dim1, dim2)
+    ids = monomial_recursive_list(m, me)
+    basis! = build_monomial_basis(ids, me.coeffs)
+    return ℒMonomialBasis(Dim, Deg, basis!)
+end
+
+function ∂exponents_mixed(::MonomialBasis{Dim, Deg}, dim1::T, dim2::T) where {Dim, Deg, T <: Int}
+    ex = collect(Vector{Int}, multiexponents(Dim + 1, Deg))
+    N = binomial(Dim + Deg, Deg)
+    e = [zeros(Int, N) for _ in 1:Dim]
+    for i in 1:(Dim), j in 1:N
+        e[i][j] = ex[j][i]
+    end
+    c = ones(T, length(e[dim1]))
+    ∂exponents!(e, c, 1, dim1)
+    ∂exponents!(e, c, 1, dim2)
+    return Monomial(e, c)
+end
+
+function H(m::MonomialBasis{Dim, Deg}) where {Dim, Deg}
+    n_unique = _num_sym(Dim)
+    return ntuple(n_unique) do k
+        i, j = _kth_sym_pair(k, Dim)
+        ∂mixed(m, i, j)
+    end
+end
+
 function _∂(m::MonomialBasis{Dim, Deg}, order::Int, ::Val{N}) where {Dim, Deg, N}
     me = ∂exponents(m, order, N)
     ids = monomial_recursive_list(m, me)
