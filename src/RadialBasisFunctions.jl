@@ -50,11 +50,17 @@ export Custom, custom
 include("operators/partial.jl")
 export Partial, partial
 
+include("operators/mixed_partial.jl")
+export MixedPartial, mixed_partial
+
 include("operators/laplacian.jl")
 export Laplacian, laplacian
 
 include("operators/jacobian.jl")
 export Jacobian, jacobian
+
+include("operators/hessian.jl")
+export Hessian, hessian
 
 include("operators/gradient.jl")
 export gradient

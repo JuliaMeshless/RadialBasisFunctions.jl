@@ -8,6 +8,7 @@ suitable for passing to [`custom`](@ref) or [`RadialBasisOperator`](@ref).
 - `∇²` / `Δ` — [`Laplacian`](@ref)
 - `∂(dim)` — first partial derivative in dimension `dim`
 - `∂²(dim)` — second partial derivative in dimension `dim`
+- `∂(dim1, dim2)` — mixed partial derivative ∂²f/(∂xᵢ ∂xⱼ)
 - `∇ ⋅ (κ * ∇)` — anisotropic diffusion (scalar or vector `κ`)
 - `c ⋅ ∇` — advection operator (vector `c`)
 - `f` / `I` — [`Identity`](@ref) operator
@@ -63,8 +64,13 @@ function _transform_operator_call(expr)
     elseif op === :/ && length(args) == 2
         return Expr(:call, :/, _transform_operator_expr(args[1]), _transform_operator_expr(args[2]))
     elseif op === :∂
-        length(args) == 1 || throw(ArgumentError("∂(dim) expects exactly 1 argument, got $(length(args))"))
-        return :(Partial(1, $(args[1])))
+        if length(args) == 1
+            return :(Partial(1, $(args[1])))
+        elseif length(args) == 2
+            return :(MixedPartial($(args[1]), $(args[2])))
+        else
+            throw(ArgumentError("∂ expects 1 or 2 arguments, got $(length(args))"))
+        end
     elseif op === :∂²
         length(args) == 1 || throw(ArgumentError("∂²(dim) expects exactly 1 argument, got $(length(args))"))
         return :(Partial(2, $(args[1])))

@@ -174,8 +174,9 @@ end
     op3 = @operator(∇² / 2)
     @test op3 isa RBF.ScaledOperator
     @test op3.α ≈ 0.5
-    # Invalid ∂ arity (LoadError wraps the ArgumentError from macro expansion)
-    @test_throws LoadError @eval @operator(∂(1, 2))
+    # ∂(i,j) is valid mixed partial; ∂(i,j,k) and ∂²(i,j) are invalid
+    @test @operator(∂(1, 2)) isa RBF.MixedPartial
+    @test_throws LoadError @eval @operator(∂(1, 2, 3))
     @test_throws LoadError @eval @operator(∂²(1, 2))
     # Non-:call Expr fallthrough (_transform_operator_expr line 31)
     ref_expr = Expr(:ref, :κ, 1)
