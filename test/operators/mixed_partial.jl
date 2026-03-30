@@ -60,6 +60,11 @@ end
     @test mean_percent_error(op(y), d2f_dxdy.(x)) < 10
 end
 
+@testset "One-shot convenience" begin
+    result = mixed_partial(x, 1, 2, y; basis = PHS(3; poly_deg = 4))
+    @test mean_percent_error(result, d2f_dxdy.(x)) < 10
+end
+
 @testset "Printing" begin
     op = MixedPartial(1, 2)
     @test RadialBasisFunctions.print_op(op) == "∂²f/∂x1∂x2"
