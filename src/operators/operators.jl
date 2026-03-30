@@ -5,7 +5,8 @@ Abstract supertype for differential operators.
 
 The parameter `N` is the tensor rank added to the output:
 - `N=0`: rank-preserving (e.g., [`Partial`](@ref), [`Laplacian`](@ref), [`Directional`](@ref))
-- `N=1`: adds a trailing dimension (e.g., [`Jacobian`](@ref))
+- `N=1`: adds one trailing dimension (e.g., [`Jacobian`](@ref))
+- `N=2`: adds two trailing dimensions (e.g., [`Hessian`](@ref))
 
 Subtypes must implement `(op::MyOp)(basis)` to return a callable applied to the basis.
 """
@@ -190,6 +191,34 @@ function (op::RadialBasisOperator)(y, x)
     return _eval_op(op, y, x)
 end
 
+# ============================================================================
+# Symmetric index helpers for rank-2 operators (Hessian)
+# ============================================================================
+
+# Number of unique entries in symmetric D×D matrix
+_num_sym(D) = D * (D + 1) ÷ 2
+
+# Recover D from number of unique entries: n = D*(D+1)/2 → D = (-1+√(1+8n))/2
+_dim_from_sym(n) = (isqrt(1 + 8n) - 1) ÷ 2
+
+# k-th (i,j) pair in upper-triangular row-major order
+# D=2: k=1→(1,1), k=2→(1,2), k=3→(2,2)
+# D=3: k=1→(1,1), k=2→(1,2), k=3→(1,3), k=4→(2,2), k=5→(2,3), k=6→(3,3)
+@inline function _kth_sym_pair(k, D)
+    count = 0
+    for i in 1:D
+        for j in i:D
+            count += 1
+            count == k && return (i, j)
+        end
+    end
+    return
+end
+
+# ============================================================================
+# Evaluation dispatches
+# ============================================================================
+
 # dispatches for evaluation
 _eval_op(op::RadialBasisOperator, x) = op.weights * x
 _eval_op(op::RadialBasisOperator, y, x) = mul!(y, op.weights, x)
@@ -305,6 +334,165 @@ function _eval_op(
     return y
 end
 
+# ============================================================================
+# Rank-2 operator evaluation (e.g., Hessian)
+# Weights: NTuple{D*(D+1)/2, SparseMatrixCSC} — upper-triangular entries only
+# Symmetric (j,i) entries filled via copyto! (O(N) vs O(nnz) for duplicate mul!)
+# ============================================================================
+
+# Rank-2 operator: Scalar field input → 3-tensor output (N_eval × D × D)
+function _eval_op(
+        op::RadialBasisOperator{<:AbstractOperator{2}}, x::AbstractVector
+    )
+    n_unique = length(op.weights)
+    D = _dim_from_sym(n_unique)
+    N_eval = length(op.eval_points)
+    T = promote_type(eltype(x), eltype(first(op.weights)))
+    out = similar(x, T, N_eval, D, D)
+    for k in 1:n_unique
+        i, j = _kth_sym_pair(k, D)
+        mul!(view(out, :, i, j), op.weights[k], x)
+        if i != j
+            copyto!(view(out, :, j, i), view(out, :, i, j))
+        end
+    end
+    return out
+end
+
+# Rank-2 operator: Vector field input (N × D_in) → 4-tensor output (N_eval × D_in × D × D)
+function _eval_op(
+        op::RadialBasisOperator{<:AbstractOperator{2}}, x::AbstractMatrix
+    )
+    n_unique = length(op.weights)
+    D = _dim_from_sym(n_unique)
+    N_eval = length(op.eval_points)
+    D_in = size(x, 2)
+    T = promote_type(eltype(x), eltype(first(op.weights)))
+    out = similar(x, T, N_eval, D_in, D, D)
+    for k in 1:n_unique, d_in in 1:D_in
+        i, j = _kth_sym_pair(k, D)
+        mul!(view(out, :, d_in, i, j), op.weights[k], view(x, :, d_in))
+        if i != j
+            copyto!(view(out, :, d_in, j, i), view(out, :, d_in, i, j))
+        end
+    end
+    return out
+end
+
+# Rank-2 operator: General tensor input → tensor output with 2 extra dimensions
+function _eval_op(
+        op::RadialBasisOperator{<:AbstractOperator{2}}, x::AbstractArray
+    )
+    n_unique = length(op.weights)
+    D = _dim_from_sym(n_unique)
+    N_eval = length(op.eval_points)
+    trailing_dims = size(x)[2:end]
+    T = promote_type(eltype(x), eltype(first(op.weights)))
+    out = similar(x, T, N_eval, trailing_dims..., D, D)
+    for idx in CartesianIndices(trailing_dims), k in 1:n_unique
+        i, j = _kth_sym_pair(k, D)
+        mul!(view(out, :, idx, i, j), op.weights[k], view(x, :, idx))
+        if i != j
+            copyto!(view(out, :, idx, j, i), view(out, :, idx, i, j))
+        end
+    end
+    return out
+end
+
+# Rank-2 operator with SparseVector weights (single eval point)
+function _eval_op(
+        op::RadialBasisOperator{<:AbstractOperator{2}, <:NTuple{<:Any, <:SparseVector}},
+        x::AbstractVector,
+    )
+    n_unique = length(op.weights)
+    D = _dim_from_sym(n_unique)
+    T = promote_type(eltype(x), eltype(first(op.weights)))
+    out = similar(x, T, D, D)
+    @inbounds for k in 1:n_unique
+        i, j = _kth_sym_pair(k, D)
+        out[i, j] = dot(op.weights[k], x)
+        if i != j
+            out[j, i] = out[i, j]
+        end
+    end
+    return out
+end
+
+function _eval_op(
+        op::RadialBasisOperator{<:AbstractOperator{2}, <:NTuple{<:Any, <:SparseVector}},
+        x::AbstractMatrix,
+    )
+    n_unique = length(op.weights)
+    D = _dim_from_sym(n_unique)
+    D_in = size(x, 2)
+    T = promote_type(eltype(x), eltype(first(op.weights)))
+    out = similar(x, T, D_in, D, D)
+    @inbounds for k in 1:n_unique, d_in in 1:D_in
+        i, j = _kth_sym_pair(k, D)
+        out[d_in, i, j] = dot(op.weights[k], view(x, :, d_in))
+        if i != j
+            out[d_in, j, i] = out[d_in, i, j]
+        end
+    end
+    return out
+end
+
+function _eval_op(
+        op::RadialBasisOperator{<:AbstractOperator{2}, <:NTuple{<:Any, <:SparseVector}},
+        x::AbstractArray,
+    )
+    n_unique = length(op.weights)
+    D = _dim_from_sym(n_unique)
+    trailing_dims = size(x)[2:end]
+    T = promote_type(eltype(x), eltype(first(op.weights)))
+    out = similar(x, T, trailing_dims..., D, D)
+    @inbounds for idx in CartesianIndices(trailing_dims), k in 1:n_unique
+        i, j = _kth_sym_pair(k, D)
+        out[idx, i, j] = dot(op.weights[k], view(x, :, idx))
+        if i != j
+            out[idx, j, i] = out[idx, i, j]
+        end
+    end
+    return out
+end
+
+# In-place: Scalar field → 3-tensor
+function _eval_op(
+        op::RadialBasisOperator{<:AbstractOperator{2}},
+        y::AbstractArray{<:Any, 3},
+        x::AbstractVector,
+    )
+    n_unique = length(op.weights)
+    D = _dim_from_sym(n_unique)
+    for k in 1:n_unique
+        i, j = _kth_sym_pair(k, D)
+        mul!(view(y, :, i, j), op.weights[k], x)
+        if i != j
+            copyto!(view(y, :, j, i), view(y, :, i, j))
+        end
+    end
+    return y
+end
+
+# In-place: Vector field → 4-tensor
+function _eval_op(
+        op::RadialBasisOperator{<:AbstractOperator{2}},
+        y::AbstractArray{<:Any, 4},
+        x::AbstractMatrix,
+    )
+    n_unique = length(op.weights)
+    D = _dim_from_sym(n_unique)
+    D_in = size(x, 2)
+    for k in 1:n_unique, d_in in 1:D_in
+        i, j = _kth_sym_pair(k, D)
+        mul!(view(y, :, d_in, i, j), op.weights[k], view(x, :, d_in))
+        if i != j
+            copyto!(view(y, :, d_in, j, i), view(y, :, d_in, i, j))
+        end
+    end
+    return y
+end
+
 # LinearAlgebra methods - divergence (dot with gradient operator)
 function LinearAlgebra.:⋅(
         op::RadialBasisOperator{<:AbstractOperator{1}}, x::AbstractVector
@@ -330,6 +518,15 @@ function update_weights!(op::RadialBasisOperator{<:AbstractOperator{1}})
     return nothing
 end
 
+function update_weights!(op::RadialBasisOperator{<:AbstractOperator{2}})
+    new_weights = _build_weights(op.ℒ, op)
+    for i in eachindex(op.weights)
+        op.weights[i] .= new_weights[i]
+    end
+    validate_cache!(op)
+    return nothing
+end
+
 # ============================================================================
 # Adapt.jl support (GPU array conversion)
 # ============================================================================
@@ -343,6 +540,14 @@ function Adapt.adapt_structure(to, op::RadialBasisOperator)
 end
 
 function Adapt.adapt_structure(to, op::RadialBasisOperator{<:AbstractOperator{1}})
+    adapted_weights = map(w -> Adapt.adapt(to, w), op.weights)
+    return RadialBasisOperator(
+        op.ℒ, adapted_weights, op.data, op.eval_points, op.adjl, op.basis,
+        is_cache_valid(op); device = op.device,
+    )
+end
+
+function Adapt.adapt_structure(to, op::RadialBasisOperator{<:AbstractOperator{2}})
     adapted_weights = map(w -> Adapt.adapt(to, w), op.weights)
     return RadialBasisOperator(
         op.ℒ, adapted_weights, op.data, op.eval_points, op.adjl, op.basis,
