@@ -15,6 +15,7 @@ Suppose we have a set of data ``\mathbf{x}`` where ``\mathbf{x}_i \in \mathbb{R}
 f(x) = 2*x[1]^2 + 3*x[2]
 x = [SVector{2}(rand(2)) for _ in 1:1000]
 y = f.(x)
+nothing # hide
 ```
 
 and now we can build the interpolator
@@ -29,6 +30,7 @@ and evaluate it at a new point
 x_new = [SVector{2}(rand(2)) for _ in 1:5]
 y_new = interp(x_new)
 y_true = f.(x_new)
+nothing # hide
 ```
 
 and compare the error
@@ -117,17 +119,18 @@ normal_deriv = directional(x, normals)
 typeof(normal_deriv(y))
 ```
 
-### Custom Operators
+### Custom Operator Basics
 
-Define your own differential operators using `custom`. The function should accept a basis and return a callable `(x, xc) -> value`. Here's an example that creates an interpolation-like operator:
+The [`@operator`](@ref) macro lets you write PDE operators in mathematical notation and pass them to [`custom`](@ref):
 
 ```@example overview
-# Custom operator that evaluates the basis function
-op = custom(x, basis -> (x, xc) -> basis(x, xc); rank=0)
-typeof(op)
+k² = 4.0
+op = @operator ∇² + k² * f
+helm = custom(x, op)
+typeof(helm)
 ```
 
-For more complex differential operators, use `operator algebra` (see below) to combine built-in operators.
+See [Operators & Type Hierarchy](@ref) for an in-depth guide to the operator system and [Custom Operators](@ref "Custom Operators") for advanced examples.
 
 ### Regridding
 
@@ -155,6 +158,17 @@ Operators can be combined using `+` and `-`:
 # Combine them: ∂f/∂x + ∂f/∂y
 combined = ∂x + ∂y
 result = combined(y)
+typeof(result)
+```
+
+## Advanced: Virtual Operators
+
+Virtual operators (`∂virtual`) use finite difference formulas on interpolated values at offset points. This can be useful for certain numerical schemes:
+
+```@example overview
+# Virtual partial derivative in x-direction with spacing Δ=0.01
+virtual_dx = ∂virtual(x, 1, 0.01)
+result = virtual_dx(y)
 typeof(result)
 ```
 
@@ -191,17 +205,6 @@ lap_hermite = laplacian(x; hermite=(
     normals=normals
 ))
 typeof(lap_hermite)
-```
-
-## Advanced: Virtual Operators
-
-Virtual operators (`∂virtual`) use finite difference formulas on interpolated values at offset points. This can be useful for certain numerical schemes:
-
-```@example overview
-# Virtual partial derivative in x-direction with spacing Δ=0.01
-virtual_dx = ∂virtual(x, 1, 0.01)
-result = virtual_dx(y)
-typeof(result)
 ```
 
 ## Current Limitations
