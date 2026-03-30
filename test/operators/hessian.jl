@@ -19,6 +19,11 @@ N = 1000
 points = SVector{2}.(HaltonPoint(2)[1:N])
 u = f.(points)
 
+# Vector field data (shared across tests)
+u1 = getindex.(points, 1) .* getindex.(points, 2)          # x*y
+u2 = getindex.(points, 1) .^ 2 .+ getindex.(points, 2) .^ 2  # x² + y²
+u_vec = hcat(u1, u2)
+
 @testset "Hessian - Scalar field" begin
     op = hessian(points, PHS(3; poly_deg = 4))
     Hu = op(u)
@@ -44,11 +49,6 @@ end
 end
 
 @testset "Hessian - Vector field" begin
-    # u = [x*y, x² + y²]
-    u1 = getindex.(points, 1) .* getindex.(points, 2)
-    u2 = getindex.(points, 1) .^ 2 .+ getindex.(points, 2) .^ 2
-    u_vec = hcat(u1, u2)
-
     op = hessian(points, PHS(3; poly_deg = 4))
     Hu = op(u_vec)
 
@@ -130,6 +130,37 @@ end
     @test Hu[:, 1, 2] ≈ Hu[:, 2, 1] atol = 1.0e-12
     @test Hu[:, 1, 3] ≈ Hu[:, 3, 1] atol = 1.0e-12
     @test Hu[:, 2, 3] ≈ Hu[:, 3, 2] atol = 1.0e-12
+end
+
+@testset "Single eval point - Vector field" begin
+    eval_pt = [SVector{2}(0.5, 0.5)]
+    op = hessian(points, eval_pt, PHS(3; poly_deg = 4))
+    Hu = op(u_vec)
+    @test Hu isa Array{<:Any, 3}
+    @test size(Hu) == (2, 2, 2)
+    # Symmetry
+    @test Hu[1, 1, 2] ≈ Hu[1, 2, 1] atol = 1.0e-12
+    @test Hu[2, 1, 2] ≈ Hu[2, 2, 1] atol = 1.0e-12
+end
+
+@testset "Hessian in-place - Vector field" begin
+    op = hessian(points, PHS(3; poly_deg = 4))
+    out = Array{Float64, 4}(undef, N, 2, 2, 2)
+    op(out, u_vec)
+    @test size(out) == (N, 2, 2, 2)
+    # ∂²(xy)/∂x² = 0
+    @test maximum(abs.(out[:, 1, 1, 1])) < 0.1
+    # ∂²(x²+y²)/∂x² = 2
+    @test maximum(abs.(out[:, 2, 1, 1] .- 2.0)) < 0.1
+end
+
+@testset "update_weights! rank-2" begin
+    op = hessian(points, PHS(3; poly_deg = 4))
+    RadialBasisFunctions.invalidate_cache!(op)
+    @test !RadialBasisFunctions.is_cache_valid(op)
+    result = op(u)
+    @test RadialBasisFunctions.is_cache_valid(op)
+    @test size(result) == (N, 2, 2)
 end
 
 @testset "Printing" begin
