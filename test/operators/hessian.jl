@@ -154,6 +154,66 @@ end
     @test maximum(abs.(out[:, 2, 1, 1] .- 2.0)) < 0.1
 end
 
+@testset "Tensor field (rank-3 input)" begin
+    # Build a (N, 2, 2) tensor field from functions with known Hessians
+    # Channel (1,1): x*y      → H = [[0,1],[1,0]]
+    # Channel (2,1): x²+y²    → H = [[2,0],[0,2]]
+    # Channel (1,2): sin(x)cos(y) = f  → H already defined above
+    # Channel (2,2): x*y      → H = [[0,1],[1,0]]
+    u_tensor = Array{Float64, 3}(undef, N, 2, 2)
+    u_tensor[:, 1, 1] .= u1
+    u_tensor[:, 2, 1] .= u2
+    u_tensor[:, 1, 2] .= u
+    u_tensor[:, 2, 2] .= u1
+
+    op = hessian(points, PHS(3; poly_deg = 4))
+    Hu = op(u_tensor)
+
+    @test Hu isa Array{<:Any, 5}
+    @test size(Hu) == (N, 2, 2, 2, 2)
+
+    # Channel (1,1): H(x*y) — ∂²/∂x∂y = 1, diag = 0
+    @test maximum(abs.(Hu[:, 1, 1, 1, 1])) < 0.1
+    @test maximum(abs.(Hu[:, 1, 1, 1, 2] .- 1.0)) < 0.1
+    @test maximum(abs.(Hu[:, 1, 1, 2, 2])) < 0.1
+
+    # Channel (2,1): H(x²+y²) — diag = 2, off-diag = 0
+    @test maximum(abs.(Hu[:, 2, 1, 1, 1] .- 2.0)) < 0.1
+    @test maximum(abs.(Hu[:, 2, 1, 1, 2])) < 0.1
+    @test maximum(abs.(Hu[:, 2, 1, 2, 2] .- 2.0)) < 0.1
+
+    # Symmetry in Hessian dimensions
+    @test Hu[:, 1, 1, 1, 2] ≈ Hu[:, 1, 1, 2, 1] atol = 1.0e-12
+    @test Hu[:, 2, 1, 1, 2] ≈ Hu[:, 2, 1, 2, 1] atol = 1.0e-12
+end
+
+@testset "Single eval point - Tensor field" begin
+    eval_pt = [SVector{2}(0.5, 0.5)]
+    op = hessian(points, eval_pt, PHS(3; poly_deg = 4))
+
+    @test op.weights[1] isa SparseVector
+
+    u_tensor = Array{Float64, 3}(undef, N, 2, 2)
+    u_tensor[:, 1, 1] .= u1
+    u_tensor[:, 2, 1] .= u2
+    u_tensor[:, 1, 2] .= u
+    u_tensor[:, 2, 2] .= u1
+
+    Hu = op(u_tensor)
+
+    @test Hu isa Array{<:Any, 4}
+    @test size(Hu) == (2, 2, 2, 2)
+
+    # Channel (2,1): H(x²+y²) at (0.5,0.5) → diag = 2, off-diag = 0
+    @test abs(Hu[2, 1, 1, 1] - 2.0) < 0.5
+    @test abs(Hu[2, 1, 1, 2]) < 0.5
+    @test abs(Hu[2, 1, 2, 2] - 2.0) < 0.5
+
+    # Symmetry
+    @test Hu[1, 1, 1, 2] ≈ Hu[1, 1, 2, 1] atol = 1.0e-12
+    @test Hu[2, 1, 1, 2] ≈ Hu[2, 1, 2, 1] atol = 1.0e-12
+end
+
 @testset "update_weights! rank-2" begin
     op = hessian(points, PHS(3; poly_deg = 4))
     RadialBasisFunctions.invalidate_cache!(op)
