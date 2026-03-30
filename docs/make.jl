@@ -21,6 +21,9 @@ makedocs(;
         "Home" => "index.md",
         "Getting Started" => "getting_started.md",
         "Guides" => [
+            "Operators & Type Hierarchy" => "guides/operators.md",
+            "Custom Operators" => "guides/custom_operators.md",
+            "PDE Operators Cookbook" => "guides/pde_operators.md",
             "Automatic Differentiation" => "guides/autodiff.md",
             "RBF Neural Networks" => "guides/lux.md",
             "Quick Reference" => "guides/quickref.md",

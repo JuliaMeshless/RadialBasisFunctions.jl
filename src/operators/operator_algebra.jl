@@ -1,3 +1,59 @@
+# ============================================================================
+# Identity Operator
+# ============================================================================
+
+"""
+    Identity <: AbstractOperator{0}
+
+Identity operator — returns the basis function unchanged. Useful in operator algebra
+to represent the function itself (e.g., `Laplacian() + k² * Identity()` for Helmholtz).
+"""
+struct Identity <: AbstractOperator{0} end
+(::Identity)(basis) = basis
+print_op(::Identity) = "Identity (f)"
+
+# ============================================================================
+# Scaled Operator
+# ============================================================================
+
+"""
+    ScaledOperator{N, T<:Number, O<:AbstractOperator{N}} <: AbstractOperator{N}
+
+An operator multiplied by a scalar coefficient. Created via `α * op` or `op * α`.
+"""
+struct ScaledOperator{N, T <: Number, O <: AbstractOperator{N}} <: AbstractOperator{N}
+    α::T
+    op::O
+end
+ScaledOperator{N}(α::T, op::O) where {N, T <: Number, O <: AbstractOperator{N}} =
+    ScaledOperator{N, T, O}(α, op)
+
+function (s::ScaledOperator)(basis)
+    f = s.op(basis)
+    return (x, xc) -> s.α * f(x, xc)
+end
+
+function (s::ScaledOperator)(basis::MonomialBasis{Dim, Deg}) where {Dim, Deg}
+    f = s.op(basis)
+    function scaled_basis!(b, x)
+        f(b, x)
+        b .*= s.α
+        return nothing
+    end
+    return ℒMonomialBasis(Dim, Deg, scaled_basis!)
+end
+
+print_op(s::ScaledOperator) = "$(s.α) × $(print_op(s.op))"
+
+Base.:*(α::Number, op::AbstractOperator{N}) where {N} = ScaledOperator{N}(α, op)
+Base.:*(op::AbstractOperator{N}, α::Number) where {N} = ScaledOperator{N}(α, op)
+Base.:-(op::AbstractOperator{N}) where {N} = ScaledOperator{N}(-1, op)
+Base.:/(op::AbstractOperator{N}, α::Number) where {N} = ScaledOperator{N}(inv(α), op)
+
+# ============================================================================
+# Operator Algebra on RadialBasisOperator (precomputed weights)
+# ============================================================================
+
 for op in (:+, :-)
     @eval function Base.$op(op1::RadialBasisOperator, op2::RadialBasisOperator)
         _check_compatible(op1, op2)
@@ -17,11 +73,14 @@ for op in (:+, :-)
         function additive_ℒ(basis)
             return additive_ℒrbf(x1, x2) = Base.$op(op1(basis)(x1, x2), op2(basis)(x1, x2))
         end
-        function additive_ℒ(basis::MonomialBasis)
-            return function additive_ℒMon(b, x)
-                b .= Base.$op(op1(basis)(x), op2(basis)(x))
+        function additive_ℒ(basis::MonomialBasis{Dim, Deg}) where {Dim, Deg}
+            f1 = op1(basis)
+            f2 = op2(basis)
+            function additive_ℒMon(b, x)
+                b .= Base.$op(f1(x), f2(x))
                 return nothing
             end
+            return ℒMonomialBasis(Dim, Deg, additive_ℒMon)
         end
         return Custom{N}(additive_ℒ)
     end

@@ -168,7 +168,7 @@ println("MLP  final MSE: ", round(losses_mlp[end]; sigdigits=3))
 ### Loss Curves
 
 ```@example lux
-fig = Figure(; size=(600, 350));
+fig = Figure(; size=(600, 350))
 ax = Makie.Axis(fig[1, 1];
     xlabel="Epoch", ylabel="MSE (log scale)",
     yscale=log10, title="Training convergence")
@@ -185,7 +185,7 @@ X_plot = reshape(x_plot, 1, :)
 y_rbf, _ = rbf_model(X_plot, ps_rbf_trained, st_rbf)
 y_mlp, _ = mlp_model(X_plot, ps_mlp_trained, st_mlp)
 
-fig = Figure(; size=(700, 400));
+fig = Figure(; size=(700, 400))
 ax = Makie.Axis(fig[1, 1]; xlabel="x", ylabel="f(x)", title="Learned fits after 1000 epochs")
 lines!(ax, x_plot, y_true; label="Target", color=:black, linewidth=2)
 lines!(ax, x_plot, vec(y_rbf); label="RBF", linewidth=2)
@@ -203,7 +203,7 @@ anchors a basis function at a specific location in the input space.
 ```@example lux
 centers = vec(ps_rbf_trained.layer_1.centers)
 
-fig = Figure(; size=(700, 350));
+fig = Figure(; size=(700, 350))
 ax = Makie.Axis(fig[1, 1]; xlabel="x", ylabel="f(x)", title="Learned RBF center locations")
 lines!(ax, x_plot, y_true; color=:black, linewidth=2, label="Target")
 vlines!(ax, centers; color=(:red, 0.5), linewidth=1.5, label="Centers")

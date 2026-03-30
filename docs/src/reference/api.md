@@ -1,3 +1,9 @@
+## Macros
+
+```@docs
+@operator
+```
+
 ## Exported Functions
 
 ```@autodocs
