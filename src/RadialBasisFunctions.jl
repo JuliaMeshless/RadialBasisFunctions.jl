@@ -68,6 +68,15 @@ export gradient
 include("operators/directional.jl")
 export Directional, directional
 
+include("operators/normal_derivative.jl")
+export normal_derivative
+
+include("operators/divergence.jl")
+export Divergence, divergence
+
+include("operators/curl.jl")
+export Curl, curl
+
 include("operators/virtual.jl")
 export ∂virtual
 
