@@ -33,15 +33,20 @@ All operators inherit from [`AbstractOperator`](@ref), where the parameter `N` i
 AbstractOperator{N}
 ├── N=0 (rank-preserving)
 │   ├── Partial          ∂ⁿf/∂xᵢⁿ
+│   ├── MixedPartial     ∂²f/∂xᵢ∂xⱼ
 │   ├── Laplacian        ∇²f
 │   ├── Directional      ∇f⋅v
+│   ├── Divergence       ∇⋅u (vector field → scalar)
+│   ├── Curl             ∇×u (vector field → scalar/vector)
 │   ├── Identity         f (function itself)
 │   ├── ScaledOperator   α * op
 │   ├── Regrid           interpolation to new points
 │   └── Custom{0}        user-defined / algebra result
-└── N=1 (rank-adding)
-    ├── Jacobian          [∂fᵢ/∂xⱼ]
-    └── Custom{1}         user-defined
+├── N=1 (rank-adding)
+│   ├── Jacobian          [∂fᵢ/∂xⱼ]
+│   └── Custom{1}         user-defined
+└── N=2 (rank+2)
+    └── Hessian           [∂²f/∂xᵢ∂xⱼ]
 ```
 
 ## Understanding Rank (`N`)
@@ -82,8 +87,12 @@ size(result)  # (100, 2, 2) — full Jacobian tensor
 |:---:|:---:|:---:|:---|
 | `N=0` | `(N,)` | `(N,)` | `laplacian`, `partial` |
 | `N=0` | `(N, D)` | `(N, D)` | `laplacian` on vector field |
+| `N=0` | `(N, D)` | `(N,)` | `divergence` (vector field → scalar) |
+| `N=0` | `(N, 2)` | `(N,)` | `curl` in 2D (vector field → scalar) |
+| `N=0` | `(N, 3)` | `(N, 3)` | `curl` in 3D (vector field → vector) |
 | `N=1` | `(N,)` | `(N, D)` | `jacobian` on scalar field |
 | `N=1` | `(N, D)` | `(N, D, D)` | `jacobian` on vector field |
+| `N=2` | `(N,)` | `(N, D, D)` | `hessian` on scalar field |
 
 ## `RadialBasisOperator`: The Wrapper
 
@@ -98,7 +107,7 @@ Key fields:
 | Field | Description |
 |:---|:---|
 | `ℒ` | The operator type (e.g., `Laplacian()`) |
-| `weights` | Precomputed weight matrix (or tuple for rank-1) |
+| `weights` | Precomputed weight matrix (or tuple of matrices for multi-component operators) |
 | `data` | Source points used to build stencils |
 | `eval_points` | Points where the operator is evaluated |
 | `adjl` | Adjacency list (neighbor indices per stencil) |

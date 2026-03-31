@@ -57,14 +57,21 @@ using RadialBasisFunctions, StaticArrays
 
 points = [SVector{2}(rand(2)) for _ in 1:100]
 
-# Differential operators
+# Scalar field operators
 lap = laplacian(points)           # ∇²f (scalar output)
 grad = gradient(points)           # ∇f (vector output)
 ∂x = partial(points, 1, 1)        # ∂f/∂x (1st order, dim 1)
 ∂²y = partial(points, 2, 2)       # ∂²f/∂y² (2nd order, dim 2)
+∂xy = mixed_partial(points, 1, 2) # ∂²f/∂x∂y
+H = hessian(points)               # Full Hessian matrix
 ∂v = directional(points, v)       # ∇f·v
+∂n = normal_derivative(points, normals)  # ∇f·n̂
 op = @operator ∇ ⋅ (κ * ∇)
 diff = custom(points, op)                      # ∇⋅(κ∇f)
+
+# Vector field operators (input: N×D matrix)
+div_op = divergence(points)       # ∇⋅u (scalar output)
+curl_op = curl(points)            # ∇×u (2D: scalar, 3D: vector)
 
 # Interpolation operators
 rg = regrid(source, target)       # Local interpolation
