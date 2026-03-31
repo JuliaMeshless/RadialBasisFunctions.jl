@@ -509,16 +509,7 @@ function update_weights!(op::RadialBasisOperator)
     return nothing
 end
 
-function update_weights!(op::RadialBasisOperator{<:AbstractOperator{1}})
-    new_weights = _build_weights(op.ℒ, op)
-    for i in eachindex(op.weights)
-        op.weights[i] .= new_weights[i]
-    end
-    validate_cache!(op)
-    return nothing
-end
-
-function update_weights!(op::RadialBasisOperator{<:AbstractOperator{2}})
+function update_weights!(op::RadialBasisOperator{<:AbstractOperator, <:Tuple})
     new_weights = _build_weights(op.ℒ, op)
     for i in eachindex(op.weights)
         op.weights[i] .= new_weights[i]
@@ -539,15 +530,7 @@ function Adapt.adapt_structure(to, op::RadialBasisOperator)
     )
 end
 
-function Adapt.adapt_structure(to, op::RadialBasisOperator{<:AbstractOperator{1}})
-    adapted_weights = map(w -> Adapt.adapt(to, w), op.weights)
-    return RadialBasisOperator(
-        op.ℒ, adapted_weights, op.data, op.eval_points, op.adjl, op.basis,
-        is_cache_valid(op); device = op.device,
-    )
-end
-
-function Adapt.adapt_structure(to, op::RadialBasisOperator{<:AbstractOperator{2}})
+function Adapt.adapt_structure(to, op::RadialBasisOperator{<:AbstractOperator, <:Tuple})
     adapted_weights = map(w -> Adapt.adapt(to, w), op.weights)
     return RadialBasisOperator(
         op.ℒ, adapted_weights, op.data, op.eval_points, op.adjl, op.basis,
