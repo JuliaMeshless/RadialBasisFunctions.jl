@@ -3,6 +3,7 @@ using StaticArraysCore
 using Statistics
 using HaltonSequences
 using LinearAlgebra
+using SparseArrays: SparseVector
 
 include("../test_utils.jl")
 
@@ -89,6 +90,38 @@ end
     @test all(abs.(view(y, :, 1)) .< 0.1)
     @test all(abs.(view(y, :, 2)) .< 0.1)
     @test mean_percent_error(view(y, :, 3), fill(2.0, N)) < 10
+end
+
+@testset "Single Eval Point 2D" begin
+    N = 10_000
+    x = SVector{2}.(HaltonPoint(2)[1:N])
+    eval_pt = [SVector{2}(0.5, 0.5)]
+
+    # u = (-x₂, x₁) → curl(u) = 2
+    u = hcat(-getindex.(x, 2), getindex.(x, 1))
+
+    curl_op = curl(x; eval_points=eval_pt)
+    @test curl_op.weights[1] isa SparseVector
+    result = curl_op(u)
+    @test result isa Number
+    @test abs(result - 2.0) < 0.1
+end
+
+@testset "Single Eval Point 3D" begin
+    N = 10_000
+    x = SVector{3}.(HaltonPoint(3)[1:N])
+    eval_pt = [SVector{3}(0.5, 0.5, 0.5)]
+
+    # u = (-x₂, x₁, 0) → curl(u) = (0, 0, 2)
+    u = hcat(-getindex.(x, 2), getindex.(x, 1), zeros(N))
+
+    curl_op = curl(x; eval_points=eval_pt)
+    @test curl_op.weights[1] isa SparseVector
+    result = curl_op(u)
+    @test result isa SVector{3}
+    @test abs(result[1]) < 0.1
+    @test abs(result[2]) < 0.1
+    @test abs(result[3] - 2.0) < 0.1
 end
 
 @testset "Printing" begin

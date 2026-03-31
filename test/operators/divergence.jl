@@ -3,6 +3,7 @@ using StaticArraysCore
 using Statistics
 using HaltonSequences
 using LinearAlgebra
+using SparseArrays: SparseVector
 
 include("../test_utils.jl")
 
@@ -68,6 +69,22 @@ end
     y = similar(exact)
     div_op(y, u)
     @test mean_percent_error(y, exact) < 10
+end
+
+@testset "Single Eval Point" begin
+    N = 10_000
+    x = SVector{2}.(HaltonPoint(2)[1:N])
+    eval_pt = [SVector{2}(0.5, 0.5)]
+
+    u = hcat(sin.(getindex.(x, 1)), cos.(getindex.(x, 2)))
+    # div(u) = cos(x₁) - sin(x₂)
+    exact = cos(0.5) - sin(0.5)
+
+    div_op = divergence(x; eval_points=eval_pt)
+    @test div_op.weights[1] isa SparseVector
+    result = div_op(u)
+    @test result isa Number
+    @test abs(result - exact) < 0.1
 end
 
 @testset "Printing" begin
