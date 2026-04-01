@@ -50,7 +50,7 @@ julia --project=benchmark benchmark/benchmarks.jl
 
 2. **Operators** (`src/operators/`): Differential operators built on RBFs
    - `RadialBasisOperator` - Main operator type with lazy weight computation
-   - Specific operators: `Partial`, `Jacobian`, `Laplacian`, `Directional`, `Custom{N}`
+   - Specific operators: `Partial`, `MixedPartial`, `Jacobian`, `Hessian`, `Laplacian`, `Directional`, `Divergence`, `Curl`, `Custom{N}`
    - `operator_algebra.jl` - `Identity`, `ScaledOperator`, and algebraic operations (`+`, `-`, `*`) on operators
    - `operator_macro.jl` - `@operator` macro for textbook notation
    - Virtual operators for performance optimization
@@ -351,8 +351,13 @@ Gaussian(0.5) # Smaller ε = wider basis function
 | Sum of second derivatives | `laplacian(points)` | Vector (scalar per point) |
 | All partial derivatives | `gradient(points)` | Matrix (N × dim) |
 | Jacobian of vector field | `jacobian(points)` | Array (N × D × D) |
+| Hessian matrix | `hessian(points)` | Array (N × D × D) |
 | Single partial derivative | `partial(points, order, dim)` | Vector |
+| Mixed partial ∂²f/∂xᵢ∂xⱼ | `mixed_partial(points, i, j)` | Vector |
 | Directional derivative | `directional(points, v)` | Vector |
+| Normal derivative ∂f/∂n | `normal_derivative(points, normals)` | Vector |
+| Divergence of vector field | `divergence(points)` | Vector (from N×D matrix) |
+| Curl of vector field | `curl(points)` | 2D: Vector, 3D: N×3 Matrix |
 | Diffusion ∇⋅(κ∇f) | `custom(points, @operator(∇ ⋅ (κ * ∇)))` | Vector |
 | Interpolate to new points | `regrid(src, dst)` | Vector |
 | Global interpolation | `Interpolator(points, values)` | Callable object |
@@ -396,7 +401,7 @@ end
 ### Adding a New Operator
 
 1. Create file `src/operators/my_operator.jl`
-2. Define operator struct inheriting from `AbstractOperator{N}` (`N=0` for rank-preserving, `N=1` for rank+1)
+2. Define operator struct inheriting from `AbstractOperator{N}` (`N=0` for rank-preserving, `N=1` for rank+1, `N=2` for rank+2)
 3. Implement the operator-basis interaction
 
 ```julia

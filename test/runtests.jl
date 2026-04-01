@@ -52,6 +52,18 @@ end
     include("operators/hessian.jl")
 end
 
+@safetestset "Normal Derivative" begin
+    include("operators/normal_derivative.jl")
+end
+
+@safetestset "Divergence" begin
+    include("operators/divergence.jl")
+end
+
+@safetestset "Curl" begin
+    include("operators/curl.jl")
+end
+
 @safetestset "Custom" begin
     include("operators/custom.jl")
 end

@@ -23,7 +23,7 @@
 
 RBF methods approximate functions from scattered data without requiring a mesh. This package focuses on **local collocation** — building stencils from k-nearest neighbors instead of coupling all N points — so it scales to large problems without dense N×N solves.
 
-Beyond interpolation, it provides differential operators (Laplacian, gradient, partials, custom) that act directly on scattered data, with support for Hermite interpolation to enforce boundary conditions in PDE applications.
+Beyond interpolation, it provides differential operators (Laplacian, gradient, divergence, curl, Hessian, partials, custom) that act directly on scattered data, with support for Hermite interpolation to enforce boundary conditions in PDE applications.
 
 Other things that might matter to you:
 - GPU evaluation support via [Adapt.jl](https://github.com/JuliaGPU/Adapt.jl) — build on CPU, evaluate on GPU ([full GPU tracking issue](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88))
