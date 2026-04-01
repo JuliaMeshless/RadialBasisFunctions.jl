@@ -100,7 +100,7 @@ end
     # u = (-x₂, x₁) → curl(u) = 2
     u = hcat(-getindex.(x, 2), getindex.(x, 1))
 
-    curl_op = curl(x; eval_points=eval_pt)
+    curl_op = curl(x; eval_points = eval_pt)
     @test curl_op.weights[1] isa SparseVector
     result = curl_op(u)
     @test result isa Number
@@ -115,7 +115,7 @@ end
     # u = (-x₂, x₁, 0) → curl(u) = (0, 0, 2)
     u = hcat(-getindex.(x, 2), getindex.(x, 1), zeros(N))
 
-    curl_op = curl(x; eval_points=eval_pt)
+    curl_op = curl(x; eval_points = eval_pt)
     @test curl_op.weights[1] isa SparseVector
     result = curl_op(u)
     @test result isa SVector{3}

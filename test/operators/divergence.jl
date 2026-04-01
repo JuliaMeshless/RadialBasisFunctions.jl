@@ -80,7 +80,7 @@ end
     # div(u) = cos(x₁) - sin(x₂)
     exact = cos(0.5) - sin(0.5)
 
-    div_op = divergence(x; eval_points=eval_pt)
+    div_op = divergence(x; eval_points = eval_pt)
     @test div_op.weights[1] isa SparseVector
     result = div_op(u)
     @test result isa Number
