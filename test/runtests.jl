@@ -64,6 +64,14 @@ end
     include("operators/curl.jl")
 end
 
+@safetestset "Strain Rate" begin
+    include("operators/strain_rate.jl")
+end
+
+@safetestset "Rotation Rate" begin
+    include("operators/rotation_rate.jl")
+end
+
 @safetestset "Custom" begin
     include("operators/custom.jl")
 end

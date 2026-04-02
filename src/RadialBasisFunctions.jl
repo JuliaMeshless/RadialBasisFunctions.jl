@@ -77,6 +77,12 @@ export Divergence, divergence
 include("operators/curl.jl")
 export Curl, curl
 
+include("operators/strain_rate.jl")
+export StrainRate, strain_rate
+
+include("operators/rotation_rate.jl")
+export RotationRate, rotation_rate
+
 include("operators/virtual.jl")
 export ∂virtual
 
