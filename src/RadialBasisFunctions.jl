@@ -12,7 +12,7 @@ using StaticArraysCore
 using SymRCM
 
 include("basis/basis.jl")
-export AbstractRadialBasis
+export AbstractBasis, AbstractRadialBasis
 export AbstractPHS, PHS, PHS1, PHS3, PHS5, PHS7
 export IMQ
 export Gaussian

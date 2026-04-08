@@ -7,7 +7,7 @@ struct Partial{T <: Int} <: AbstractOperator{0}
     order::T
     dim::T
 end
-(op::Partial)(basis) = ∂(basis, op.order, op.dim)
+(op::Partial)(basis::AbstractBasis) = ∂(basis, op.order, op.dim)
 
 # Primary interface using unified keyword constructor
 """
