@@ -121,12 +121,12 @@ typeof(normal_deriv(y))
 
 ### Custom Operator Basics
 
-The [`@operator`](@ref) macro lets you write PDE operators in mathematical notation and pass them to [`custom`](@ref):
+The [`@operator`](@ref) macro lets you write PDE operators in mathematical notation and call them directly with data points:
 
 ```@example overview
 k² = 4.0
 op = @operator ∇² + k² * f
-helm = custom(x, op)
+helm = op(x)
 typeof(helm)
 ```
 

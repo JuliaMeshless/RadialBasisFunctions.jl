@@ -18,7 +18,7 @@ Differentiation increases tensor rank by 1. The output gains a trailing dimensio
 """
 struct Jacobian{Dim} <: AbstractOperator{1} end
 
-function (op::Jacobian{Dim})(basis) where {Dim}
+function (op::Jacobian{Dim})(basis::AbstractBasis) where {Dim}
     return ntuple(dim -> ∂(basis, dim), Dim)
 end
 

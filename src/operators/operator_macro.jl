@@ -2,7 +2,7 @@
     @operator expr
 
 Create an operator from mathematical notation. Returns an `AbstractOperator`
-suitable for passing to [`custom`](@ref) or [`RadialBasisOperator`](@ref).
+that can be called directly with data points to build a [`RadialBasisOperator`](@ref).
 
 # Recognized symbols
 - `∇²` / `Δ` — [`Laplacian`](@ref)
@@ -16,10 +16,10 @@ suitable for passing to [`custom`](@ref) or [`RadialBasisOperator`](@ref).
 
 # Examples
 ```julia
-helm = custom(x, @operator(∇² + k^2 * f))
-aniso = custom(x, @operator(κx * ∂²(1) + κy * ∂²(2)))
-advdiff = custom(x, @operator(ν * ∇² - c ⋅ ∇))
-diff = custom(x, @operator(∇ ⋅ (κ * ∇)))
+helm = (@operator ∇² + k^2 * f)(x)
+aniso = (@operator κx * ∂²(1) + κy * ∂²(2))(x)
+advdiff = (@operator ν * ∇² - c ⋅ ∇)(x)
+diff = (@operator ∇ ⋅ (κ * ∇))(x)
 ```
 """
 macro operator(expr)
