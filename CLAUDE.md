@@ -358,6 +358,8 @@ Gaussian(0.5) # Smaller ε = wider basis function
 | Normal derivative ∂f/∂n | `normal_derivative(points, normals)` | Vector |
 | Divergence of vector field | `divergence(points)` | Vector (from N×D matrix) |
 | Curl of vector field | `curl(points)` | 2D: Vector, 3D: N×3 Matrix |
+| Strain rate ½(∇u + (∇u)ᵀ) | `strain_rate(points)` | Array (N × D × D) |
+| Rotation rate ½(∇u − (∇u)ᵀ) | `rotation_rate(points)` | Array (N × D × D) |
 | Diffusion ∇⋅(κ∇f) | `(@operator ∇ ⋅ (κ * ∇))(points)` | Vector |
 | Interpolate to new points | `regrid(src, dst)` | Vector |
 | Global interpolation | `Interpolator(points, values)` | Callable object |

@@ -71,6 +71,8 @@ diff = (@operator ∇ ⋅ (κ * ∇))(points)          # ∇⋅(κ∇f)
 # Vector field operators (input: N×D matrix)
 div_op = divergence(points)       # ∇⋅u (scalar output)
 curl_op = curl(points)            # ∇×u (2D: scalar, 3D: vector)
+S = strain_rate(points)           # ½(∇u + (∇u)ᵀ)
+R = rotation_rate(points)         # ½(∇u − (∇u)ᵀ)
 
 # Interpolation operators
 rg = regrid(source, target)       # Local interpolation
