@@ -4,7 +4,7 @@
 Operator for the sum of the second derivatives w.r.t. each independent variable (∇²f).
 """
 struct Laplacian <: AbstractOperator{0} end
-(::Laplacian)(basis::AbstractBasis) = ∇²(basis)
+(::Laplacian)(basis) = ∇²(basis)
 
 # Primary interface using unified keyword constructor
 """

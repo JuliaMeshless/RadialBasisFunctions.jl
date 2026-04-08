@@ -8,18 +8,9 @@ The parameter `N` is the tensor rank added to the output:
 - `N=1`: adds one trailing dimension (e.g., [`Jacobian`](@ref))
 - `N=2`: adds two trailing dimensions (e.g., [`Hessian`](@ref))
 
-Subtypes must implement `(op::MyOp)(basis::AbstractBasis)` to return a callable applied to the basis.
-
-All `AbstractOperator` subtypes are callable with data points to construct a [`RadialBasisOperator`](@ref):
-
-```julia
-op = Laplacian()(points)
-op = (@operator ∇² + k² * f)(points; basis=PHS(5; poly_deg=3))
-```
+Subtypes must implement `(op::MyOp)(basis)` to return a callable applied to the basis.
 """
 abstract type AbstractOperator{N} end
-
-(op::AbstractOperator)(data::AbstractVector; kw...) = RadialBasisOperator(op, data; kw...)
 
 """
     struct RadialBasisOperator
@@ -77,16 +68,14 @@ Unified constructor with keyword arguments.
 
 # Examples
 ```julia
-# Preferred: call operator directly with data points
-op = Laplacian()(data)
-op = Laplacian()(data; basis=PHS(5; poly_deg=3), k=40)
-op = (@operator ∇² + k² * f)(data)
-
-# Explicit constructor form
+# Basic usage
 op = RadialBasisOperator(Laplacian(), data)
 
+# With custom basis and stencil size
+op = RadialBasisOperator(Laplacian(), data; basis=PHS(5; poly_deg=3), k=40)
+
 # With different evaluation points
-op = Laplacian()(data; eval_points=eval_pts)
+op = RadialBasisOperator(Laplacian(), data; eval_points=eval_pts)
 
 # With Hermite boundary conditions
 op = RadialBasisOperator(Laplacian(), data;

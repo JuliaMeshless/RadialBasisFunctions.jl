@@ -173,7 +173,7 @@ Available functor types (accessed via `RadialBasisFunctions.∂` etc.):
 | `D` | `D(basis, v)` | `(x, xᵢ) -> scalar` |
 | `H` | `H(basis)` | `(x, xᵢ) -> matrix` |
 
-These functors are the interface between operators and [Custom Operators](@ref "Custom Operators"). See that page for how to use them.
+These functors are the interface between operators and the [`custom`](@ref) function. See [Custom Operators](@ref "Custom Operators") for how to use them.
 
 ## Operator Algebra
 

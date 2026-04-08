@@ -13,7 +13,7 @@ x = SVector{2}.(HaltonPoint(2)[1:N])
 
 @testset "Custom struct" begin
     c = Custom{0}(identity)
-    @test c(PHS(3; poly_deg = 2)) == PHS(3; poly_deg = 2)
+    @test c(1) == 1
 end
 
 @testset "Printing" begin
@@ -237,42 +237,4 @@ end
         rank = 0,
     )
     @test op isa RadialBasisOperator
-end
-
-@testset "AbstractOperator functor API" begin
-    f(x) = 1 + sin(4 * x[1]) + cos(3 * x[1]) + sin(2 * x[2])
-    d2f(x) = -16 * sin(4 * x[1]) - 9 * cos(3 * x[1]) - 4 * sin(2 * x[2])
-    df_dx(x) = 4 * cos(4 * x[1]) - 3 * sin(3 * x[1])
-    df_dy(x) = 2 * cos(2 * x[2])
-
-    N_fun = 10_000
-    x_fun = SVector{2}.(HaltonPoint(2)[1:N_fun])
-    y_fun = f.(x_fun)
-    basis_fun = PHS(5; poly_deg = 3)
-
-    # Custom{0} functor
-    ℒ = Custom{0}(basis -> (x, xᵢ) -> basis(x, xᵢ))
-    op = ℒ(x_fun)
-    @test op isa RadialBasisOperator
-
-    # @operator returning Laplacian
-    op_lap = (@operator ∇²)(x_fun; basis = basis_fun)
-    @test op_lap isa RadialBasisOperator
-    @test mean_percent_error(op_lap(y_fun), d2f.(x_fun)) < 5
-
-    # @operator returning Partial with keyword forwarding
-    op_dx = (@operator ∂(1))(x_fun; basis = basis_fun)
-    @test op_dx isa RadialBasisOperator
-    @test mean_percent_error(op_dx(y_fun), df_dx.(x_fun)) < 5
-
-    # ScaledOperator functor
-    op_scaled = (@operator 3 * ∇²)(x_fun; basis = basis_fun)
-    @test op_scaled isa RadialBasisOperator
-    @test mean_percent_error(op_scaled(y_fun), 3 .* d2f.(x_fun)) < 5
-
-    # Operator algebra result (wraps in Custom)
-    op_sum = (@operator ∂(1) + ∂(2))(x_fun; basis = basis_fun)
-    @test op_sum isa RadialBasisOperator
-    exact_sum = df_dx.(x_fun) .+ df_dy.(x_fun)
-    @test mean_percent_error(op_sum(y_fun), exact_sum) < 5
 end

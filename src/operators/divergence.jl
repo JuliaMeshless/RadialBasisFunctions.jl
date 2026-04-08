@@ -9,7 +9,7 @@ per spatial dimension, reusing the Jacobian weight-building infrastructure.
 """
 struct Divergence{Dim} <: AbstractOperator{0} end
 
-function (::Divergence{Dim})(basis::AbstractBasis) where {Dim}
+function (::Divergence{Dim})(basis) where {Dim}
     return ntuple(dim -> ∂(basis, dim), Dim)
 end
 

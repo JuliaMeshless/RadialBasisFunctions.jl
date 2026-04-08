@@ -16,7 +16,7 @@ struct Curl{Dim} <: AbstractOperator{0}
     end
 end
 
-function (::Curl{Dim})(basis::AbstractBasis) where {Dim}
+function (::Curl{Dim})(basis) where {Dim}
     return ntuple(dim -> ∂(basis, dim), Dim)
 end
 

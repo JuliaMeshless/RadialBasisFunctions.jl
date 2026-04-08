@@ -9,7 +9,7 @@ Identity operator — returns the basis function unchanged. Useful in operator a
 to represent the function itself (e.g., `Laplacian() + k² * Identity()` for Helmholtz).
 """
 struct Identity <: AbstractOperator{0} end
-(::Identity)(basis::AbstractBasis) = basis
+(::Identity)(basis) = basis
 print_op(::Identity) = "Identity (f)"
 
 # ============================================================================
@@ -28,7 +28,7 @@ end
 ScaledOperator{N}(α::T, op::O) where {N, T <: Number, O <: AbstractOperator{N}} =
     ScaledOperator{N, T, O}(α, op)
 
-function (s::ScaledOperator)(basis::AbstractBasis)
+function (s::ScaledOperator)(basis)
     f = s.op(basis)
     return (x, xc) -> s.α * f(x, xc)
 end

@@ -358,7 +358,7 @@ Gaussian(0.5) # Smaller ε = wider basis function
 | Normal derivative ∂f/∂n | `normal_derivative(points, normals)` | Vector |
 | Divergence of vector field | `divergence(points)` | Vector (from N×D matrix) |
 | Curl of vector field | `curl(points)` | 2D: Vector, 3D: N×3 Matrix |
-| Diffusion ∇⋅(κ∇f) | `(@operator ∇ ⋅ (κ * ∇))(points)` | Vector |
+| Diffusion ∇⋅(κ∇f) | `custom(points, @operator(∇ ⋅ (κ * ∇)))` | Vector |
 | Interpolate to new points | `regrid(src, dst)` | Vector |
 | Global interpolation | `Interpolator(points, values)` | Callable object |
 
@@ -412,11 +412,12 @@ struct MixedPartial{T<:Int} <: AbstractOperator{0}
 end
 
 # Define how operator acts on basis (returns callable)
-(op::MixedPartial)(basis::AbstractRadialBasis) = MixedPartialOp(basis, op.dim1, op.dim2)
+(op::MixedPartial)(basis) = MixedPartialOp(basis, op.dim1, op.dim2)
 
-# All AbstractOperator subtypes are callable with data points:
-# op = MixedPartial(1, 2)(data)
-# op = MixedPartial(1, 2)(data; basis=PHS(5; poly_deg=3))
+# Constructor function
+function mixed_partial(data::AbstractVector, dim1::Int, dim2::Int; kw...)
+    return RadialBasisOperator(MixedPartial(dim1, dim2), data; kw...)
+end
 
 # Implement MixedPartialOp(basis, dim1, dim2)(x, xᵢ) for each basis type
 ```

@@ -9,7 +9,7 @@ Takes a vector field (Matrix N×D) as input and produces an anti-symmetric tenso
 """
 struct RotationRate{Dim} <: AbstractOperator{0} end
 
-function (::RotationRate{Dim})(basis::AbstractBasis) where {Dim}
+function (::RotationRate{Dim})(basis) where {Dim}
     return ntuple(dim -> ∂(basis, dim), Dim)
 end
 
