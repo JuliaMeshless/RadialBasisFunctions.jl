@@ -11,6 +11,8 @@ import{_ as l,c as i,o as e,aA as t,j as s,a as n}from"./chunks/framework.DInFk6
 <span class="line"><span>│   ├── Curl             ∇×u (vector field → scalar/vector)</span></span>
 <span class="line"><span>│   ├── Identity         f (function itself)</span></span>
 <span class="line"><span>│   ├── ScaledOperator   α * op</span></span>
+<span class="line"><span>│   ├── StrainRate       ½(∇u + (∇u)ᵀ)</span></span>
+<span class="line"><span>│   ├── RotationRate     ½(∇u − (∇u)ᵀ)</span></span>
 <span class="line"><span>│   ├── Regrid           interpolation to new points</span></span>
 <span class="line"><span>│   └── Custom{0}        user-defined / algebra result</span></span>
 <span class="line"><span>├── N=1 (rank-adding)</span></span>
