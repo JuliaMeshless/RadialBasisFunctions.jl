@@ -43,37 +43,7 @@ maximum(abs, helm(u) .- expected)
 
 Standard arithmetic (`+`, `-`, `*`) and unary negation work as expected. Scalars can be literals, variables, or expressions like `k^2` or `c[1]`.
 
-### More examples
-
-```@example custom
-# Anisotropic diffusion: κx ∂²f/∂x² + κy ∂²f/∂y²
-κx = 2.0; κy = 0.5
-op = @operator κx * ∂²(1) + κy * ∂²(2)
-aniso = op(x)
-
-expected = κx .* partial(x, 2, 1)(u) .+ κy .* partial(x, 2, 2)(u)
-maximum(abs, aniso(u) .- expected)
-```
-
-```@example custom
-# Anisotropic diffusion: ∇⋅(κ∇f) using textbook notation
-κ = [2.0, 0.5]
-op = @operator ∇ ⋅ (κ * ∇)
-diff = op(x)
-
-expected = κ[1] .* partial(x, 2, 1)(u) .+ κ[2] .* partial(x, 2, 2)(u)
-maximum(abs, diff(u) .- expected)
-```
-
-```@example custom
-# Advection-diffusion: ν∇²f - c⋅∇f
-ν = 0.01; c = SVector(1.0, 0.5)
-op = @operator ν * ∇² - c ⋅ ∇
-advdiff = op(x)
-
-expected = ν .* laplacian(x)(u) .- c[1] .* partial(x, 1, 1)(u) .- c[2] .* partial(x, 1, 2)(u)
-maximum(abs, advdiff(u) .- expected)
-```
+For more `@operator` recipes — diffusion, anisotropic diffusion, advection-diffusion — see the [PDE Operators Cookbook](@ref).
 
 ## Understanding Rank
 
@@ -167,6 +137,3 @@ maximum(abs, helm3(u) .- helm(u))
 !!! note
     Simple cases that return a single functor directly — like `basis -> ∂(basis, 1)` — don't need dual dispatch. The built-in functors already handle both basis types internally. Two methods are only needed when you compose multiple functors with arithmetic.
 
-## Example: PDE Operators
-
-For more worked examples — Helmholtz, anisotropic diffusion, advection-diffusion — see the [PDE Operators Cookbook](@ref).
