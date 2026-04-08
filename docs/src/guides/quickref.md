@@ -66,8 +66,7 @@ grad = gradient(points)           # ∇f (vector output)
 H = hessian(points)               # Full Hessian matrix
 ∂v = directional(points, v)       # ∇f·v
 ∂n = normal_derivative(points, normals)  # ∇f·n̂
-op = @operator ∇ ⋅ (κ * ∇)
-diff = custom(points, op)                      # ∇⋅(κ∇f)
+diff = (@operator ∇ ⋅ (κ * ∇))(points)          # ∇⋅(κ∇f)
 
 # Vector field operators (input: N×D matrix)
 div_op = divergence(points)       # ∇⋅u (scalar output)

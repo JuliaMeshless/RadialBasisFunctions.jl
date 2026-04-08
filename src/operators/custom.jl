@@ -11,7 +11,7 @@ struct Custom{N, F <: Function} <: AbstractOperator{N}
     ℒ::F
 end
 Custom{N}(ℒ::F) where {N, F <: Function} = Custom{N, F}(ℒ)
-(op::Custom)(basis) = op.ℒ(basis)
+(op::Custom)(basis::AbstractBasis) = op.ℒ(basis)
 
 """
     _infer_rank(ℒ)
@@ -48,14 +48,14 @@ Build a `RadialBasisOperator` with a custom operator.
 
 # Examples
 ```julia
+# Using @operator macro — call the operator directly with data points
+op = (@operator ∇² + k² * f)(data)
+
 # Custom operator that returns the basis function itself (rank-preserving)
 op = custom(data, basis -> (x, xᵢ) -> basis(x, xᵢ))
 
 # Custom second partial derivative ∂²f/∂x₁² using the ∂² functor
 op = custom(data, basis -> ∂²(basis, 1))
-
-# Using @operator macro (rank inferred from type parameter)
-op = custom(data, @operator ∇² + k² * f)
 ```
 """
 function custom(data::AbstractVector, ℒ::Function; rank::Int = _infer_rank(ℒ), kw...)

@@ -9,7 +9,7 @@ reusing the Jacobian weight-building infrastructure.
 """
 struct StrainRate{Dim} <: AbstractOperator{0} end
 
-function (::StrainRate{Dim})(basis) where {Dim}
+function (::StrainRate{Dim})(basis::AbstractBasis) where {Dim}
     return ntuple(dim -> ∂(basis, dim), Dim)
 end
 

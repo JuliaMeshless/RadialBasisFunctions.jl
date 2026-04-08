@@ -22,7 +22,7 @@ The [`@operator`](@ref) macro lets you write PDE operators in mathematical notat
 ```@example custom
 k² = 4.0
 op = @operator ∇² + k² * f
-helm = custom(x, op)
+helm = op(x)
 
 # Verify against separate built-in operators
 expected = laplacian(x)(u) .+ k² .* u
@@ -49,7 +49,7 @@ Standard arithmetic (`+`, `-`, `*`) and unary negation work as expected. Scalars
 # Anisotropic diffusion: κx ∂²f/∂x² + κy ∂²f/∂y²
 κx = 2.0; κy = 0.5
 op = @operator κx * ∂²(1) + κy * ∂²(2)
-aniso = custom(x, op)
+aniso = op(x)
 
 expected = κx .* partial(x, 2, 1)(u) .+ κy .* partial(x, 2, 2)(u)
 maximum(abs, aniso(u) .- expected)
@@ -59,7 +59,7 @@ maximum(abs, aniso(u) .- expected)
 # Anisotropic diffusion: ∇⋅(κ∇f) using textbook notation
 κ = [2.0, 0.5]
 op = @operator ∇ ⋅ (κ * ∇)
-diff = custom(x, op)
+diff = op(x)
 
 expected = κ[1] .* partial(x, 2, 1)(u) .+ κ[2] .* partial(x, 2, 2)(u)
 maximum(abs, diff(u) .- expected)
@@ -69,7 +69,7 @@ maximum(abs, diff(u) .- expected)
 # Advection-diffusion: ν∇²f - c⋅∇f
 ν = 0.01; c = SVector(1.0, 0.5)
 op = @operator ν * ∇² - c ⋅ ∇
-advdiff = custom(x, op)
+advdiff = op(x)
 
 expected = ν .* laplacian(x)(u) .- c[1] .* partial(x, 1, 1)(u) .- c[2] .* partial(x, 1, 2)(u)
 maximum(abs, advdiff(u) .- expected)
@@ -92,7 +92,7 @@ For `AbstractOperator` inputs (from `@operator` or algebra), the rank is encoded
 Custom operators support Hermite interpolation via the `hermite` keyword, just like built-in operators:
 
 ```julia
-op = custom(data, my_ℒ; hermite=(
+op = my_ℒ(data; hermite=(
     is_boundary=is_boundary,
     bc=bcs,
     normals=normals
@@ -103,7 +103,9 @@ See the [Boundary Conditions](@ref "Getting Started") section of Getting Started
 
 ## The Contract
 
-The [`custom`](@ref) function builds a `RadialBasisOperator` from a user-defined operator function:
+Any `AbstractOperator` — including results from `@operator` — can be called directly with data points to build a `RadialBasisOperator`. Under the hood this calls `RadialBasisOperator(op, data; kw...)`.
+
+For raw closure-based operators, the [`custom`](@ref) function wraps a function in a `Custom{N}` operator:
 
 ```julia
 custom(data, ℒ)
@@ -158,7 +160,7 @@ function helmholtz_op(basis::MonomialBasis)
     end
 end
 
-helm3 = custom(x, helmholtz_op)
+helm3 = Custom{0}(helmholtz_op)(x)
 maximum(abs, helm3(u) .- helm(u))
 ```
 
