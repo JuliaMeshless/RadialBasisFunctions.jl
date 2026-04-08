@@ -21,8 +21,8 @@ include("../test_utils.jl")
     # Anti-symmetry
     @test ω[:, 1, 2] ≈ -ω[:, 2, 1]
     # Diagonal is zero
-    @test all(abs.(ω[:, 1, 1]) .< 1e-10)
-    @test all(abs.(ω[:, 2, 2]) .< 1e-10)
+    @test all(abs.(ω[:, 1, 1]) .< 1.0e-10)
+    @test all(abs.(ω[:, 2, 2]) .< 1.0e-10)
 end
 
 @testset "2D Rotation Rate (opposite sign)" begin
@@ -71,9 +71,9 @@ end
     @test ω[:, 1, 3] ≈ -ω[:, 3, 1]
     @test ω[:, 2, 3] ≈ -ω[:, 3, 2]
     # Diagonal zero
-    @test all(abs.(ω[:, 1, 1]) .< 1e-10)
-    @test all(abs.(ω[:, 2, 2]) .< 1e-10)
-    @test all(abs.(ω[:, 3, 3]) .< 1e-10)
+    @test all(abs.(ω[:, 1, 1]) .< 1.0e-10)
+    @test all(abs.(ω[:, 2, 2]) .< 1.0e-10)
+    @test all(abs.(ω[:, 3, 3]) .< 1.0e-10)
 end
 
 @testset "Different Eval Points" begin
