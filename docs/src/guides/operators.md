@@ -40,6 +40,8 @@ AbstractOperator{N}
 │   ├── Curl             ∇×u (vector field → scalar/vector)
 │   ├── Identity         f (function itself)
 │   ├── ScaledOperator   α * op
+│   ├── StrainRate       ½(∇u + (∇u)ᵀ)
+│   ├── RotationRate     ½(∇u − (∇u)ᵀ)
 │   ├── Regrid           interpolation to new points
 │   └── Custom{0}        user-defined / algebra result
 ├── N=1 (rank-adding)
