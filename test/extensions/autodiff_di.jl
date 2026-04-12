@@ -2,6 +2,7 @@ using RadialBasisFunctions
 using StaticArraysCore
 using FiniteDifferences
 using LinearAlgebra
+using SparseArrays
 using Test
 import DifferentiationInterface as DI
 using Enzyme: Enzyme
@@ -9,6 +10,80 @@ using Mooncake: Mooncake
 using Random: MersenneTwister
 
 const FD = FiniteDifferences
+
+# =============================================================================
+# IFT-based differentiable PDE solve (local, defined at module scope)
+#
+# Wraps: assemble A from W (Laplacian weights + Dirichlet BC rows) → solve A\b
+# Backward: implicit function theorem — no need to differentiate through lu.
+#   Given ∂L/∂u: η = Aᵀ\(∂L/∂u),  ∂L/∂b += η,  ∂L/∂W[i,j] = -η[i]·u[j] (interior i only)
+#
+# Boundary rows of A are identity (Dirichlet), so they carry no gradient from W.
+# =============================================================================
+
+struct PDESolveIFT
+    interior_idx::Vector{Int}
+    boundary_idx::Vector{Int}
+    is_interior::BitVector
+end
+
+function PDESolveIFT(interior_idx::Vector{Int}, boundary_idx::Vector{Int}, N::Int)
+    is_int = falses(N)
+    is_int[interior_idx] .= true
+    return PDESolveIFT(interior_idx, boundary_idx, is_int)
+end
+
+function (solver::PDESolveIFT)(
+        W::SparseMatrixCSC{Float64,Int}, b::Vector{Float64}
+    )
+    A = Matrix(W)
+    for i in solver.boundary_idx
+        A[i, :] .= 0.0
+        A[i, i] = 1.0
+    end
+    return A \ b
+end
+
+Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{PDESolveIFT, SparseMatrixCSC{Float64,Int}, Vector{Float64}}
+
+function Mooncake.rrule!!(
+        solver_cd::Mooncake.CoDual{PDESolveIFT},
+        W::Mooncake.CoDual{SparseMatrixCSC{Float64,Int}},
+        b::Mooncake.CoDual{Vector{Float64}},
+    )
+    solver = Mooncake.primal(solver_cd)
+    W_val = Mooncake.primal(W)
+    b_val = Mooncake.primal(b)
+
+    A = Matrix(W_val)
+    for i in solver.boundary_idx
+        A[i, :] .= 0.0
+        A[i, i] = 1.0
+    end
+    u = A \ b_val
+    u_codual = Mooncake.zero_fcodual(u)
+
+    function pde_solve_pb!!(::Mooncake.NoRData)
+        Δu = u_codual.dx
+        η = A' \ Δu               # adjoint solve (IFT)
+        b.dx .+= η                # ∂L/∂b = η
+        # ∂L/∂W[i,j] = -η[i]·u[j], but only for interior rows i
+        # (boundary rows were overwritten with identity and carry no W gradient)
+        ΔW_nzval = W.dx.data.nzval
+        rows = rowvals(W_val)
+        for j in 1:size(W_val, 2)
+            for idx in nzrange(W_val, j)
+                i = rows[idx]
+                if solver.is_interior[i]
+                    ΔW_nzval[idx] -= η[i] * u[j]
+                end
+            end
+        end
+        return Mooncake.NoRData(), Mooncake.NoRData(), Mooncake.NoRData()
+    end
+
+    return u_codual, pde_solve_pb!!
+end
 
 # Version compatibility - Enzyme.jl has known issues with Julia 1.12+
 # See: https://github.com/EnzymeAD/Enzyme.jl/issues/2699
@@ -584,5 +659,138 @@ end
         @test Base.find_package("Enzyme") !== nothing
         @test Base.find_package("Mooncake") !== nothing
         @test Base.find_package("DifferentiationInterface") !== nothing
+    end
+
+    # =========================================================================
+    # End-to-end: gradient of (W(pts) * f) w.r.t. point positions
+    #
+    # This is the missing link between the existing _build_weights gradient tests
+    # (which only test sum(W.nzval^2)) and full shape optimization. Here we chain:
+    #   pts_flat → _build_weights → W → W * f_vals → loss
+    #
+    # Key design choices:
+    #   - adjl is fixed outside the loss (topology does not change as pts move)
+    #   - f_vals are fixed at original point positions (we test sensitivity of W to pts)
+    #   - f = sin(πx)cos(πy), NOT in the polynomial span of PHS(3; poly_deg=2),
+    #     so W*f genuinely varies with point positions (non-trivial gradient)
+    # =========================================================================
+    @testset "Laplacian application gradient w.r.t. point positions" begin
+        rng = MersenneTwister(1234)
+        n_side = 5
+        N_grid = n_side^2
+        noise_scale = 0.02
+        h = 1.0 / (n_side + 1)
+
+        # Perturbed regular grid — fixed reference configuration
+        points_grid = [
+            SVector{2}(i * h + noise_scale * randn(rng), j * h + noise_scale * randn(rng))
+            for i in 1:n_side for j in 1:n_side
+        ]
+
+        # Adjacency list fixed once: topology does not change under perturbation
+        adjl_grid = RadialBasisFunctions.find_neighbors(points_grid, 14)
+        basis_grid = PHS(3; poly_deg = 2)
+
+        # Function values fixed at original positions.
+        # sin(πx)cos(πy) is not in the quadratic polynomial span, so
+        # W(pts) * f_vals genuinely depends on pts → non-trivial gradient.
+        f_vals_grid = [sin(π * p[1]) * cos(π * p[2]) for p in points_grid]
+
+        function loss_lap_application(pts_flat)
+            pts = [SVector{2}(pts_flat[2 * i - 1], pts_flat[2 * i]) for i in 1:N_grid]
+            W = RadialBasisFunctions._build_weights(
+                Laplacian(), pts, pts, adjl_grid, basis_grid
+            )
+            return sum((W * f_vals_grid) .^ 2)
+        end
+
+        pts_flat_grid = vcat([collect(p) for p in points_grid]...)
+
+        # Sanity check: loss is finite and nonzero at the reference configuration
+        @test isfinite(loss_lap_application(pts_flat_grid))
+        @test loss_lap_application(pts_flat_grid) > 0
+
+        @testset "Mooncake" begin
+            test_gradient_vs_fd(
+                loss_lap_application, pts_flat_grid, MOONCAKE_BACKEND; rtol = 1.0e-3
+            )
+        end
+    end
+
+    # =========================================================================
+    # Full PDE solve gradient w.r.t. point positions (IFT through linear solve)
+    #
+    # Chain: pts_flat → _build_weights → W → PDESolveIFT(W, b) → u → sum(u²)
+    #
+    # Setup: Laplace equation on a perturbed grid with Dirichlet BCs.
+    # Test function: f(x,y) = x²+y², ∇²f = 4 (exactly reproduced by PHS+poly_deg=2).
+    #
+    # Sanity check: at the nominal configuration, the solver recovers f_exact
+    # to machine precision (exact polynomial reproduction).
+    #
+    # AD test: b_rhs is FIXED at original point positions. As pts move, A(pts)
+    # changes but b stays constant, so u = A(pts)⁻¹b changes non-trivially.
+    # Loss = sum(u²) is nonzero with a genuine gradient w.r.t. pts.
+    # =========================================================================
+    @testset "Full PDE solve gradient w.r.t. point positions (IFT)" begin
+        rng = MersenneTwister(5678)
+        n_side = 6
+        N_pde = n_side^2
+        h = 1.0 / (n_side + 1)
+        noise_scale = 0.01
+
+        # Perturbed regular grid
+        points_pde = [
+            SVector{2}(i * h + noise_scale * randn(rng), j * h + noise_scale * randn(rng))
+            for i in 1:n_side for j in 1:n_side
+        ]
+
+        # Boundary = outer ring of the grid
+        boundary_mask = [
+            i == 1 || i == n_side || j == 1 || j == n_side
+            for i in 1:n_side for j in 1:n_side
+        ]
+        boundary_idx_pde = findall(boundary_mask)
+        interior_idx_pde = findall(.!boundary_mask)
+
+        # Fixed adjacency list — topology does not change under perturbation
+        adjl_pde = RadialBasisFunctions.find_neighbors(points_pde, 14)
+        basis_pde = PHS(3; poly_deg = 2)
+
+        # Quadratic test function: f(x,y) = x²+y², ∇²f = 4 (constant, no approx error)
+        f_exact_pde = [p[1]^2 + p[2]^2 for p in points_pde]
+
+        # RHS fixed at original point positions (does NOT update when pts move)
+        b_rhs_pde = zeros(N_pde)
+        b_rhs_pde[interior_idx_pde] .= 4.0                           # ∇²f = 4
+        b_rhs_pde[boundary_idx_pde] = f_exact_pde[boundary_idx_pde]  # Dirichlet values
+
+        pde_solver = PDESolveIFT(interior_idx_pde, boundary_idx_pde, N_pde)
+
+        # Sanity check: exact polynomial reproduction at nominal configuration
+        W_nom = RadialBasisFunctions._build_weights(
+            Laplacian(), points_pde, points_pde, adjl_pde, basis_pde
+        )
+        u_nom = pde_solver(W_nom, b_rhs_pde)
+        @test norm(u_nom - f_exact_pde) / norm(f_exact_pde) < 1e-10
+
+        # AD test
+        function loss_pde(pts_flat)
+            pts = [SVector{2}(pts_flat[2 * i - 1], pts_flat[2 * i]) for i in 1:N_pde]
+            W = RadialBasisFunctions._build_weights(
+                Laplacian(), pts, pts, adjl_pde, basis_pde
+            )
+            u = pde_solver(W, b_rhs_pde)
+            return sum(u .^ 2)
+        end
+
+        pts_flat_pde = vcat([collect(p) for p in points_pde]...)
+
+        @test isfinite(loss_pde(pts_flat_pde))
+        @test loss_pde(pts_flat_pde) > 0
+
+        @testset "Mooncake" begin
+            test_gradient_vs_fd(loss_pde, pts_flat_pde, MOONCAKE_BACKEND; rtol = 1.0e-3)
+        end
     end
 end
