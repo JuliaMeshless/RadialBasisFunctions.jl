@@ -24,15 +24,6 @@ end
 # Evaluation
 # ============================================================================
 
-function _eval_op(op::RadialBasisOperator{<:Curl}, x::AbstractVector)
-    throw(
-        ArgumentError(
-            "Curl requires a vector field (Matrix input, N×D), got a Vector. " *
-                "Each column should be a component of the vector field."
-        )
-    )
-end
-
 # 2D curl: (N×2) → (N,)  =  ∂u₂/∂x₁ − ∂u₁/∂x₂
 function _eval_op(op::RadialBasisOperator{<:Curl{2}}, x::AbstractMatrix)
     N_eval = length(op.eval_points)

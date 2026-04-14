@@ -92,6 +92,10 @@ end
     include("operators/operator_algebra.jl")
 end
 
+@safetestset "Operator Traits" begin
+    include("operators/operator_traits.jl")
+end
+
 @safetestset "Device Kwarg" begin
     include("operators/device_kwarg.jl")
 end

@@ -33,6 +33,12 @@ adjl[2] = dx.adjl[1]
 dy = partial(x, 1, 2; adjl = adjl)
 @test_throws ArgumentError dx + dy
 
+# test rank-mismatched algebra gives clear error
+@testset "Rank mismatch error" begin
+    @test_throws ArgumentError Laplacian() + Jacobian{2}()
+    @test_throws ArgumentError Partial(1, 1) - Hessian{2}()
+end
+
 # ScaledOperator algebra
 @testset "ScaledOperator" begin
     p = Partial(1, 1)

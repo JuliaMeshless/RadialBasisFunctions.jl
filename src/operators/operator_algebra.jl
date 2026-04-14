@@ -86,6 +86,19 @@ for op in (:+, :-)
     end
 end
 
+# Catch rank-mismatched operator algebra with a clear error
+for op in (:+, :-)
+    @eval function Base.$op(op1::AbstractOperator, op2::AbstractOperator)
+        throw(
+            ArgumentError(
+                "Cannot combine operators with different output ranks: " *
+                    "$(print_op(op1)) (rank $(output_rank(op1))) and " *
+                    "$(print_op(op2)) (rank $(output_rank(op2)))"
+            )
+        )
+    end
+end
+
 function _check_compatible(op1::RadialBasisOperator, op2::RadialBasisOperator)
     if (length(op1.data) != length(op2.data)) || !all(op1.data .≈ op2.data)
         throw(

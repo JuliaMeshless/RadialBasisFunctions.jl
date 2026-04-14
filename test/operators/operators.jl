@@ -71,6 +71,36 @@ end
     @test RBF.dim(∂3d) == 3
 end
 
+@testset "LinearAlgebra.mul! interface" begin
+    # Rank-0: mul!(y, op, x)
+    ∂ = partial(x, 1, 1)
+    z = rand(rng, N)
+    y1 = similar(z)
+    y2 = similar(z)
+    ∂(y1, z)
+    mul!(y2, ∂, z)
+    @test y1 ≈ y2
+
+    # Rank-0: 5-arg mul!(y, op, x, α, β)
+    α, β = 2.5, -0.3
+    y3 = rand(rng, N)
+    y_ref = copy(y3)
+    mul!(y3, ∂, z, α, β)
+    @test y3 ≈ α * (∂.weights * z) + β * y_ref
+
+    # Laplacian (also rank-0)
+    ∇² = laplacian(x)
+    y4 = similar(z)
+    y5 = similar(z)
+    ∇²(y4, z)
+    mul!(y5, ∇², z)
+    @test y4 ≈ y5
+
+    # size and eltype
+    @test size(∂) == size(∂.weights)
+    @test eltype(∂) == eltype(∂.weights)
+end
+
 @testset "Printing" begin
     ∂ = partial(x, 1, 1)
     @test repr(∂) == """

@@ -234,6 +234,19 @@ end
 _eval_op(op::RadialBasisOperator, x) = op.weights * x
 _eval_op(op::RadialBasisOperator, y, x) = mul!(y, op.weights, x)
 
+# Generic error for operators that require vector field (matrix) input
+function _eval_op(op::RadialBasisOperator, x::AbstractVector)
+    if requires_vector_input(op.ℒ)
+        throw(
+            ArgumentError(
+                "$(print_op(op.ℒ)) requires a vector field (Matrix input, N×D), got a Vector. " *
+                    "Each column should be a component of the vector field."
+            )
+        )
+    end
+    return op.weights * x
+end
+
 # Rank-1 operator weights: Scalar field input → Matrix output (N×D)
 function _eval_op(
         op::RadialBasisOperator{<:AbstractOperator{1}}, x::AbstractVector
@@ -504,6 +517,52 @@ function _eval_op(
     return y
 end
 
+# ============================================================================
+# LinearAlgebra.mul! interface
+# ============================================================================
+
+"""
+    LinearAlgebra.mul!(y, op::RadialBasisOperator, x)
+    LinearAlgebra.mul!(y, op::RadialBasisOperator, x, α, β)
+
+Standard linear algebra interface for operator application: `y = op * x` or `y = α * op * x + β * y`.
+
+This makes `RadialBasisOperator` composable with iterative solvers (Krylov.jl),
+LinearMaps.jl, and any generic Julia code expecting a `mul!`-compatible linear map.
+
+Only defined for rank-0 operators with scalar (non-tuple) weights, since `mul!` expects
+a single linear map `y = A * x`.
+"""
+function LinearAlgebra.mul!(
+        y, op::RadialBasisOperator{<:AbstractOperator{0}}, x
+    )
+    !is_cache_valid(op) && update_weights!(op)
+    return _eval_op(op, y, x)
+end
+
+function LinearAlgebra.mul!(
+        y, op::RadialBasisOperator{<:AbstractOperator{0}}, x,
+        α::Number, β::Number,
+    )
+    !is_cache_valid(op) && update_weights!(op)
+    return mul!(y, op.weights, x, α, β)
+end
+
+"""
+    Base.size(op::RadialBasisOperator{<:AbstractOperator{0}})
+
+Return the dimensions `(m, n)` of the operator's weight matrix.
+Only defined for rank-0 operators with scalar weights.
+"""
+Base.size(op::RadialBasisOperator{<:AbstractOperator{0}}) = size(op.weights)
+
+"""
+    Base.eltype(op::RadialBasisOperator)
+
+Return the element type of the operator's weight matrix.
+"""
+Base.eltype(op::RadialBasisOperator) = eltype(op.weights)
+
 # LinearAlgebra methods - divergence (dot with gradient operator)
 function LinearAlgebra.:⋅(
         op::RadialBasisOperator{<:AbstractOperator{1}}, x::AbstractVector
@@ -550,9 +609,22 @@ function Adapt.adapt_structure(to, op::RadialBasisOperator{<:AbstractOperator, <
 end
 
 # pretty printing
+function _format_traits(ℒ::AbstractOperator)
+    traits = String[]
+    requires_vector_input(ℒ) && push!(traits, "vector-field input")
+    is_self_adjoint(ℒ) && push!(traits, "self-adjoint")
+    is_symmetric(ℒ) && push!(traits, "symmetric")
+    is_antisymmetric(ℒ) && push!(traits, "antisymmetric")
+    return join(traits, ", ")
+end
+
 function Base.show(io::IO, op::RadialBasisOperator)
     println(io, "RadialBasisOperator")
     println(io, "├─Operator: " * print_op(op.ℒ))
+    traits_str = _format_traits(op.ℒ)
+    if !isempty(traits_str)
+        println(io, "├─Properties: ", traits_str)
+    end
     println(io, "├─Data type: ", eltype(op.data))
     println(io, "├─Number of points: ", length(op.data))
     println(io, "├─Stencil size: ", length(first(op.adjl)))
