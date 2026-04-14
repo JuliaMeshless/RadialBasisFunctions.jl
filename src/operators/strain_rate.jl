@@ -17,15 +17,6 @@ end
 # Evaluation — vector field input only
 # ============================================================================
 
-function _eval_op(op::RadialBasisOperator{<:StrainRate}, x::AbstractVector)
-    throw(
-        ArgumentError(
-            "StrainRate requires a vector field (Matrix input, N×D), got a Vector. " *
-                "Each column should be a component of the vector field."
-        )
-    )
-end
-
 function _eval_op(op::RadialBasisOperator{<:StrainRate}, x::AbstractMatrix)
     D = length(op.weights)
     N_eval = length(op.eval_points)

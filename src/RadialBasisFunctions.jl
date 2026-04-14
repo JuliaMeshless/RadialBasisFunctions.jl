@@ -102,6 +102,10 @@ export Interpolator
 include("operators/regridding.jl")
 export Regrid, regrid
 
+include("operators/operator_traits.jl")
+export output_rank, requires_vector_input, is_symmetric, is_antisymmetric
+export is_self_adjoint, derivative_order
+
 # Some consts and aliases
 const Δ = ∇² # some people like this notation for the Laplacian
 const AVOID_INF = 1.0e-16
