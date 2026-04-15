@@ -112,4 +112,9 @@ end
     @test contains(r, "└─Basis: Polyharmonic spline (r³) with degree 2 polynomial augmentation")
 
     @test RBF.print_op(∂.ℒ) == "∂ⁿf/∂xᵢ (n = 1, i = 1)"
+
+    # operator with traits shown
+    ∇² = laplacian(x)
+    r_lap = repr(∇²)
+    @test contains(r_lap, "├─Properties: self-adjoint")
 end
