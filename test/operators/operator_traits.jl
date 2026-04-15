@@ -66,4 +66,5 @@ end
     @test derivative_order(StrainRate{2}()) == 1
     @test derivative_order(RotationRate{3}()) == 1
     @test derivative_order(2.0 * Laplacian()) == 2
+    @test_throws ArgumentError derivative_order(Custom{0}(identity))
 end

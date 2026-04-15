@@ -75,4 +75,6 @@ derivative_order(::Curl) = 1
 derivative_order(::StrainRate) = 1
 derivative_order(::RotationRate) = 1
 derivative_order(s::ScaledOperator) = derivative_order(s.op)
-derivative_order(::Custom) = -1  # unknown
+function derivative_order(::Custom)
+    throw(ArgumentError("derivative_order is not defined for Custom operators"))
+end
