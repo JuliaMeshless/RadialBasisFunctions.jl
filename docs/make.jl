@@ -27,6 +27,7 @@ makedocs(;
             "Vector Calculus & Continuum Mechanics" => "guides/vector_calculus.md",
             "Automatic Differentiation" => "guides/autodiff.md",
             "RBF Neural Networks" => "guides/lux.md",
+            "Convergence & Parameter Selection" => "guides/convergence.md",
             "Quick Reference" => "guides/quickref.md",
         ],
         "Reference" => [
