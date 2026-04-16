@@ -5,7 +5,7 @@ Create an operator from mathematical notation. Returns an `AbstractOperator`
 that can be called directly with data points to build a [`RadialBasisOperator`](@ref).
 
 # Recognized symbols
-- `∇²` / `Δ` — [`Laplacian`](@ref)
+- `∇²` / `Δ` — [`Laplacian`](@ref RadialBasisFunctions.Laplacian)
 - `∂(dim)` — first partial derivative in dimension `dim`
 - `∂²(dim)` — second partial derivative in dimension `dim`
 - `∂(dim1, dim2)` — mixed partial derivative ∂²f/(∂xᵢ ∂xⱼ)

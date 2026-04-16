@@ -33,7 +33,7 @@ maximum(abs, helm(u) .- expected)
 
 | Symbol | Meaning |
 |:-------|:--------|
-| `∇²`, `Δ` | [`Laplacian`](@ref) |
+| `∇²`, `Δ` | [`Laplacian`](@ref RadialBasisFunctions.Laplacian) |
 | `∂(dim)` | First partial derivative in dimension `dim` |
 | `∂²(dim)` | Second partial derivative in dimension `dim` |
 | `∇ ⋅ (κ * ∇)` | Diffusion operator (scalar or vector `κ`) |
