@@ -227,10 +227,13 @@ axislegend(ax; position=:rt)
 fig
 ```
 
-Error is minimized near the `autoselect_k` value (dashed lines) and can actually
-*increase* for very large stencils — distant points degrade local approximation
-quality. The default is near-optimal; increasing ``k`` beyond ~2× the minimum
-wastes computation and can hurt accuracy.
+Error is minimized somewhat above the `autoselect_k` value (dashed lines) — not
+exactly at it — and then grows monotonically with ``k``. Two effects combine to
+produce this: distant points degrade the local approximation (a polynomial of
+fixed degree cannot represent function variation across an enlarged
+neighborhood), and near-boundary stencils become increasingly one-sided. The
+`autoselect_k` default is near-optimal, and increasing ``k`` beyond ~2× the
+default wastes computation and hurts accuracy.
 
 **`autoselect_k` values by polynomial degree and dimension:**
 
@@ -246,12 +249,18 @@ wastes computation and can hurt accuracy.
 
 ### PHS Order
 
+Each PHS order is paired with a matching polynomial degree
+(``\text{poly\_deg} = \lceil n/2 \rceil`` for ``\text{PHS}(n)``).
+Under-augmented high-order PHS is ill-posed — PHS(7) with `poly_deg=2`, for
+example, fails to converge — and that is a separate issue from which PHS order
+is better.
+
 ```@example convergence
 phs_configs = [
-    (PHS(1; poly_deg=2), "PHS1"),
+    (PHS(1; poly_deg=1), "PHS1"),
     (PHS(3; poly_deg=2), "PHS3"),
-    (PHS(5; poly_deg=2), "PHS5"),
-    (PHS(7; poly_deg=2), "PHS7"),
+    (PHS(5; poly_deg=3), "PHS5"),
+    (PHS(7; poly_deg=4), "PHS7"),
 ]
 
 phs_errors = Dict(label => Float64[] for (_, label) in phs_configs)
@@ -270,7 +279,7 @@ fig = Figure(; size=(600, 400))
 ax = Axis(fig[1, 1];
     xlabel="N (number of points)", ylabel="Normalized RMSE",
     xscale=log10, yscale=log10,
-    title="PHS Order Comparison (poly_deg=2)")
+    title="PHS Order Comparison (scaled poly_deg)")
 for (_, label) in phs_configs
     scatterlines!(ax, Ns, phs_errors[label]; label=label, linewidth=2, markersize=8)
 end
@@ -279,9 +288,11 @@ fig
 ```
 
 PHS(1) (``r^1``) is unsuitable for second-order operators — its second derivative
-is singular at ``r=0``, producing catastrophic errors. Among the smooth PHS kernels
-(3, 5, 7), the differences are modest. PHS(3) is the sweet spot; PHS(5) and PHS(7)
-offer marginal improvement at higher computational cost.
+is singular at ``r=0``, producing very large errors. Among the smooth PHS
+kernels (3, 5, 7), each achieves its theoretical rate when paired with a matching
+polynomial degree, and higher orders reach lower absolute error. The cost is
+larger stencils (`autoselect_k` grows with `poly_deg`) and more computation per
+stencil. PHS(3) with `poly_deg=2` remains the best default for most problems.
 
 ### PHS vs. IMQ vs. Gaussian
 
@@ -316,10 +327,13 @@ axislegend(ax; position=:lb)
 fig
 ```
 
-All three families converge at similar rates (parallel slopes), though IMQ and
-Gaussian achieve lower absolute error thanks to their infinite smoothness. Despite
-this, PHS is preferred for most applications because it needs no shape parameter
-tuning — IMQ and Gaussian require choosing ``\varepsilon``, covered next.
+PHS converges algebraically at the rate set by `poly_deg`. IMQ and Gaussian, with
+a well-chosen ``\varepsilon``, can converge faster on smooth problems — their
+infinite smoothness means convergence is not capped by the polynomial degree. On
+this test function, IMQ and Gaussian both reach ~100× error reduction over the
+sweep versus ~10× for PHS3. The catch is that this advantage is
+``\varepsilon``-dependent, and choosing ``\varepsilon`` well is the main
+difficulty with IMQ and Gaussian — covered next.
 
 ## Shape Parameter Sensitivity
 
@@ -355,9 +369,11 @@ axislegend(ax; position=:rt)
 fig
 ```
 
-The error curves are U-shaped: there is an optimal ``\varepsilon`` range (typically
-1–5 for unit-domain problems), but finding it requires experimentation. This is the
-main disadvantage of IMQ and Gaussian compared to PHS, which has no shape parameter.
+The error curves are U-shaped: there is an optimal ``\varepsilon`` range — on
+this test function it sits around ``\varepsilon \approx 0.3\text{–}1`` — but the
+optimum is problem- and scale-dependent, and finding it requires experimentation.
+This is the main disadvantage of IMQ and Gaussian compared to PHS, which has no
+shape parameter.
 
 ## Practical Guidelines
 
