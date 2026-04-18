@@ -1,4 +1,4 @@
-# Vector Calculus & Continuum Mechanics
+# Vector & Tensor Operators
 
 This guide demonstrates RBF-FD operators for vector calculus on scattered point clouds using the 2D Taylor-Green vortex — an incompressible flow with known analytical solutions for every quantity we compute.
 
