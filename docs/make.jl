@@ -24,7 +24,7 @@ makedocs(;
             "Operators & Type Hierarchy" => "guides/operators.md",
             "Custom Operators" => "guides/custom_operators.md",
             "PDE Operators Cookbook" => "guides/pde_operators.md",
-            "Vector Calculus & Continuum Mechanics" => "guides/vector_calculus.md",
+            "Vector & Tensor Operators" => "guides/vector_calculus.md",
             "Automatic Differentiation" => "guides/autodiff.md",
             "RBF Neural Networks" => "guides/lux.md",
             "Convergence & Parameter Selection" => "guides/convergence.md",
