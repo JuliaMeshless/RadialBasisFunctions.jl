@@ -38,6 +38,14 @@ g(x) = 1 + sin(4x[1]) + cos(3x[1]) + sin(2x[2])
 # Normalized RMSE
 nrmse(computed, exact) = sqrt(sum((computed .- exact).^2) / sum(exact.^2))
 
+# Reference convergence slope on a log-log error-vs-N plot in 2D.
+# For error ∝ h^p with h ∼ 1/√N, error scales as N^(-p/2).
+# Anchors the line at (anchor_N, anchor_err).
+function ref_slope!(ax, Ns, p; anchor_N, anchor_err, label)
+    y = anchor_err .* (Ns ./ anchor_N) .^ (-p / 2)
+    lines!(ax, Ns, y; linestyle=:dash, color=(:gray, 0.7), linewidth=1.2, label=label)
+end
+
 # Resolution sweep
 n_sides = [10, 15, 20, 30, 45, 70]
 Ns = n_sides .^ 2
@@ -85,6 +93,10 @@ ax = Axis(fig[1, 1];
 for (i, (_, label)) in enumerate(configs)
     scatterlines!(ax, Ns, interp_errors[label]; label=label, linewidth=2, markersize=8)
 end
+# Reference slopes: interpolation converges at O(h^{m+1})
+ref_slope!(ax, Ns, 3; anchor_N=Ns[1], anchor_err=interp_errors["PHS3, p=2"][1], label="O(h³)")
+ref_slope!(ax, Ns, 4; anchor_N=Ns[1], anchor_err=interp_errors["PHS3, p=3"][1], label="O(h⁴)")
+ref_slope!(ax, Ns, 5; anchor_N=Ns[1], anchor_err=interp_errors["PHS5, p=4"][1], label="O(h⁵)")
 axislegend(ax; position=:lb)
 fig
 ```
@@ -116,6 +128,10 @@ ax = Axis(fig[1, 1];
 for (i, (_, label)) in enumerate(configs)
     scatterlines!(ax, Ns, lap_errors[label]; label=label, linewidth=2, markersize=8)
 end
+# Reference slopes: second derivatives converge at O(h^{m-1})
+ref_slope!(ax, Ns, 1; anchor_N=Ns[1], anchor_err=lap_errors["PHS3, p=2"][1], label="O(h)")
+ref_slope!(ax, Ns, 2; anchor_N=Ns[1], anchor_err=lap_errors["PHS3, p=3"][1], label="O(h²)")
+ref_slope!(ax, Ns, 3; anchor_N=Ns[1], anchor_err=lap_errors["PHS5, p=4"][1], label="O(h³)")
 axislegend(ax; position=:lb)
 fig
 ```
@@ -286,6 +302,10 @@ ax = Axis(fig[1, 1];
 for (_, label) in phs_configs
     scatterlines!(ax, Ns, phs_errors[label]; label=label, linewidth=2, markersize=8)
 end
+# Reference slopes for second-derivative O(h^{m-1})
+ref_slope!(ax, Ns, 1; anchor_N=Ns[1], anchor_err=phs_errors["PHS3"][1], label="O(h)")
+ref_slope!(ax, Ns, 2; anchor_N=Ns[1], anchor_err=phs_errors["PHS5"][1], label="O(h²)")
+ref_slope!(ax, Ns, 3; anchor_N=Ns[1], anchor_err=phs_errors["PHS7"][1], label="O(h³)")
 axislegend(ax; position=:lb)
 fig
 ```
@@ -326,6 +346,8 @@ ax = Axis(fig[1, 1];
 for (_, label) in family_configs
     scatterlines!(ax, Ns, family_errors[label]; label=label, linewidth=2, markersize=8)
 end
+# Reference: PHS is bounded by polynomial rate O(h); smooth bases can go faster
+ref_slope!(ax, Ns, 1; anchor_N=Ns[1], anchor_err=family_errors["PHS(3)"][1], label="O(h)")
 axislegend(ax; position=:lb)
 fig
 ```
