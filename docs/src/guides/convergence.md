@@ -181,7 +181,8 @@ The stencil size ``k`` (number of nearest neighbors) controls the local system s
 and ``d`` is the spatial dimension.
 
 ```@example convergence
-pts_k = scattered_points(30)  # N = 900
+pts_k = scattered_points(70)  # N = 4900 — large enough that boundary stencils
+                              # are a small fraction of the total
 vals_k = g.(pts_k)
 exact_k = ∇²g.(pts_k)
 
@@ -214,7 +215,7 @@ fig = Figure(; size=(600, 400))
 ax = Axis(fig[1, 1];
     xlabel="Stencil size k", ylabel="Normalized RMSE",
     yscale=log10,
-    title="Laplacian Error vs. Stencil Size (N = 900)")
+    title="Laplacian Error vs. Stencil Size (N = 4900)")
 scatterlines!(ax, collect(k_range), err_k_pd2;
     label="poly_deg=2", linewidth=2, markersize=8)
 scatterlines!(ax, collect(k_range), err_k_pd3;
@@ -227,13 +228,15 @@ axislegend(ax; position=:rt)
 fig
 ```
 
-Error is minimized somewhat above the `autoselect_k` value (dashed lines) — not
-exactly at it — and then grows monotonically with ``k``. Two effects combine to
-produce this: distant points degrade the local approximation (a polynomial of
-fixed degree cannot represent function variation across an enlarged
-neighborhood), and near-boundary stencils become increasingly one-sided. The
-`autoselect_k` default is near-optimal, and increasing ``k`` beyond ~2× the
-default wastes computation and hurts accuracy.
+Error has a minimum near (or slightly above) the `autoselect_k` value (dashed
+lines). Going *below* `autoselect_k` degrades accuracy sharply — the stencil
+cannot support the polynomial system — while going *above* it degrades accuracy
+only mildly. The slow upward drift at large ``k`` reflects two effects: distant
+points contribute less useful information for a local approximation, and
+stencils near the domain boundary become increasingly one-sided as they enlarge.
+The practical takeaway is that `autoselect_k` is a safe default; ``k`` up to
+roughly 2× the default sits near the minimum, and much larger stencils waste
+computation without meaningful accuracy gains.
 
 **`autoselect_k` values by polynomial degree and dimension:**
 
