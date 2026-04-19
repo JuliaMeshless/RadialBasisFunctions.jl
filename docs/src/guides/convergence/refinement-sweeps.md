@@ -17,6 +17,19 @@ accuracy benefit.
 
 ![Interpolation p-refinement at N=2500](../../assets/convergence/plots/p_refinement_interpolation.png)
 
+Each curve is flat — polynomial degree has essentially no effect on `Interpolator`
+accuracy at fixed `N`. This is not a bug. `Interpolator` is a **global** method: it uses
+all `N` points in one collocation system, so the RBF's native smoothness already
+reproduces the target to whatever accuracy that kernel can achieve, and the polynomial
+augmentation contributes only a low-order reproducing property that doesn't change the
+answer on a smooth non-polynomial target like Franke. Contrast with the local-stencil
+differential operators below, where `poly_deg` controls local approximation and matters
+a great deal.
+
+**Practical implication:** for `Interpolator`, pick the smallest `poly_deg` that meets
+your reproducing-polynomial needs (usually `poly_deg = 2`) — going higher adds cost
+without accuracy.
+
 ### Laplacian
 
 ![Laplacian p-refinement at N=2500](../../assets/convergence/plots/p_refinement_laplacian.png)
