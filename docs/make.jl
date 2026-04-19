@@ -27,7 +27,14 @@ makedocs(;
             "Vector & Tensor Operators" => "guides/vector_calculus.md",
             "Automatic Differentiation" => "guides/autodiff.md",
             "RBF Neural Networks" => "guides/lux.md",
-            "Convergence & Parameter Selection" => "guides/convergence.md",
+            "Convergence & Parameter Selection" => [
+                "Overview" => "guides/convergence/index.md",
+                "Scalar Operators" => "guides/convergence/scalar-operators.md",
+                "Vector Operators" => "guides/convergence/vector-operators.md",
+                "Refinement Sweeps" => "guides/convergence/refinement-sweeps.md",
+                "Work-Precision" => "guides/convergence/work-precision.md",
+                "3D Extensions" => "guides/convergence/3d.md",
+            ],
             "Quick Reference" => "guides/quickref.md",
         ],
         "Reference" => [
