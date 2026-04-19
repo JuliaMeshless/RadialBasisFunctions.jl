@@ -1,0 +1,6 @@
+Julia version: 1.12.6
+CPU: AMD Ryzen 9 9900X 12-Core Processor
+Threads: 20
+OS: Linux x86_64-linux-gnu
+RadialBasisFunctions: 0.5.0
+Generated: 2026-04-18 10:14:01
