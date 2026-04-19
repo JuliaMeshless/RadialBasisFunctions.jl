@@ -33,17 +33,17 @@ function scattered_points(n_side; seed = 42, dim = 2)
     if dim == 2
         return [
             SVector(
-                clamp(h * (i - 0.5) + 0.2h * randn(), 0.001, 0.999),
-                clamp(h * (j - 0.5) + 0.2h * randn(), 0.001, 0.999),
-            ) for i in 1:n_side for j in 1:n_side
+                    clamp(h * (i - 0.5) + 0.2h * randn(), 0.001, 0.999),
+                    clamp(h * (j - 0.5) + 0.2h * randn(), 0.001, 0.999),
+                ) for i in 1:n_side for j in 1:n_side
         ]
     elseif dim == 3
         return [
             SVector(
-                clamp(h * (i - 0.5) + 0.2h * randn(), 0.001, 0.999),
-                clamp(h * (j - 0.5) + 0.2h * randn(), 0.001, 0.999),
-                clamp(h * (k - 0.5) + 0.2h * randn(), 0.001, 0.999),
-            ) for i in 1:n_side for j in 1:n_side for k in 1:n_side
+                    clamp(h * (i - 0.5) + 0.2h * randn(), 0.001, 0.999),
+                    clamp(h * (j - 0.5) + 0.2h * randn(), 0.001, 0.999),
+                    clamp(h * (k - 0.5) + 0.2h * randn(), 0.001, 0.999),
+                ) for i in 1:n_side for j in 1:n_side for k in 1:n_side
         ]
     else
         error("unsupported dim: $dim")
@@ -51,9 +51,9 @@ function scattered_points(n_side; seed = 42, dim = 2)
 end
 
 franke(x) = 0.75 * exp(-(9x[1] - 2)^2 / 4 - (9x[2] - 2)^2 / 4) +
-            0.75 * exp(-(9x[1] + 1)^2 / 49 - (9x[2] + 1) / 10) +
-            0.5 * exp(-(9x[1] - 7)^2 / 4 - (9x[2] - 3)^2 / 4) -
-            0.2 * exp(-(9x[1] - 4)^2 - (9x[2] - 7)^2)
+    0.75 * exp(-(9x[1] + 1)^2 / 49 - (9x[2] + 1) / 10) +
+    0.5 * exp(-(9x[1] - 7)^2 / 4 - (9x[2] - 3)^2 / 4) -
+    0.2 * exp(-(9x[1] - 4)^2 - (9x[2] - 7)^2)
 
 g(x) = 1 + sin(4x[1]) + cos(3x[1]) + sin(2x[2]) + sin(x[1] + x[2])
 ∂g_∂x1(x) = 4cos(4x[1]) - 3sin(3x[1]) + cos(x[1] + x[2])
@@ -302,8 +302,10 @@ end
 
 function sweep_h_refinement()
     header = ["operator", "family", "phs_order", "poly_deg", "eps", "N", "nrmse"]
-    store = CSVStore(joinpath(DATA_DIR, "h_refinement.csv"), header,
-                     ["operator", "family", "phs_order", "poly_deg", "eps", "N"])
+    store = CSVStore(
+        joinpath(DATA_DIR, "h_refinement.csv"), header,
+        ["operator", "family", "phs_order", "poly_deg", "eps", "N"]
+    )
 
     cfgs = all_configs_2d()
     total = length(OPERATORS_2D) * length(cfgs) * length(N_SIDES)
@@ -321,7 +323,7 @@ function sweep_h_refinement()
         err = try
             compute_error(op, pts, basis)
         catch e
-            @warn "failed" op family ord pdeg eps N exception=(e, catch_backtrace())
+            @warn "failed" op family ord pdeg eps N exception = (e, catch_backtrace())
             NaN
         end
         append_row!(store, (String(op), String(family), ord, pdeg, eps, N, err))
@@ -329,7 +331,7 @@ function sweep_h_refinement()
             @printf("[h-ref] %d / %d\n", done, total)
         end
     end
-    println("[h-ref] done")
+    return println("[h-ref] done")
 end
 
 # ----------------------------------------------------------------------
@@ -338,8 +340,10 @@ end
 
 function sweep_p_refinement()
     header = ["operator", "family", "phs_order", "poly_deg", "eps", "N", "nrmse", "build_time_s"]
-    store = CSVStore(joinpath(DATA_DIR, "p_refinement.csv"), header,
-                     ["operator", "family", "phs_order", "poly_deg", "eps", "N"])
+    store = CSVStore(
+        joinpath(DATA_DIR, "p_refinement.csv"), header,
+        ["operator", "family", "phs_order", "poly_deg", "eps", "N"]
+    )
 
     N_fixed = 2500  # n_side = 50
     n_side = 50
@@ -360,11 +364,11 @@ function sweep_p_refinement()
         err = try
             compute_error(op, pts, basis)
         catch e
-            @warn "failed" op family ord p exception=(e, catch_backtrace())
+            @warn "failed" op family ord p exception = (e, catch_backtrace())
             NaN
         end
         bt = try
-            t = @belapsed ($compute_error)($op, $pts, $basis) samples=3 evals=1
+            t = @belapsed ($compute_error)($op, $pts, $basis) samples = 3 evals = 1
             t
         catch
             NaN
@@ -372,7 +376,7 @@ function sweep_p_refinement()
         append_row!(store, (String(op), String(family), ord, p, eps, N_fixed, err, bt))
         done % 10 == 0 && @printf("[p-ref] %d / %d\n", done, total)
     end
-    println("[p-ref] done")
+    return println("[p-ref] done")
 end
 
 # ----------------------------------------------------------------------
@@ -381,8 +385,10 @@ end
 
 function sweep_k_refinement()
     header = ["operator", "family", "phs_order", "poly_deg", "eps", "N", "k", "nrmse"]
-    store = CSVStore(joinpath(DATA_DIR, "k_refinement.csv"), header,
-                     ["operator", "family", "phs_order", "poly_deg", "eps", "N", "k"])
+    store = CSVStore(
+        joinpath(DATA_DIR, "k_refinement.csv"), header,
+        ["operator", "family", "phs_order", "poly_deg", "eps", "N", "k"]
+    )
 
     n_side = 70
     N_fixed = n_side^2
@@ -411,13 +417,13 @@ function sweep_k_refinement()
                 compute_error(op, pts, basis; k = k)
             end
         catch e
-            @warn "failed" op family ord pdeg k exception=(e, catch_backtrace())
+            @warn "failed" op family ord pdeg k exception = (e, catch_backtrace())
             NaN
         end
         append_row!(store, (String(op), String(family), ord, pdeg, eps, N_fixed, k, err))
         done % 10 == 0 && @printf("[k-ref] %d / %d\n", done, total)
     end
-    println("[k-ref] done")
+    return println("[k-ref] done")
 end
 
 # ----------------------------------------------------------------------
@@ -426,8 +432,10 @@ end
 
 function sweep_eps_refinement()
     header = ["operator", "family", "poly_deg", "eps", "N", "nrmse", "cond_est"]
-    store = CSVStore(joinpath(DATA_DIR, "eps_refinement.csv"), header,
-                     ["operator", "family", "poly_deg", "eps"])
+    store = CSVStore(
+        joinpath(DATA_DIR, "eps_refinement.csv"), header,
+        ["operator", "family", "poly_deg", "eps"]
+    )
 
     n_side = 30
     N_fixed = n_side^2
@@ -465,7 +473,7 @@ function sweep_eps_refinement()
         end
         append_row!(store, ("laplacian_polysweep", String(family), p, eps, N_fixed, err, NaN))
     end
-    println("[ε-ref] done")
+    return println("[ε-ref] done")
 end
 
 # ----------------------------------------------------------------------
@@ -473,10 +481,14 @@ end
 # ----------------------------------------------------------------------
 
 function sweep_work_precision()
-    header = ["operator", "family", "phs_order", "poly_deg", "eps", "N",
-              "nrmse", "build_time_s", "apply_time_s", "build_bytes"]
-    store = CSVStore(joinpath(DATA_DIR, "work_precision.csv"), header,
-                     ["operator", "family", "phs_order", "poly_deg", "eps", "N"])
+    header = [
+        "operator", "family", "phs_order", "poly_deg", "eps", "N",
+        "nrmse", "build_time_s", "apply_time_s", "build_bytes",
+    ]
+    store = CSVStore(
+        joinpath(DATA_DIR, "work_precision.csv"), header,
+        ["operator", "family", "phs_order", "poly_deg", "eps", "N"]
+    )
 
     cfgs = all_configs_2d()
     operators = [:laplacian, :interpolation]
@@ -503,7 +515,7 @@ function sweep_work_precision()
                 b = @benchmarkable laplacian($pts; basis = $basis) samples = 3 evals = 1 seconds = 30
                 tune!(b)
                 res = run(b)
-                bt = median(res.times) / 1e9
+                bt = median(res.times) / 1.0e9
                 bbytes = res.memory
                 # build one instance for apply timing and error
                 opx = laplacian(pts; basis = basis)
@@ -513,14 +525,14 @@ function sweep_work_precision()
                 a = @benchmarkable $opx($vals) samples = 5 evals = 1 seconds = 30
                 tune!(a)
                 ar = run(a)
-                at = median(ar.times) / 1e9
+                at = median(ar.times) / 1.0e9
                 err = nrmse(opx(vals), ∇²g.(pts))
             elseif op === :interpolation
                 vals = franke.(pts)
                 b = @benchmarkable Interpolator($pts, $vals, $basis) samples = 3 evals = 1 seconds = 30
                 tune!(b)
                 res = run(b)
-                bt = median(res.times) / 1e9
+                bt = median(res.times) / 1.0e9
                 bbytes = res.memory
                 interp = Interpolator(pts, vals, basis)
                 Random.seed!(99)
@@ -529,16 +541,16 @@ function sweep_work_precision()
                 a = @benchmarkable $interp.($eval_pts) samples = 5 evals = 1 seconds = 30
                 tune!(a)
                 ar = run(a)
-                at = median(ar.times) / 1e9
+                at = median(ar.times) / 1.0e9
                 err = nrmse(interp.(eval_pts), franke.(eval_pts))
             end
         catch e
-            @warn "work-precision failed" op family ord pdeg eps N exception=(e,)
+            @warn "work-precision failed" op family ord pdeg eps N exception = (e,)
         end
         append_row!(store, (String(op), String(family), ord, pdeg, eps, N, err, bt, at, bbytes))
         @printf("[wp] %d / %d\n", done, total)
     end
-    println("[wp] done")
+    return println("[wp] done")
 end
 
 # ----------------------------------------------------------------------
@@ -547,8 +559,10 @@ end
 
 function sweep_3d()
     header = ["operator", "family", "phs_order", "poly_deg", "eps", "N", "k", "nrmse"]
-    store = CSVStore(joinpath(DATA_DIR, "3d_refinement.csv"), header,
-                     ["operator", "family", "phs_order", "poly_deg", "eps", "N", "k"])
+    store = CSVStore(
+        joinpath(DATA_DIR, "3d_refinement.csv"), header,
+        ["operator", "family", "phs_order", "poly_deg", "eps", "N", "k"]
+    )
 
     # 3D h-ref: smaller sweep because N grows as n_side³
     n_sides_3d = [8, 12, 16, 20]
@@ -587,7 +601,7 @@ function sweep_3d()
         append_row!(store, ("laplacian3d_kref", "PHS", ord, pdeg, 0.0, N_fixed, k, err))
         @printf("[3d k-ref] ord=%d pdeg=%d k=%d err=%.3e\n", ord, pdeg, k, err)
     end
-    println("[3d] done")
+    return println("[3d] done")
 end
 
 # ----------------------------------------------------------------------
@@ -596,7 +610,7 @@ end
 
 function write_machine_info()
     path = joinpath(DATA_DIR, "machine.txt")
-    open(path, "w") do io
+    return open(path, "w") do io
         println(io, "Julia version: ", VERSION)
         println(io, "CPU: ", Sys.cpu_info()[1].model)
         println(io, "Threads: ", Threads.nthreads())
@@ -615,15 +629,15 @@ using Dates
 function main(targets)
     targets = isempty(targets) ? ["h", "p", "k", "eps", "wp", "3d"] : targets
     for t in targets
-        t == "h"   ? sweep_h_refinement()   :
-        t == "p"   ? sweep_p_refinement()   :
-        t == "k"   ? sweep_k_refinement()   :
-        t == "eps" ? sweep_eps_refinement() :
-        t == "wp"  ? sweep_work_precision() :
-        t == "3d"  ? sweep_3d()             :
+        t == "h" ? sweep_h_refinement() :
+            t == "p" ? sweep_p_refinement() :
+            t == "k" ? sweep_k_refinement() :
+            t == "eps" ? sweep_eps_refinement() :
+            t == "wp" ? sweep_work_precision() :
+            t == "3d" ? sweep_3d() :
             error("unknown target: $t")
     end
-    write_machine_info()
+    return write_machine_info()
 end
 
 main(ARGS)
