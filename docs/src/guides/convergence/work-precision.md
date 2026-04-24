@@ -10,6 +10,11 @@ Each marker represents one `(basis, poly_deg)` configuration; connected markers 
 same configuration at different `N ∈ {225, 900, 2025, 4900}`. The lower-left corner is
 "best": low error per unit time.
 
+Plots below are **PHS-only**. Shape-parameter bases (`IMQ`, `Gaussian`) need ε scaled
+with stencil spacing to produce a fair cost comparison (see
+[Shape-Parameter Bases](shape-parameter-bases.md) for why); a cost study of the scaled-ε
+configs is not covered here.
+
 !!! info "Benchmark environment"
     Timings below were measured on: AMD Ryzen 9 9900X, 20 threads, Julia 1.12.6,
     RadialBasisFunctions 0.5.0. Absolute numbers will differ on other machines; the
@@ -19,12 +24,13 @@ same configuration at different `N ∈ {225, 900, 2025, 4900}`. The lower-left c
 
 ![Laplacian: build time vs NRMSE](../../assets/convergence/plots/work_precision_laplacian_build.png)
 
-Higher-order PHS with matched polynomial degree dominates the Pareto frontier. PHS7/p=6
-reaches the lowest errors but spends the most time; PHS5/p=3 hits the sweet spot for most
-applications. IMQ and Gaussian configurations cluster in the middle of the plot — they
-deliver comparable accuracy at comparable cost, not a free lunch. `PHS1/p=1` is omitted
-from this plot because its error is not useful for second-derivative operators (see the
-[Laplacian section](scalar-operators.md#laplacian)).
+Each family appears twice: a solid curve at the matched polynomial degree (`PHS3/p=2`,
+`PHS5/p=3`, `PHS7/p=4`) and a dashed curve at a higher-poly_deg overshoot (`p=4`, `p=5`,
+`p=6` respectively). The overshoot curves sit below their matched siblings — extra
+polynomial degree buys lower error at extra cost. Higher-order PHS dominates the Pareto
+frontier: `PHS7/p=6` reaches the lowest error, `PHS5/p=3` hits the sweet spot for most
+applications. `PHS1/p=1` is omitted because its error is not useful for second-derivative
+operators (see the [Laplacian section](scalar-operators.md#laplacian)).
 
 ## Apply time — Laplacian
 

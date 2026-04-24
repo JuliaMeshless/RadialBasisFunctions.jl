@@ -20,3 +20,6 @@ Manifest.toml
 # Flyer et al. script to test
 *.m
 
+# Local Claude Code artifacts
+.claude/
+

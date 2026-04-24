@@ -6,12 +6,13 @@ All plots use CairoMakie and are written to `docs/src/assets/convergence/plots/`
 Usage:
     julia --project=docs docs/src/assets/convergence/generate_plots.jl [targets...]
 
-Targets (omit to run all): h p k eps wp 3d
+Targets (omit to run all): h hseps p k eps wp 3d
 =#
 
 using CairoMakie
 using DelimitedFiles
 using Printf
+using Statistics
 
 const DATA_DIR = joinpath(@__DIR__, "data")
 const PLOTS_DIR = joinpath(@__DIR__, "plots")
@@ -57,9 +58,6 @@ const UNUSABLE = Set{Tuple{String, String, Int, Int}}(
         ("hessian", "IMQ", 0, 2),
         ("hessian", "Gaussian", 0, 0),
         ("hessian", "Gaussian", 0, 2),
-
-        # 3D Laplacian: PHS1 unusable for 2nd derivatives in 3D just as in 2D.
-        ("laplacian3d", "PHS", 1, 1),
     ]
 )
 
@@ -109,59 +107,65 @@ struct OpMeta
     name::String      # key in CSV operator column
     title::String     # plot title base
     ylabel::String
-    rates_matched::NTuple{4, Int}  # expected rates for PHS1/3/5/7 at matched poly_deg
+    rate_at_p3::Int   # expected convergence rate at poly_deg=3
+    rate_label::String  # human-readable reference slope label
 end
 
+# At poly_deg = 3 the expected rate is `poly_deg + 1 - derivative_order`:
+# interpolation=4, 1st-deriv=3, 2nd-deriv=2.
 const OPS = [
-    OpMeta("interpolation", "Interpolation", "NRMSE of u", (2, 4, 6, 8)),
-    OpMeta("laplacian", "Laplacian (∇²)", "NRMSE of ∇²u", (0, 2, 4, 6)),
-    OpMeta("gradient", "Gradient (∇)", "NRMSE of ∇u", (1, 3, 5, 7)),
-    OpMeta("partial1", "First partial (∂/∂x₁)", "NRMSE of ∂u/∂x", (1, 3, 5, 7)),
-    OpMeta("partial2", "Second partial (∂²/∂x₁²)", "NRMSE of ∂²u/∂x²", (0, 2, 4, 6)),
-    OpMeta("mixed_partial", "Mixed partial (∂²/∂x₁∂x₂)", "NRMSE of ∂²u/∂x∂y", (0, 2, 4, 6)),
-    OpMeta("hessian", "Hessian (Hu)", "Frobenius NRMSE", (0, 2, 4, 6)),
-    OpMeta("jacobian", "Jacobian (Ju)", "Frobenius NRMSE", (1, 3, 5, 7)),
-    OpMeta("divergence", "Divergence (∇·u)", "NRMSE of ∇·u", (1, 3, 5, 7)),
-    OpMeta("curl2d", "Curl (∇×u, 2D)", "NRMSE of ∇×u", (1, 3, 5, 7)),
+    OpMeta("interpolation", "Interpolation", "NRMSE of u", 4, "O(h⁴)"),
+    OpMeta("laplacian", "Laplacian (∇²)", "NRMSE of ∇²u", 2, "O(h²)"),
+    OpMeta("gradient", "Gradient (∇)", "NRMSE of ∇u", 3, "O(h³)"),
+    OpMeta("partial1", "First partial (∂/∂x₁)", "NRMSE of ∂u/∂x", 3, "O(h³)"),
+    OpMeta("partial2", "Second partial (∂²/∂x₁²)", "NRMSE of ∂²u/∂x²", 2, "O(h²)"),
+    OpMeta("mixed_partial", "Mixed partial (∂²/∂x₁∂x₂)", "NRMSE of ∂²u/∂x∂y", 2, "O(h²)"),
+    OpMeta("hessian", "Hessian (Hu)", "Frobenius NRMSE", 2, "O(h²)"),
+    OpMeta("jacobian", "Jacobian (Ju)", "Frobenius NRMSE", 3, "O(h³)"),
+    OpMeta("divergence", "Divergence (∇·u)", "NRMSE of ∇·u", 3, "O(h³)"),
+    OpMeta("curl2d", "Curl (∇×u, 2D)", "NRMSE of ∇×u", 3, "O(h³)"),
 ]
 
 # ----------------------------------------------------------------------
 # h-refinement plots — three per operator
 # ----------------------------------------------------------------------
 
-function plot_h_phs_matched!(ax, rows_for_op, rates, op_name)
-    configs = [(1, 1), (3, 2), (5, 3), (7, 4)]
+function plot_h_phs_matched!(ax, rows_for_op, rate, rate_label, op_name)
+    # Show PHS3, PHS5, PHS7 all at poly_deg=3 so differences between curves isolate
+    # RBF smoothness from polynomial augmentation.
+    POLY_DEG = 3
+    orders = [3, 5, 7]
     cmap = Makie.wong_colors()
-    for (i, (ord, pdeg)) in enumerate(configs)
-        is_unusable(op_name, "PHS", ord, pdeg) && continue
+    plotted_Ns = Int[]
+    leftmost_errs = Float64[]
+    for (i, ord) in enumerate(orders)
+        is_unusable(op_name, "PHS", ord, POLY_DEG) && continue
         rs = sorted_by_N(
             filter_rows(
                 rows_for_op,
-                r -> r.family == "PHS" && r.phs_order == ord && r.poly_deg == pdeg
+                r -> r.family == "PHS" && r.phs_order == ord && r.poly_deg == POLY_DEG
             )
         )
         isempty(rs) && continue
         Ns = [r.N for r in rs]
         errs = [r.nrmse for r in rs]
         scatterlines!(
-            ax, Ns, errs; color = cmap[i],
-            label = "PHS$ord, p=$pdeg", markersize = 8, linewidth = 1.8
+            ax, Ns, errs; color = cmap[i + 1],
+            label = "PHS$ord, p=$POLY_DEG", markersize = 8, linewidth = 1.8
         )
+        plotted_Ns = Ns
+        push!(leftmost_errs, first(errs))
     end
-    # Reference slopes anchored near the cleanest (highest-rate) non-PHS1 curve
-    ref_row = filter(r -> r.family == "PHS" && r.phs_order == 5 && r.poly_deg == 3, rows_for_op)
-    return if !isempty(ref_row)
-        ref_row = sort(ref_row; by = r -> r.N)
-        Ns_ref = [r.N for r in ref_row]
-        Ns_line = range(minimum(Ns_ref), maximum(Ns_ref); length = 50) |> collect
-        for (rate, lab) in zip(rates, ("O(h)", "O(h²)", "O(h⁴)", "O(h⁶)"))
-            rate == 0 && continue
-            ref_slope!(
-                ax, Ns_line, rate;
-                anchor_N = Ns_ref[1], anchor_err = 10.0^(-1 - rate / 4),
-                label = "O(h^$rate)"
-            )
-        end
+    # Reference slope anchored at the geometric mean of curves at leftmost N
+    # so the dashed line sits among the data rather than below it.
+    return if !isempty(leftmost_errs)
+        Ns_line = range(minimum(plotted_Ns), maximum(plotted_Ns); length = 50) |> collect
+        anchor_err = exp(mean(log.(leftmost_errs)))
+        ref_slope!(
+            ax, Ns_line, rate;
+            anchor_N = first(plotted_Ns), anchor_err = anchor_err,
+            label = rate_label
+        )
     end
 end
 
@@ -212,14 +216,14 @@ function make_h_plots(h_rows)
         rows_op = filter(r -> r.operator == op.name, h_rows)
         isempty(rows_op) && continue
 
-        # A — all PHS at matched poly_deg
+        # A — PHS3, PHS5, PHS7 at fixed poly_deg=3 (isolates PHS-order effect)
         fig = Figure(size = (640, 460))
         ax = Axis(
             fig[1, 1]; xscale = log10, yscale = log10,
             xlabel = "N", ylabel = op.ylabel,
-            title = "$(op.title): PHS orders at matched poly_deg"
+            title = "$(op.title): PHS orders at poly_deg=3"
         )
-        plot_h_phs_matched!(ax, rows_op, op.rates_matched, op.name)
+        plot_h_phs_matched!(ax, rows_op, op.rate_at_p3, op.rate_label, op.name)
         axislegend(ax; position = :lb, framevisible = false, labelsize = 10)
         save(joinpath(PLOTS_DIR, "$(op.name)_phs_matched.png"), fig)
 
@@ -262,6 +266,151 @@ function make_h_plots(h_rows)
         save(joinpath(PLOTS_DIR, "$(op.name)_imq_gaussian_polydeg.png"), fig)
 
         println("  h-plots: $(op.name) ✓")
+    end
+    return
+end
+
+# ----------------------------------------------------------------------
+# Fixed-ε vs scaled-ε comparison (shape-parameter bases page)
+# ----------------------------------------------------------------------
+#
+# Each figure is two panels (shared y-axis):
+#   Left:  IMQ / Gaussian at fixed ε=1 (from h_refinement.csv) — shows
+#          divergence as N grows due to the RBF uncertainty principle.
+#   Right: Same bases at scaled ε = c/h (from h_refinement_scaled_eps.csv)
+#          — shows clean convergence once ε·h is held near its sweet spot.
+# A PHS5/p=3 reference curve anchors both panels.
+
+const EPS_COMPARE_OPS = [
+    ("interpolation", "Interpolation", "NRMSE of u"),
+    ("laplacian", "Laplacian (∇²)", "NRMSE of ∇²u"),
+    ("mixed_partial", "Mixed partial (∂²/∂x₁∂x₂)", "NRMSE of ∂²u/∂x∂y"),
+]
+
+function _plot_eps_compare_panel_fixed!(
+        ax, h_rows, op_name, poly_degs, style_by_family,
+    )
+    cmap = Makie.wong_colors()
+    for family in ("IMQ", "Gaussian")
+        for (i, p) in enumerate(poly_degs)
+            is_unusable(op_name, family, 0, p) && continue
+            rs = sorted_by_N(
+                filter_rows(
+                    h_rows,
+                    r -> r.operator == op_name && r.family == family &&
+                        r.phs_order == 0 && r.poly_deg == p,
+                ),
+            )
+            isempty(rs) && continue
+            Ns = [r.N for r in rs]
+            errs = [r.nrmse for r in rs]
+            scatterlines!(
+                ax, Ns, errs;
+                color = cmap[i + 2], linestyle = style_by_family[family],
+                marker = family === "IMQ" ? :circle : :diamond,
+                markersize = 8, linewidth = 1.5,
+                label = "$family p=$p",
+            )
+        end
+    end
+    return
+end
+
+function _plot_eps_compare_panel_scaled!(
+        ax, scaled_rows, op_name, poly_degs, style_by_family,
+    )
+    cmap = Makie.wong_colors()
+    for family in ("IMQ", "Gaussian")
+        for (i, p) in enumerate(poly_degs)
+            is_unusable(op_name, family, 0, p) && continue
+            rs = sorted_by_N(
+                filter_rows(
+                    scaled_rows,
+                    r -> r.operator == op_name && r.family == family &&
+                        r.poly_deg == p,
+                ),
+            )
+            isempty(rs) && continue
+            Ns = [r.N for r in rs]
+            errs = [r.nrmse for r in rs]
+            scatterlines!(
+                ax, Ns, errs;
+                color = cmap[i + 2], linestyle = style_by_family[family],
+                marker = family === "IMQ" ? :circle : :diamond,
+                markersize = 8, linewidth = 1.5,
+                label = "$family p=$p",
+            )
+        end
+    end
+    return
+end
+
+function _plot_phs_reference!(ax, h_rows, op_name)
+    # PHS5/p=3 as a stable reference across both panels.
+    rs = sorted_by_N(
+        filter_rows(
+            h_rows,
+            r -> r.operator == op_name && r.family == "PHS" &&
+                r.phs_order == 5 && r.poly_deg == 3,
+        ),
+    )
+    isempty(rs) && return
+    Ns = [r.N for r in rs]
+    errs = [r.nrmse for r in rs]
+    scatterlines!(
+        ax, Ns, errs;
+        color = (:black, 0.7), marker = :utriangle, markersize = 7,
+        linewidth = 1.5, linestyle = :solid, label = "PHS5 p=3 (ref)",
+    )
+    return
+end
+
+function make_eps_compare_plots(h_rows, scaled_rows)
+    style_by_family = Dict("IMQ" => :solid, "Gaussian" => :dash)
+    for (op_name, op_title, ylabel) in EPS_COMPARE_OPS
+        # Pick poly_degs to show: p=2 and p=3 where both are usable. For
+        # mixed_partial, p=2 is in UNUSABLE for shape-parameter bases, so
+        # only p=3 shows up there (both panels).
+        poly_degs = [2, 3]
+        c = get(Dict(
+                "interpolation" => 0.15,
+                "laplacian" => 0.03,
+                "mixed_partial" => 0.03,
+            ), op_name, 0.03)
+
+        fig = Figure(size = (1100, 460))
+        ax_left = Axis(
+            fig[1, 1]; xscale = log10, yscale = log10,
+            xlabel = "N", ylabel = ylabel,
+            title = "Fixed ε = 1",
+        )
+        ax_right = Axis(
+            fig[1, 2]; xscale = log10, yscale = log10,
+            xlabel = "N", ylabel = "",
+            title = "Scaled ε = $c / h",
+        )
+
+        _plot_phs_reference!(ax_left, h_rows, op_name)
+        _plot_eps_compare_panel_fixed!(
+            ax_left, h_rows, op_name, poly_degs, style_by_family,
+        )
+
+        _plot_phs_reference!(ax_right, h_rows, op_name)
+        _plot_eps_compare_panel_scaled!(
+            ax_right, scaled_rows, op_name, poly_degs, style_by_family,
+        )
+
+        linkyaxes!(ax_left, ax_right)
+
+        axislegend(ax_left; position = :lb, framevisible = false, labelsize = 9)
+        axislegend(ax_right; position = :lb, framevisible = false, labelsize = 9)
+
+        Label(
+            fig[0, :], "$(op_title): fixed-ε divergence vs scaled-ε convergence",
+            fontsize = 14,
+        )
+        save(joinpath(PLOTS_DIR, "$(op_name)_imq_gaussian_eps_compare.png"), fig)
+        println("  eps-compare: $(op_name) ✓")
     end
     return
 end
@@ -345,7 +494,7 @@ function plot_k_refinement(k_rows)
         ("gradient", "Gradient (∇)"),
     ]
     cmap = Makie.wong_colors()
-    configs = [(3, 2, "PHS3, p=2"), (5, 3, "PHS5, p=3"), (7, 4, "PHS7, p=4")]
+    configs = [(3, 3, "PHS3, p=3"), (5, 3, "PHS5, p=3"), (7, 3, "PHS7, p=3")]
 
     for (op_key, op_title) in operators
         fig = Figure(size = (640, 460))
@@ -437,147 +586,86 @@ end
 # Work-precision (§15)
 # ----------------------------------------------------------------------
 
-function plot_work_precision(wp_rows)
-    # Build markers per (family, poly_deg). Within a family, poly_deg is a color;
-    # across families, use different marker shapes.
-    family_markers = Dict("PHS" => :circle, "IMQ" => :rect, "Gaussian" => :diamond)
+# Curated (family, phs_order, poly_deg, label, color, linestyle, marker) for WP plots.
+# PHS-only: shape-parameter bases need scaled ε to give a fair cost comparison — see
+# the Shape-Parameter Bases page. Within-family: solid = matched poly_deg; dashed =
+# higher-poly_deg overshoot showing the extra-accuracy-for-extra-cost tradeoff.
+function _wp_configs()
+    wong = Makie.wong_colors()
+    c_phs3, c_phs5, c_phs7 = wong[1], wong[2], wong[3]
+    return [
+        ("PHS", 3, 2, "PHS3, p=2", c_phs3, :solid, :circle),
+        ("PHS", 3, 4, "PHS3, p=4", c_phs3, :dash,  :circle),
+        ("PHS", 5, 3, "PHS5, p=3", c_phs5, :solid, :utriangle),
+        ("PHS", 5, 5, "PHS5, p=5", c_phs5, :dash,  :utriangle),
+        ("PHS", 7, 4, "PHS7, p=4", c_phs7, :solid, :rect),
+        ("PHS", 7, 6, "PHS7, p=6", c_phs7, :dash,  :rect),
+    ]
+end
 
+function _plot_wp_curves!(ax, rows_op, op_name, xfield)
+    for (fam, ord, pdeg, label, color, ls, mk) in _wp_configs()
+        is_unusable(op_name, fam, ord, pdeg) && continue
+        rs = sort(
+            filter(
+                r -> r.family == fam && r.phs_order == ord && r.poly_deg == pdeg,
+                rows_op,
+            );
+            by = r -> r.N,
+        )
+        isempty(rs) && continue
+        x = getproperty.(rs, xfield)
+        e = [r.nrmse for r in rs]
+        scatterlines!(
+            ax, x, e;
+            color = color, linestyle = ls, marker = mk,
+            markersize = 11, linewidth = 2.2,
+            label = label,
+        )
+    end
+    return
+end
+
+function plot_work_precision(wp_rows)
     for op in ("laplacian", "interpolation")
         rows_op = filter(r -> r.operator == op, wp_rows)
         for (time_col, suffix, title) in [
                 (:build_time_s, "build", "weight-build time"),
                 (:apply_time_s, "apply", "operator-apply time"),
             ]
-            fig = Figure(size = (850, 500))
+            fig = Figure(size = (950, 520))
             ax = Axis(
                 fig[1, 1]; xscale = log10, yscale = log10,
                 xlabel = "$title (s)", ylabel = "NRMSE",
-                title = "Work-precision ($op): $title"
+                title = "Work-precision ($op): $title",
             )
-            colors_phs = cgrad(:viridis, 10; categorical = true)
-            for (i, (ord, pdeg)) in enumerate([(1, 1), (3, 2), (3, 3), (3, 4), (5, 3), (5, 4), (5, 5), (7, 4), (7, 5), (7, 6)])
-                is_unusable(op, "PHS", ord, pdeg) && continue
-                rs = filter(r -> r.family == "PHS" && r.phs_order == ord && r.poly_deg == pdeg, rows_op)
-                isempty(rs) && continue
-                rs = sort(rs; by = r -> r.N)
-                t = getproperty.(rs, time_col)
-                e = [r.nrmse for r in rs]
-                scatterlines!(
-                    ax, t, e; color = colors_phs[i], marker = :circle,
-                    markersize = 7, linewidth = 1.2,
-                    label = "PHS$ord/p=$pdeg"
-                )
-            end
-            for family in ("IMQ", "Gaussian")
-                for (i, p) in enumerate([1, 2, 3])
-                    is_unusable(op, family, 0, p) && continue
-                    rs = filter(r -> r.family == family && r.poly_deg == p, rows_op)
-                    isempty(rs) && continue
-                    rs = sort(rs; by = r -> r.N)
-                    t = getproperty.(rs, time_col)
-                    e = [r.nrmse for r in rs]
-                    scatterlines!(
-                        ax, t, e; color = cgrad(:plasma, 4)[i + 1],
-                        marker = family_markers[family], markersize = 7,
-                        linewidth = 1.2, label = "$family/p=$p"
-                    )
-                end
-            end
-            Legend(fig[1, 2], ax; framevisible = true, labelsize = 9)
+            _plot_wp_curves!(ax, rows_op, op, time_col)
+            Legend(
+                fig[1, 2], ax;
+                framevisible = true, labelsize = 12,
+                patchsize = (24, 16), rowgap = 4,
+            )
             save(joinpath(PLOTS_DIR, "work_precision_$(op)_$(suffix).png"), fig)
         end
     end
 
-    # Memory footprint vs NRMSE for laplacian
-    fig = Figure(size = (850, 500))
+    # Memory footprint vs NRMSE for laplacian (same style, just different x-field)
+    fig = Figure(size = (950, 520))
     ax = Axis(
         fig[1, 1]; xscale = log10, yscale = log10,
         xlabel = "build memory (bytes)", ylabel = "NRMSE",
-        title = "Work-precision: memory footprint (laplacian)"
+        title = "Work-precision: memory footprint (laplacian)",
     )
     rows_op = filter(r -> r.operator == "laplacian", wp_rows)
-    colors_phs = cgrad(:viridis, 10; categorical = true)
-    for (i, (ord, pdeg)) in enumerate([(1, 1), (3, 2), (3, 3), (3, 4), (5, 3), (5, 4), (5, 5), (7, 4), (7, 5), (7, 6)])
-        is_unusable("laplacian", "PHS", ord, pdeg) && continue
-        rs = filter(r -> r.family == "PHS" && r.phs_order == ord && r.poly_deg == pdeg, rows_op)
-        isempty(rs) && continue
-        rs = sort(rs; by = r -> r.N)
-        b = [r.build_bytes for r in rs]
-        e = [r.nrmse for r in rs]
-        scatterlines!(
-            ax, b, e; color = colors_phs[i],
-            markersize = 7, linewidth = 1.2, label = "PHS$ord/p=$pdeg"
-        )
-    end
-    Legend(fig[1, 2], ax; framevisible = true, labelsize = 9)
+    _plot_wp_curves!(ax, rows_op, "laplacian", :build_bytes)
+    Legend(
+        fig[1, 2], ax;
+        framevisible = true, labelsize = 12,
+        patchsize = (24, 16), rowgap = 4,
+    )
     save(joinpath(PLOTS_DIR, "work_precision_memory.png"), fig)
 
     return println("  work-precision plots ✓")
-end
-
-# ----------------------------------------------------------------------
-# 3D (§16)
-# ----------------------------------------------------------------------
-
-function plot_3d(rows_3d)
-    cmap = Makie.wong_colors()
-
-    # 3D h-ref: laplacian3d + gradient3d, PHS1/3/5/7 at matched poly_deg
-    for (op, title) in [
-            ("laplacian3d", "3D Laplacian"),
-            ("gradient3d", "3D Gradient"),
-        ]
-        fig = Figure(size = (640, 460))
-        ax = Axis(
-            fig[1, 1]; xscale = log10, yscale = log10,
-            xlabel = "N", ylabel = "NRMSE",
-            title = "$title: PHS orders at matched poly_deg"
-        )
-        for (i, (ord, pdeg)) in enumerate([(1, 1), (3, 2), (5, 3), (7, 4)])
-            is_unusable(op, "PHS", ord, pdeg) && continue
-            rs = sort(
-                filter(
-                    r -> r.operator == op && r.phs_order == ord && r.poly_deg == pdeg,
-                    rows_3d
-                ); by = r -> r.N
-            )
-            isempty(rs) && continue
-            Ns = [r.N for r in rs]
-            er = [r.nrmse for r in rs]
-            scatterlines!(
-                ax, Ns, er; color = cmap[i], label = "PHS$ord, p=$pdeg",
-                markersize = 8, linewidth = 1.8
-            )
-        end
-        axislegend(ax; position = :lb, framevisible = false, labelsize = 10)
-        save(joinpath(PLOTS_DIR, "3d_$(op)_h_ref.png"), fig)
-    end
-
-    # 3D k-ref
-    fig = Figure(size = (640, 460))
-    ax = Axis(
-        fig[1, 1]; yscale = log10,
-        xlabel = "stencil size k", ylabel = "NRMSE",
-        title = "3D Laplacian: k-refinement at N=4096"
-    )
-    for (i, (ord, pdeg)) in enumerate([(3, 2), (5, 3), (7, 4)])
-        rs = sort(
-            filter(
-                r -> r.operator == "laplacian3d_kref" && r.phs_order == ord && r.poly_deg == pdeg,
-                rows_3d
-            ); by = r -> r.k
-        )
-        isempty(rs) && continue
-        ks = [r.k for r in rs]
-        er = [r.nrmse for r in rs]
-        scatterlines!(
-            ax, ks, er; color = cmap[i], label = "PHS$ord, p=$pdeg",
-            markersize = 8, linewidth = 1.8
-        )
-    end
-    axislegend(ax; position = :rt, framevisible = false, labelsize = 10)
-    save(joinpath(PLOTS_DIR, "3d_laplacian_k_ref.png"), fig)
-    return println("  3D plots ✓")
 end
 
 # ----------------------------------------------------------------------
@@ -585,11 +673,17 @@ end
 # ----------------------------------------------------------------------
 
 function main(targets)
-    targets = isempty(targets) ? ["h", "p", "k", "eps", "wp", "3d"] : targets
+    targets = isempty(targets) ? ["h", "hseps", "p", "k", "eps", "wp"] : targets
     for t in targets
         if t == "h"
             rows = load_csv(joinpath(DATA_DIR, "h_refinement.csv"))
             make_h_plots(rows)
+        elseif t == "hseps"
+            h_rows = load_csv(joinpath(DATA_DIR, "h_refinement.csv"))
+            scaled_rows = load_csv(
+                joinpath(DATA_DIR, "h_refinement_scaled_eps.csv"),
+            )
+            make_eps_compare_plots(h_rows, scaled_rows)
         elseif t == "p"
             rows = load_csv(joinpath(DATA_DIR, "p_refinement.csv"))
             plot_p_refinement(rows)
@@ -602,9 +696,6 @@ function main(targets)
         elseif t == "wp"
             rows = load_csv(joinpath(DATA_DIR, "work_precision.csv"))
             plot_work_precision(rows)
-        elseif t == "3d"
-            rows = load_csv(joinpath(DATA_DIR, "3d_refinement.csv"))
-            plot_3d(rows)
         else
             error("unknown target: $t")
         end

@@ -9,7 +9,7 @@ skipped on rerun.
 Usage:
     julia --project=docs docs/src/assets/convergence/generate_data.jl [targets...]
 
-Targets (omit to run all): h p k eps wp 3d
+Targets (omit to run all): h hseps p k eps wp 3d
 =#
 
 using RadialBasisFunctions
@@ -27,27 +27,15 @@ mkpath(DATA_DIR)
 # Test functions and helpers
 # ----------------------------------------------------------------------
 
-function scattered_points(n_side; seed = 42, dim = 2)
+function scattered_points(n_side; seed = 42)
     Random.seed!(seed)
     h = 1.0 / n_side
-    if dim == 2
-        return [
-            SVector(
-                    clamp(h * (i - 0.5) + 0.2h * randn(), 0.001, 0.999),
-                    clamp(h * (j - 0.5) + 0.2h * randn(), 0.001, 0.999),
-                ) for i in 1:n_side for j in 1:n_side
-        ]
-    elseif dim == 3
-        return [
-            SVector(
-                    clamp(h * (i - 0.5) + 0.2h * randn(), 0.001, 0.999),
-                    clamp(h * (j - 0.5) + 0.2h * randn(), 0.001, 0.999),
-                    clamp(h * (k - 0.5) + 0.2h * randn(), 0.001, 0.999),
-                ) for i in 1:n_side for j in 1:n_side for k in 1:n_side
-        ]
-    else
-        error("unsupported dim: $dim")
-    end
+    return [
+        SVector(
+                clamp(h * (i - 0.5) + 0.2h * randn(), 0.001, 0.999),
+                clamp(h * (j - 0.5) + 0.2h * randn(), 0.001, 0.999),
+            ) for i in 1:n_side for j in 1:n_side
+    ]
 end
 
 franke(x) = 0.75 * exp(-(9x[1] - 2)^2 / 4 - (9x[2] - 2)^2 / 4) +
@@ -62,16 +50,6 @@ g(x) = 1 + sin(4x[1]) + cos(3x[1]) + sin(2x[2]) + sin(x[1] + x[2])
 ∂²g_∂x2²(x) = -4sin(2x[2]) - sin(x[1] + x[2])
 ∂²g_∂x1∂x2(x) = -sin(x[1] + x[2])
 ∇²g(x) = ∂²g_∂x1²(x) + ∂²g_∂x2²(x)
-
-# 3D scalar test (separable trig)
-g3(x) = 1 + sin(3x[1]) + cos(2x[2]) + sin(x[3])
-∂²g3_∂x1²(x) = -9sin(3x[1])
-∂²g3_∂x2²(x) = -4cos(2x[2])
-∂²g3_∂x3²(x) = -sin(x[3])
-∇²g3(x) = ∂²g3_∂x1²(x) + ∂²g3_∂x2²(x) + ∂²g3_∂x3²(x)
-∂g3_∂x1(x) = 3cos(3x[1])
-∂g3_∂x2(x) = -2sin(2x[2])
-∂g3_∂x3(x) = cos(x[3])
 
 # Vector field with all derivatives nonzero on [0,1]² (so NRMSE well-defined)
 u1(x) = sin(π * x[1]) + 0.5cos(2π * x[2])
@@ -190,17 +168,6 @@ function compute_error(op_kind::Symbol, pts, basis; k = nothing)
         u_mat = hcat(u1.(pts), u2.(pts))
         got = op(u_mat)
         return nrmse(got, curl_u.(pts))
-
-    elseif op_kind === :laplacian3d
-        op = laplacian(pts; kw...)
-        got = op(g3.(pts))
-        return nrmse(got, ∇²g3.(pts))
-
-    elseif op_kind === :gradient3d
-        op = gradient(pts; kw...)
-        got = op(g3.(pts))  # N × 3
-        exact = hcat(∂g3_∂x1.(pts), ∂g3_∂x2.(pts), ∂g3_∂x3.(pts))
-        return frobenius_nrmse(got, exact)
 
     else
         error("unknown op_kind: $op_kind")
@@ -335,6 +302,70 @@ function sweep_h_refinement()
 end
 
 # ----------------------------------------------------------------------
+# Scaled-ε h-refinement sweep (IMQ / Gaussian)
+# ----------------------------------------------------------------------
+#
+# With fixed ε and shrinking h ~ 1/n_side, the non-dimensional ε·h collapses
+# as N grows; shape-parameter bases go "flat" over each stencil and the
+# collocation matrix becomes ill-conditioned (RBF uncertainty principle).
+#
+# Fix: hold ε·h constant across the sweep, i.e. ε = c/h = c · n_side.
+# The constants `c` below are calibrated from the fixed-N ε-refinement data
+# in `data/eps_refinement.csv` at N=900 (n_side=30), using the NRMSE minimum
+# for each operator (averaged across IMQ and Gaussian; picked so the scaled
+# ε lands in the sweet spot at representative N).
+#
+#   operator       ε_opt (N=900)   c = ε_opt · h = ε_opt / 30
+#   interpolation  3 – 6           ≈ 0.10 – 0.21  → use 0.15
+#   laplacian      0.5 – 1.0       ≈ 0.017 – 0.033 → use 0.03
+#   mixed_partial  (no sweep; use laplacian's c — same operator order)
+
+const EPS_SCALE_C = Dict(
+    :interpolation => 0.15,
+    :laplacian => 0.03,
+    :mixed_partial => 0.03,
+)
+
+function sweep_h_refinement_scaled_eps()
+    header = [
+        "operator", "family", "poly_deg", "eps_scale_c", "N", "eps", "nrmse",
+    ]
+    store = CSVStore(
+        joinpath(DATA_DIR, "h_refinement_scaled_eps.csv"), header,
+        ["operator", "family", "poly_deg", "eps_scale_c", "N"],
+    )
+
+    operators = [:interpolation, :laplacian, :mixed_partial]
+    families = [:IMQ, :Gaussian]
+    poly_degs = [2, 3]
+
+    total = length(operators) * length(families) * length(poly_degs) * length(N_SIDES)
+    done = 0
+
+    for op in operators, family in families, pdeg in poly_degs, n_side in N_SIDES
+        done += 1
+        N = n_side^2
+        c = EPS_SCALE_C[op]
+        eps = c * n_side  # ε = c / h, h = 1 / n_side
+        key = (String(op), String(family), pdeg, c, N)
+        has_row(store, key) && continue
+        basis = make_basis(family, 0, pdeg, eps)
+        pts = scattered_points(n_side)
+        err = try
+            compute_error(op, pts, basis)
+        catch e
+            @warn "failed" op family pdeg eps N exception = (e, catch_backtrace())
+            NaN
+        end
+        append_row!(store, (String(op), String(family), pdeg, c, N, eps, err))
+        if done % 10 == 0
+            @printf("[h-ref scaled-ε] %d / %d\n", done, total)
+        end
+    end
+    return println("[h-ref scaled-ε] done")
+end
+
+# ----------------------------------------------------------------------
 # p-refinement sweep (fixed N, vary poly_deg)
 # ----------------------------------------------------------------------
 
@@ -395,9 +426,9 @@ function sweep_k_refinement()
     pts = scattered_points(n_side)
 
     configs = [
-        (:PHS, 3, 2, 0.0),
+        (:PHS, 3, 3, 0.0),
         (:PHS, 5, 3, 0.0),
-        (:PHS, 7, 4, 0.0),
+        (:PHS, 7, 3, 0.0),
     ]
     operators = [:interpolation, :laplacian, :gradient]
     k_range = [10, 15, 20, 25, 30, 40, 50, 60, 80, 100]
@@ -554,57 +585,6 @@ function sweep_work_precision()
 end
 
 # ----------------------------------------------------------------------
-# 3D sweeps (§16)
-# ----------------------------------------------------------------------
-
-function sweep_3d()
-    header = ["operator", "family", "phs_order", "poly_deg", "eps", "N", "k", "nrmse"]
-    store = CSVStore(
-        joinpath(DATA_DIR, "3d_refinement.csv"), header,
-        ["operator", "family", "phs_order", "poly_deg", "eps", "N", "k"]
-    )
-
-    # 3D h-ref: smaller sweep because N grows as n_side³
-    n_sides_3d = [8, 12, 16, 20]
-    operators = [:laplacian3d, :gradient3d]
-
-    # h-ref at matched poly_deg
-    for op in operators, (ord, pdeg) in PHS_MATCHED, n_side in n_sides_3d
-        N = n_side^3
-        key = (String(op), "PHS", ord, pdeg, 0.0, N, 0)
-        has_row(store, key) && continue
-        pts = scattered_points(n_side; dim = 3)
-        basis = PHS(ord; poly_deg = pdeg)
-        err = try
-            compute_error(op, pts, basis)
-        catch
-            NaN
-        end
-        append_row!(store, (String(op), "PHS", ord, pdeg, 0.0, N, 0, err))
-        @printf("[3d h-ref] op=%s n_side=%d ord=%d pdeg=%d err=%.3e\n", op, n_side, ord, pdeg, err)
-    end
-
-    # 3D k-ref at fixed N
-    n_side_k = 16
-    N_fixed = n_side_k^3
-    pts3 = scattered_points(n_side_k; dim = 3)
-    k_range = [20, 30, 40, 50, 70, 100, 130, 170]
-    for (ord, pdeg) in [(3, 2), (5, 3), (7, 4)], k in k_range
-        key = ("laplacian3d_kref", "PHS", ord, pdeg, 0.0, N_fixed, k)
-        has_row(store, key) && continue
-        basis = PHS(ord; poly_deg = pdeg)
-        err = try
-            compute_error(:laplacian3d, pts3, basis; k = k)
-        catch
-            NaN
-        end
-        append_row!(store, ("laplacian3d_kref", "PHS", ord, pdeg, 0.0, N_fixed, k, err))
-        @printf("[3d k-ref] ord=%d pdeg=%d k=%d err=%.3e\n", ord, pdeg, k, err)
-    end
-    return println("[3d] done")
-end
-
-# ----------------------------------------------------------------------
 # Machine specs sidecar
 # ----------------------------------------------------------------------
 
@@ -627,14 +607,14 @@ using Dates
 # ----------------------------------------------------------------------
 
 function main(targets)
-    targets = isempty(targets) ? ["h", "p", "k", "eps", "wp", "3d"] : targets
+    targets = isempty(targets) ? ["h", "hseps", "p", "k", "eps", "wp"] : targets
     for t in targets
         t == "h" ? sweep_h_refinement() :
+            t == "hseps" ? sweep_h_refinement_scaled_eps() :
             t == "p" ? sweep_p_refinement() :
             t == "k" ? sweep_k_refinement() :
             t == "eps" ? sweep_eps_refinement() :
             t == "wp" ? sweep_work_precision() :
-            t == "3d" ? sweep_3d() :
             error("unknown target: $t")
     end
     return write_machine_info()
