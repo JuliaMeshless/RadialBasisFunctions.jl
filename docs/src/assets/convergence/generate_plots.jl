@@ -372,11 +372,13 @@ function make_eps_compare_plots(h_rows, scaled_rows)
         # mixed_partial, p=2 is in UNUSABLE for shape-parameter bases, so
         # only p=3 shows up there (both panels).
         poly_degs = [2, 3]
-        c = get(Dict(
+        c = get(
+            Dict(
                 "interpolation" => 0.15,
                 "laplacian" => 0.03,
                 "mixed_partial" => 0.03,
-            ), op_name, 0.03)
+            ), op_name, 0.03
+        )
 
         fig = Figure(size = (1100, 460))
         ax_left = Axis(
@@ -595,11 +597,11 @@ function _wp_configs()
     c_phs3, c_phs5, c_phs7 = wong[1], wong[2], wong[3]
     return [
         ("PHS", 3, 2, "PHS3, p=2", c_phs3, :solid, :circle),
-        ("PHS", 3, 4, "PHS3, p=4", c_phs3, :dash,  :circle),
+        ("PHS", 3, 4, "PHS3, p=4", c_phs3, :dash, :circle),
         ("PHS", 5, 3, "PHS5, p=3", c_phs5, :solid, :utriangle),
-        ("PHS", 5, 5, "PHS5, p=5", c_phs5, :dash,  :utriangle),
+        ("PHS", 5, 5, "PHS5, p=5", c_phs5, :dash, :utriangle),
         ("PHS", 7, 4, "PHS7, p=4", c_phs7, :solid, :rect),
-        ("PHS", 7, 6, "PHS7, p=6", c_phs7, :dash,  :rect),
+        ("PHS", 7, 6, "PHS7, p=6", c_phs7, :dash, :rect),
     ]
 end
 
