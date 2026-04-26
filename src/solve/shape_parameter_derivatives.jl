@@ -66,6 +66,26 @@ function ∂Partial_φ_∂ε(basis::Gaussian, dim::Int, x, xi)
     return 4 * ε * Δ_dim * (ε² * r² - 1) * φ
 end
 
+"""
+    ∂MixedPartial_φ_∂ε(basis::Gaussian, dim1::Int, dim2::Int, x, xi)
+
+Derivative of mixed second partial derivative of Gaussian basis w.r.t. ε.
+"""
+function ∂MixedPartial_φ_∂ε(basis::Gaussian, dim1::Int, dim2::Int, x, xi)
+    ε = basis.ε
+    ε2 = ε^2
+    ε3 = ε^3
+    ε5 = ε^5
+    r2 = sqeuclidean(x, xi)
+    Δ1 = x[dim1] - xi[dim1]
+    Δ2 = x[dim2] - xi[dim2]
+    φ = exp(-ε2 * r2)
+
+    # ∂²φ/∂x_dim1∂x_dim2 = 4ε⁴Δ1Δ2φ (for dim1 != dim2)
+    # d/dε = 16ε³Δ1Δ2φ - 8ε⁵r²Δ1Δ2φ
+    return φ * Δ1 * Δ2 * (16 * ε3 - 8 * ε5 * r2)
+end
+
 # =============================================================================
 # IMQ basis: φ(r) = 1/√(ε²r² + 1)
 # =============================================================================
@@ -134,6 +154,26 @@ function ∂Partial_φ_∂ε(basis::IMQ, dim::Int, x, xi)
     return Δ_dim * (2 * ε / sqrt(s^3) - 3 * ε³ * r² / sqrt(s^5))
 end
 
+"""
+    ∂MixedPartial_φ_∂ε(basis::IMQ, dim1::Int, dim2::Int, x, xi)
+
+Derivative of mixed second partial derivative of IMQ basis w.r.t. ε.
+"""
+function ∂MixedPartial_φ_∂ε(basis::IMQ, dim1::Int, dim2::Int, x, xi)
+    ε = basis.ε
+    ε2 = ε^2
+    ε3 = ε^3
+    ε5 = ε^5
+    r2 = sqeuclidean(x, xi)
+    Δ1 = x[dim1] - xi[dim1]
+    Δ2 = x[dim2] - xi[dim2]
+    s = ε2 * r2 + 1
+
+    # ∂²φ/∂x_dim1∂x_dim2 = 3ε⁴Δ1Δ2 s^(-5/2)
+    # d/dε = 12ε³Δ1Δ2 s^(-5/2) - 15ε⁵r²Δ1Δ2 s^(-7/2)
+    return 12 * ε3 * Δ1 * Δ2 / sqrt(s^5) - 15 * ε5 * r2 * Δ1 * Δ2 / sqrt(s^7)
+end
+
 # =============================================================================
 # PHS basis: no shape parameter, gradients are zero
 # =============================================================================
@@ -141,3 +181,47 @@ end
 ∂φ_∂ε(::AbstractPHS, x, xi) = zero(eltype(x))
 ∂Laplacian_φ_∂ε(::AbstractPHS, x, xi) = zero(eltype(x))
 ∂Partial_φ_∂ε(::AbstractPHS, ::Int, x, xi) = zero(eltype(x))
+∂MixedPartial_φ_∂ε(::AbstractPHS, ::Int, ::Int, x, xi) = zero(eltype(x))
+∂SecondPartial_φ_∂ε(::AbstractPHS, ::Int, x, xi) = zero(eltype(x))
+
+"""
+    ∂SecondPartial_φ_∂ε(basis::Gaussian, dim::Int, x, xi)
+
+Derivative of ∂²φ/∂x[dim]² w.r.t. shape parameter ε for Gaussian basis.
+
+∂²φ/∂x[dim]² = φ(-2ε² + 4ε⁴δ_d²)
+∂/∂ε = φ[-4ε + 16ε³δ_d² + (-2ε² + 4ε⁴δ_d²)(-2εr²)]
+      = φ[-4ε + 16ε³δ_d² + 4ε³r² - 8ε⁵r²δ_d²]
+"""
+function ∂SecondPartial_φ_∂ε(basis::Gaussian, dim::Int, x, xi)
+    ε = basis.ε
+    ε2 = ε^2
+    ε3 = ε^3
+    ε5 = ε^5
+    r2 = sqeuclidean(x, xi)
+    δ_d = x[dim] - xi[dim]
+    φ = exp(-ε2 * r2)
+    return φ * (-4 * ε + 16 * ε3 * δ_d^2 + 4 * ε3 * r2 - 8 * ε5 * r2 * δ_d^2)
+end
+
+"""
+    ∂SecondPartial_φ_∂ε(basis::IMQ, dim::Int, x, xi)
+
+Derivative of ∂²φ/∂x[dim]² w.r.t. shape parameter ε for IMQ basis.
+
+∂²φ/∂x[dim]² = -ε²/s^(3/2) + 3ε⁴δ_d²/s^(5/2),  s = ε²r²+1
+∂/∂ε = -2ε/s^(3/2) + 3ε³r²/s^(5/2) + 12ε³δ_d²/s^(5/2) - 15ε⁵r²δ_d²/s^(7/2)
+"""
+function ∂SecondPartial_φ_∂ε(basis::IMQ, dim::Int, x, xi)
+    ε = basis.ε
+    ε2 = ε^2
+    ε3 = ε^3
+    ε5 = ε^5
+    r2 = sqeuclidean(x, xi)
+    δ_d = x[dim] - xi[dim]
+    s = ε2 * r2 + 1
+    s32 = sqrt(s^3)
+    s52 = sqrt(s^5)
+    s72 = sqrt(s^7)
+    return -2 * ε / s32 + 3 * ε3 * r2 / s52 + 12 * ε3 * δ_d^2 / s52 - 15 * ε5 * r2 * δ_d^2 / s72
+end

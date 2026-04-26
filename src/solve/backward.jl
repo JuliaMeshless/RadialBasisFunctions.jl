@@ -29,11 +29,11 @@ Using implicit function theorem:
   Δb = η
 """
 function backward_linear_solve!(
-        ΔA::AbstractMatrix{T},
-        Δb::AbstractVecOrMat{T},
-        Δw::AbstractVecOrMat{T},
-        cache::StencilForwardCache{T},
-    ) where {T}
+    ΔA::AbstractMatrix{T},
+    Δb::AbstractVecOrMat{T},
+    Δw::AbstractVecOrMat{T},
+    cache::StencilForwardCache{T},
+) where {T}
     k = cache.k
     nmon = cache.nmon
     n = k + nmon
@@ -82,14 +82,14 @@ For polynomial block:
 Note: A is symmetric, so we need to handle both triangles.
 """
 function backward_collocation!(
-        Δdata::Vector{Vector{T}},
-        ΔA::AbstractMatrix{T},
-        neighbors::Vector{Int},
-        data::AbstractVector,
-        basis::AbstractRadialBasis,
-        mon::MonomialBasis{Dim, Deg},
-        k::Int,
-    ) where {T, Dim, Deg}
+    Δdata::Vector{Vector{T}},
+    ΔA::AbstractMatrix{T},
+    neighbors::Vector{Int},
+    data::AbstractVector,
+    basis::AbstractRadialBasis,
+    mon::MonomialBasis{Dim,Deg},
+    k::Int,
+) where {T,Dim,Deg}
     grad_φ = ∇(basis)
     n = k + binomial(Dim + Deg, Deg)
 
@@ -98,7 +98,7 @@ function backward_collocation!(
     @inbounds for j in 1:k
         xj = data[neighbors[j]]
         Δdata_j = Δdata[neighbors[j]]
-        for i in 1:(j - 1)  # Skip diagonal (i == j) since φ(x,x) = 0 always, no gradient contribution
+        for i in 1:(j-1)  # Skip diagonal (i == j) since φ(x,x) = 0 always, no gradient contribution
             xi = data[neighbors[i]]
             Δdata_i = Δdata[neighbors[i]]
 
@@ -136,7 +136,7 @@ function backward_collocation!(
             for j in 1:nmon
                 # ΔA[i, k+j] contributes to Δxi via ∇pⱼ
                 # Also ΔA[k+j, i] from transpose block
-                scale = ΔA[i, k + j] + ΔA[k + j, i]
+                scale = ΔA[i, k+j] + ΔA[k+j, i]
                 # In-place accumulation without broadcast allocation
                 for d in 1:Dim
                     Δdata_i[d] += scale * ∇p[j, d]
@@ -160,18 +160,18 @@ Polynomial section (Partial only — Laplacian gives constants, no gradient):
   b[k+j] = ℒpⱼ(eval_point) → passed as optional `poly_backward!` closure
 """
 function backward_rhs!(
-        Δdata::Vector{Vector{T}},
-        Δeval_point::Vector{T},
-        Δb::AbstractVecOrMat{T},
-        neighbors::Vector{Int},
-        eval_point,
-        data::AbstractVector,
-        basis::AbstractRadialBasis,
-        k::Int,
-        grad_Lφ_x,
-        grad_Lφ_xi;
-        poly_backward!::F = nothing,
-    ) where {T, F}
+    Δdata::Vector{Vector{T}},
+    Δeval_point::Vector{T},
+    Δb::AbstractVecOrMat{T},
+    neighbors::Vector{Int},
+    eval_point,
+    data::AbstractVector,
+    basis::AbstractRadialBasis,
+    k::Int,
+    grad_Lφ_x,
+    grad_Lφ_xi;
+    poly_backward!::F=nothing,
+) where {T,F}
     num_ops = size(Δb, 2)
     n = size(Δb, 1)
     nmon = n - k
@@ -220,13 +220,13 @@ The gradients of these w.r.t. eval_point are:
 This is equivalent to computing the mixed second derivatives ∂²pⱼ/∂x[dim]∂x[d].
 """
 function _backward_partial_polynomial_section!(
-        Δeval_point::Vector{T},
-        Δb::AbstractVecOrMat{T},
-        k::Int,
-        nmon::Int,
-        dim::Int,
-        num_ops::Int,
-    ) where {T}
+    Δeval_point::Vector{T},
+    Δb::AbstractVecOrMat{T},
+    k::Int,
+    nmon::Int,
+    dim::Int,
+    num_ops::Int,
+) where {T}
     D = length(Δeval_point)
 
     # The contribution depends on spatial dimension and polynomial degree
@@ -245,20 +245,20 @@ end
 
 """Backward pass for polynomial section in 1D."""
 function _backward_partial_poly_1d!(
-        Δeval_point::Vector{T},
-        Δb::AbstractVecOrMat{T},
-        k::Int,
-        nmon::Int,
-        dim::Int,
-        num_ops::Int,
-    ) where {T}
+    Δeval_point::Vector{T},
+    Δb::AbstractVecOrMat{T},
+    k::Int,
+    nmon::Int,
+    dim::Int,
+    num_ops::Int,
+) where {T}
     # 1D monomials up to degree 2: 1, x, x²
     # ∂/∂x gives: 0, 1, 2x
     # Second derivatives ∂²/∂x²: 0, 0, 2
     # Only x² term contributes, at index k+3 (if nmon >= 3)
     if nmon >= 3
         @inbounds for op_idx in 1:num_ops
-            Δeval_point[1] += Δb[k + 3, op_idx] * 2
+            Δeval_point[1] += Δb[k+3, op_idx] * 2
         end
     end
     return nothing
@@ -266,13 +266,13 @@ end
 
 """Backward pass for polynomial section in 2D."""
 function _backward_partial_poly_2d!(
-        Δeval_point::Vector{T},
-        Δb::AbstractVecOrMat{T},
-        k::Int,
-        nmon::Int,
-        dim::Int,
-        num_ops::Int,
-    ) where {T}
+    Δeval_point::Vector{T},
+    Δb::AbstractVecOrMat{T},
+    k::Int,
+    nmon::Int,
+    dim::Int,
+    num_ops::Int,
+) where {T}
     # 2D monomials with poly_deg=2: 1, x, y, xy, x², y² (nmon=6)
     # 2D monomials with poly_deg=1: 1, x, y (nmon=3)
     # 2D monomials with poly_deg=0: 1 (nmon=1)
@@ -296,13 +296,13 @@ function _backward_partial_poly_2d!(
 
     if dim == 1  # ∂/∂x operator
         @inbounds for op_idx in 1:num_ops
-            Δeval_point[2] += Δb[k + 4, op_idx]  # from xy term: ∂(y)/∂y = 1
-            Δeval_point[1] += Δb[k + 5, op_idx] * 2  # from x² term: ∂(2x)/∂x = 2
+            Δeval_point[2] += Δb[k+4, op_idx]  # from xy term: ∂(y)/∂y = 1
+            Δeval_point[1] += Δb[k+5, op_idx] * 2  # from x² term: ∂(2x)/∂x = 2
         end
     elseif dim == 2  # ∂/∂y operator
         @inbounds for op_idx in 1:num_ops
-            Δeval_point[1] += Δb[k + 4, op_idx]  # from xy term: ∂(x)/∂x = 1
-            Δeval_point[2] += Δb[k + 6, op_idx] * 2  # from y² term: ∂(2y)/∂y = 2
+            Δeval_point[1] += Δb[k+4, op_idx]  # from xy term: ∂(x)/∂x = 1
+            Δeval_point[2] += Δb[k+6, op_idx] * 2  # from y² term: ∂(2y)/∂y = 2
         end
     end
 
@@ -311,13 +311,13 @@ end
 
 """Backward pass for polynomial section in 3D."""
 function _backward_partial_poly_3d!(
-        Δeval_point::Vector{T},
-        Δb::AbstractVecOrMat{T},
-        k::Int,
-        nmon::Int,
-        dim::Int,
-        num_ops::Int,
-    ) where {T}
+    Δeval_point::Vector{T},
+    Δb::AbstractVecOrMat{T},
+    k::Int,
+    nmon::Int,
+    dim::Int,
+    num_ops::Int,
+) where {T}
     # 3D monomials with poly_deg=2: 1, x, y, z, xy, xz, yz, x², y², z² (nmon=10)
     # 3D monomials with poly_deg=1: 1, x, y, z (nmon=4)
 
@@ -336,25 +336,139 @@ function _backward_partial_poly_3d!(
 
     if dim == 1  # ∂/∂x operator
         @inbounds for op_idx in 1:num_ops
-            Δeval_point[2] += Δb[k + 5, op_idx]  # from xy: ∂(y)/∂y = 1
-            Δeval_point[3] += Δb[k + 6, op_idx]  # from xz: ∂(z)/∂z = 1
-            Δeval_point[1] += Δb[k + 8, op_idx] * 2  # from x²: ∂(2x)/∂x = 2
+            Δeval_point[2] += Δb[k+5, op_idx]  # from xy: ∂(y)/∂y = 1
+            Δeval_point[3] += Δb[k+6, op_idx]  # from xz: ∂(z)/∂z = 1
+            Δeval_point[1] += Δb[k+8, op_idx] * 2  # from x²: ∂(2x)/∂x = 2
         end
     elseif dim == 2  # ∂/∂y operator
         @inbounds for op_idx in 1:num_ops
-            Δeval_point[1] += Δb[k + 5, op_idx]  # from xy: ∂(x)/∂x = 1
-            Δeval_point[3] += Δb[k + 7, op_idx]  # from yz: ∂(z)/∂z = 1
-            Δeval_point[2] += Δb[k + 9, op_idx] * 2  # from y²: ∂(2y)/∂y = 2
+            Δeval_point[1] += Δb[k+5, op_idx]  # from xy: ∂(x)/∂x = 1
+            Δeval_point[3] += Δb[k+7, op_idx]  # from yz: ∂(z)/∂z = 1
+            Δeval_point[2] += Δb[k+9, op_idx] * 2  # from y²: ∂(2y)/∂y = 2
         end
     elseif dim == 3  # ∂/∂z operator
         @inbounds for op_idx in 1:num_ops
-            Δeval_point[1] += Δb[k + 6, op_idx]  # from xz: ∂(x)/∂x = 1
-            Δeval_point[2] += Δb[k + 7, op_idx]  # from yz: ∂(y)/∂y = 1
-            Δeval_point[3] += Δb[k + 10, op_idx] * 2  # from z²: ∂(2z)/∂z = 2
+            Δeval_point[1] += Δb[k+6, op_idx]  # from xz: ∂(x)/∂x = 1
+            Δeval_point[2] += Δb[k+7, op_idx]  # from yz: ∂(y)/∂y = 1
+            Δeval_point[3] += Δb[k+10, op_idx] * 2  # from z²: ∂(2z)/∂z = 2
         end
     end
 
     return nothing
+end
+
+"""
+    _backward_mixed_partial_polynomial_section!(Δeval_point, Δb, k, nmon, dim1, dim2, num_ops)
+
+Backward pass through the polynomial section of the RHS for MixedPartial operator.
+
+For a mixed second derivative operator, this accumulates third derivatives of the
+monomial basis into `Δeval_point`. In the common `poly_deg <= 3` regime, these
+contributions are constants determined by monomial exponents.
+"""
+function _backward_mixed_partial_polynomial_section!(
+    Δeval_point::Vector{T},
+    Δb::AbstractVecOrMat{T},
+    k::Int,
+    nmon::Int,
+    dim1::Int,
+    dim2::Int,
+    num_ops::Int,
+) where {T}
+    D = length(Δeval_point)
+    deg = _infer_poly_degree_from_nmon(D, nmon)
+    deg < 3 && return nothing
+
+    ex = collect(Vector{Int}, multiexponents(D + 1, deg))
+    nterms = min(nmon, length(ex))
+
+    @inbounds for term_idx in 1:nterms
+        e = ex[term_idx]
+        for q in 1:D
+            c = zeros(Int, D)
+            c[dim1] += 1
+            c[dim2] += 1
+            c[q] += 1
+
+            coeff = _third_derivative_constant_coeff(e, c)
+            coeff == 0 && continue
+
+            for op_idx in 1:num_ops
+                Δeval_point[q] += Δb[k+term_idx, op_idx] * coeff
+            end
+        end
+    end
+
+    return nothing
+end
+
+"""
+    _backward_second_partial_polynomial_section!(Δeval_point, Δb, k, nmon, dim, num_ops)
+
+Backward pass through the polynomial section of the RHS for Partial(2, dim) operator.
+
+For a monomial p = x₁^e₁⋯xD^eD, the RHS entry is ∂²p/∂x[dim]², which is a constant
+when poly_deg ≤ 2. The gradient ∂³p/∂x[dim]²∂x[q] is non-zero only for poly_deg ≥ 3.
+"""
+function _backward_second_partial_polynomial_section!(
+    Δeval_point::Vector{T},
+    Δb::AbstractVecOrMat{T},
+    k::Int,
+    nmon::Int,
+    dim::Int,
+    num_ops::Int,
+) where {T}
+    D = length(Δeval_point)
+    deg = _infer_poly_degree_from_nmon(D, nmon)
+    deg < 3 && return nothing  # All third derivatives of quadratics are zero
+
+    ex = collect(Vector{Int}, multiexponents(D + 1, deg))
+    nterms = min(nmon, length(ex))
+
+    @inbounds for term_idx in 1:nterms
+        e = ex[term_idx]
+        e[dim] < 2 && continue
+        for q in 1:D
+            c = zeros(Int, D)
+            c[dim] += 2
+            c[q] += 1  # gives c[dim]=3 when q==dim
+            coeff = _third_derivative_constant_coeff(e, c)
+            coeff == 0 && continue
+            for op_idx in 1:num_ops
+                Δeval_point[q] += Δb[k+term_idx, op_idx] * coeff
+            end
+        end
+    end
+    return nothing
+end
+
+function _infer_poly_degree_from_nmon(D::Int, nmon::Int)
+    deg = 0
+    while deg <= 32
+        if binomial(D + deg, deg) == nmon
+            return deg
+        end
+        deg += 1
+    end
+    throw(ArgumentError("Could not infer polynomial degree from D=$D and nmon=$nmon"))
+end
+
+function _third_derivative_constant_coeff(e::AbstractVector{Int}, c::AbstractVector{Int})
+    coeff = one(Int)
+    @inbounds for d in eachindex(c)
+        cd = c[d]
+        cd == 0 && continue
+        ed = e[d]
+        ed < cd && return 0
+        if cd == 1
+            coeff *= ed
+        elseif cd == 2
+            coeff *= ed * (ed - 1)
+        else
+            coeff *= ed * (ed - 1) * (ed - 2)
+        end
+    end
+    return coeff
 end
 
 # =============================================================================
@@ -370,18 +484,18 @@ Uses implicit differentiation: Δε += Σᵢⱼ ΔA[i,j] * ∂A[i,j]/∂ε
 where A[i,j] = φ(xi, xj) for the RBF block.
 """
 function backward_collocation_ε!(
-        Δε_acc::Base.RefValue{T},
-        ΔA::AbstractMatrix{T},
-        neighbors::Vector{Int},
-        data::AbstractVector,
-        basis::AbstractRadialBasis,
-        k::Int,
-    ) where {T}
+    Δε_acc::Base.RefValue{T},
+    ΔA::AbstractMatrix{T},
+    neighbors::Vector{Int},
+    data::AbstractVector,
+    basis::AbstractRadialBasis,
+    k::Int,
+) where {T}
     # RBF block: A[i,j] = φ(xi, xj)
     # Accumulate gradient from upper triangle (matrix is symmetric)
     @inbounds for j in 1:k
         xj = data[neighbors[j]]
-        for i in 1:(j - 1)
+        for i in 1:(j-1)
             xi = data[neighbors[i]]
             # ∂φ/∂ε at this pair
             ∂φ_∂ε_val = ∂φ_∂ε(basis, xi, xj)
@@ -402,14 +516,14 @@ Compute gradient contribution to shape parameter ε from RHS.
   - Partial:   `(x, xi) -> ∂Partial_φ_∂ε(basis, dim, x, xi)`
 """
 function backward_rhs_ε!(
-        Δε_acc::Base.RefValue{T},
-        Δb::AbstractVecOrMat{T},
-        neighbors::Vector{Int},
-        eval_point,
-        data::AbstractVector,
-        k::Int,
-        ∂Lφ_∂ε_fn::F,
-    ) where {T, F}
+    Δε_acc::Base.RefValue{T},
+    Δb::AbstractVecOrMat{T},
+    neighbors::Vector{Int},
+    eval_point,
+    data::AbstractVector,
+    k::Int,
+    ∂Lφ_∂ε_fn::F,
+) where {T,F}
     num_ops = size(Δb, 2)
 
     @inbounds for i in 1:k
@@ -439,22 +553,22 @@ Optional closures:
 - `∂Lφ_∂ε_fn`: shape parameter derivative function (IMQ/Gaussian only)
 """
 function backward_stencil_with_ε!(
-        Δdata::Vector{Vector{T}},
-        Δeval_point::Vector{T},
-        Δε_acc::Base.RefValue{T},
-        Δw::AbstractVecOrMat{T},
-        cache::StencilForwardCache{T},
-        neighbors::Vector{Int},
-        eval_point,
-        data::AbstractVector,
-        basis::AbstractRadialBasis,
-        mon::MonomialBasis{Dim, Deg},
-        k::Int,
-        grad_Lφ_x,
-        grad_Lφ_xi;
-        poly_backward!::F1 = nothing,
-        ∂Lφ_∂ε_fn::F2 = nothing,
-    ) where {T, Dim, Deg, F1, F2}
+    Δdata::Vector{Vector{T}},
+    Δeval_point::Vector{T},
+    Δε_acc::Base.RefValue{T},
+    Δw::AbstractVecOrMat{T},
+    cache::StencilForwardCache{T},
+    neighbors::Vector{Int},
+    eval_point,
+    data::AbstractVector,
+    basis::AbstractRadialBasis,
+    mon::MonomialBasis{Dim,Deg},
+    k::Int,
+    grad_Lφ_x,
+    grad_Lφ_xi;
+    poly_backward!::F1=nothing,
+    ∂Lφ_∂ε_fn::F2=nothing,
+) where {T,Dim,Deg,F1,F2}
     n = k + cache.nmon
 
     ΔA = zeros(T, n, n)
@@ -465,7 +579,7 @@ function backward_stencil_with_ε!(
     backward_collocation_ε!(Δε_acc, ΔA, neighbors, data, basis, k)
     backward_rhs!(
         Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, k,
-        grad_Lφ_x, grad_Lφ_xi; poly_backward! = poly_backward!
+        grad_Lφ_x, grad_Lφ_xi; (poly_backward!)=poly_backward!
     )
     if ∂Lφ_∂ε_fn !== nothing
         backward_rhs_ε!(Δε_acc, Δb, neighbors, eval_point, data, k, ∂Lφ_∂ε_fn)
@@ -485,8 +599,8 @@ Extract cotangent values for a single stencil from a dense/sparse matrix cotange
 Used by the Enzyme extension.
 """
 function extract_stencil_cotangent(
-        ΔW::AbstractMatrix{T}, eval_idx::Int, neighbors::Vector{Int}, k::Int, num_ops::Int
-    ) where {T}
+    ΔW::AbstractMatrix{T}, eval_idx::Int, neighbors::Vector{Int}, k::Int, num_ops::Int
+) where {T}
     Δw = zeros(T, k, num_ops)
     for (local_idx, global_idx) in enumerate(neighbors)
         Δw[local_idx, 1] = ΔW[eval_idx, global_idx]
@@ -501,12 +615,12 @@ Extract cotangent values for a single stencil from sparse matrix nzval gradient.
 Used by Mooncake extension where gradients are stored in fdata.nzval.
 """
 function extract_stencil_cotangent_from_nzval(
-        ΔW_nzval::Vector{T}, W::SparseMatrixCSC, eval_idx::Int, neighbors::Vector{Int}, k::Int
-    ) where {T}
+    ΔW_nzval::Vector{T}, W::SparseMatrixCSC, eval_idx::Int, neighbors::Vector{Int}, k::Int
+) where {T}
     Δw = zeros(T, k, 1)
     for (local_idx, global_idx) in enumerate(neighbors)
         col_start = W.colptr[global_idx]
-        col_end = W.colptr[global_idx + 1] - 1
+        col_end = W.colptr[global_idx+1] - 1
         for pos in col_start:col_end
             if W.rowval[pos] == eval_idx
                 Δw[local_idx, 1] = ΔW_nzval[pos]

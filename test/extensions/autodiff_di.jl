@@ -34,8 +34,8 @@ function PDESolveIFT(interior_idx::Vector{Int}, boundary_idx::Vector{Int}, N::In
 end
 
 function (solver::PDESolveIFT)(
-        W::SparseMatrixCSC{Float64,Int}, b::Vector{Float64}
-    )
+    W::SparseMatrixCSC{Float64,Int}, b::Vector{Float64}
+)
     A = Matrix(W)
     for i in solver.boundary_idx
         A[i, :] .= 0.0
@@ -44,13 +44,13 @@ function (solver::PDESolveIFT)(
     return A \ b
 end
 
-Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{PDESolveIFT, SparseMatrixCSC{Float64,Int}, Vector{Float64}}
+Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{PDESolveIFT,SparseMatrixCSC{Float64,Int},Vector{Float64}}
 
 function Mooncake.rrule!!(
-        solver_cd::Mooncake.CoDual{PDESolveIFT},
-        W::Mooncake.CoDual{SparseMatrixCSC{Float64,Int}},
-        b::Mooncake.CoDual{Vector{Float64}},
-    )
+    solver_cd::Mooncake.CoDual{PDESolveIFT},
+    W::Mooncake.CoDual{SparseMatrixCSC{Float64,Int}},
+    b::Mooncake.CoDual{Vector{Float64}},
+)
     solver = Mooncake.primal(solver_cd)
     W_val = Mooncake.primal(W)
     b_val = Mooncake.primal(b)
@@ -90,11 +90,11 @@ end
 const ENZYME_SUPPORTED = VERSION < v"1.12"
 
 # Backend configuration
-const ENZYME_BACKEND = DI.AutoEnzyme(; function_annotation = Enzyme.Const)
-const MOONCAKE_BACKEND = DI.AutoMooncake(; config = nothing)
+const ENZYME_BACKEND = DI.AutoEnzyme(; function_annotation=Enzyme.Const)
+const MOONCAKE_BACKEND = DI.AutoMooncake(; config=nothing)
 
 # Build backend registry (only include supported backends)
-const AD_BACKENDS = Pair{String, Any}[]
+const AD_BACKENDS = Pair{String,Any}[]
 ENZYME_SUPPORTED && push!(AD_BACKENDS, "Enzyme" => ENZYME_BACKEND)
 push!(AD_BACKENDS, "Mooncake" => MOONCAKE_BACKEND)
 
@@ -103,11 +103,11 @@ push!(AD_BACKENDS, "Mooncake" => MOONCAKE_BACKEND)
 
 Test that DI.gradient matches finite differences for function f at point x.
 """
-function test_gradient_vs_fd(f, x, backend; rtol = 1.0e-4, name = "")
+function test_gradient_vs_fd(f, x, backend; rtol=1.0e-4, name="")
     di_grad = DI.gradient(f, backend, x)
     fd_grad = FD.grad(FD.central_fdm(5, 1), f, x)[1]
     @test !all(iszero, di_grad)
-    return @test isapprox(di_grad, fd_grad; rtol = rtol)
+    return @test isapprox(di_grad, fd_grad; rtol=rtol)
 end
 
 @testset "Autodiff via DifferentiationInterface" begin
@@ -115,7 +115,7 @@ end
         N = 50
         points = [
             SVector{2}(0.1 + 0.8 * i / N, 0.1 + 0.8 * j / N) for i in 1:isqrt(N)
-                for j in 1:isqrt(N)
+            for j in 1:isqrt(N)
         ]
         N = length(points)
         values = sin.(getindex.(points, 1)) .+ cos.(getindex.(points, 2))
@@ -126,7 +126,7 @@ end
 
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
-                    test_gradient_vs_fd(loss_lap, values, backend; rtol = 1.0e-4)
+                    test_gradient_vs_fd(loss_lap, values, backend; rtol=1.0e-4)
                 end
             end
         end
@@ -141,7 +141,7 @@ end
                     if name == "Enzyme" && VERSION >= v"1.12"
                         @test_skip "Vector-valued operators have known issues on Julia 1.12+"
                     else
-                        test_gradient_vs_fd(loss_grad, values, backend; rtol = 1.0e-4)
+                        test_gradient_vs_fd(loss_grad, values, backend; rtol=1.0e-4)
                     end
                 end
             end
@@ -153,7 +153,7 @@ end
 
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
-                    test_gradient_vs_fd(loss_partial, values, backend; rtol = 1.0e-4)
+                    test_gradient_vs_fd(loss_partial, values, backend; rtol=1.0e-4)
                 end
             end
         end
@@ -177,7 +177,7 @@ end
                     if name == "Enzyme"
                         @test_skip "Enzyme cannot differentiate through Interpolator constructor (factorize Union types)"
                     else
-                        test_gradient_vs_fd(loss_interp, values, backend; rtol = 1.0e-3)
+                        test_gradient_vs_fd(loss_interp, values, backend; rtol=1.0e-3)
                     end
                 end
             end
@@ -194,7 +194,7 @@ end
                     if name == "Enzyme"
                         @test_skip "Enzyme cannot differentiate through Interpolator constructor (factorize Union types)"
                     else
-                        test_gradient_vs_fd(loss_interp_imq, values, backend; rtol = 1.0e-3)
+                        test_gradient_vs_fd(loss_interp_imq, values, backend; rtol=1.0e-3)
                     end
                 end
             end
@@ -210,30 +210,34 @@ end
                 @testset "$name" begin
                     if name == "Enzyme"
                         @test_skip "Enzyme cannot differentiate through Interpolator constructor (factorize Union types)"
-                    else
-                        test_gradient_vs_fd(loss_interp_gauss, values, backend; rtol = 1.0e-3)
+                        @testset "Mooncake" begin
+                            test_gradient_vs_fd(loss_pde, pts_flat_pde, MOONCAKE_BACKEND; rtol=1.0e-3)
+                        end
+                    end
+                end
+            end
+
+            @testset "Single point evaluation" begin
+                single_eval_point = SVector{2}(0.5, 0.5)
+
+                function loss_interp_single(v)
+                    interp_local = Interpolator(points, v)
+                    return interp_local(single_eval_point)^2
+                end
+
+                for (name, backend) in AD_BACKENDS
+                    @testset "$name" begin
+                        if name == "Enzyme"
+                            @test_skip "Enzyme cannot differentiate through Interpolator constructor (factorize Union types)"
+                        else
+                            test_gradient_vs_fd(loss_interp_single, values, backend; rtol=1.0e-3)
+                        end
                     end
                 end
             end
         end
-
-        @testset "Single point evaluation" begin
-            single_eval_point = SVector{2}(0.5, 0.5)
-
-            function loss_interp_single(v)
-                interp_local = Interpolator(points, v)
-                return interp_local(single_eval_point)^2
-            end
-
-            for (name, backend) in AD_BACKENDS
-                @testset "$name" begin
-                    if name == "Enzyme"
-                        @test_skip "Enzyme cannot differentiate through Interpolator constructor (factorize Union types)"
-                    else
-                        test_gradient_vs_fd(loss_interp_single, values, backend; rtol = 1.0e-3)
-                    end
-                end
-            end
+        @testset "Mooncake" begin
+            test_gradient_vs_fd(loss_pde, pts_flat_pde, MOONCAKE_BACKEND; rtol=1.0e-3)
         end
     end
 
@@ -247,7 +251,7 @@ end
 
                 for (name, backend) in AD_BACKENDS
                     @testset "PHS($order) - $name" begin
-                        test_gradient_vs_fd(loss_phs, x, backend; rtol = 1.0e-4)
+                        test_gradient_vs_fd(loss_phs, x, backend; rtol=1.0e-4)
                     end
                 end
             end
@@ -259,7 +263,7 @@ end
 
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
-                    test_gradient_vs_fd(loss_imq, x, backend; rtol = 1.0e-4)
+                    test_gradient_vs_fd(loss_imq, x, backend; rtol=1.0e-4)
                 end
             end
         end
@@ -270,7 +274,7 @@ end
 
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
-                    test_gradient_vs_fd(loss_gauss, x, backend; rtol = 1.0e-4)
+                    test_gradient_vs_fd(loss_gauss, x, backend; rtol=1.0e-4)
                 end
             end
         end
@@ -282,11 +286,11 @@ end
         adjl = RadialBasisFunctions.find_neighbors(points, 10)
 
         @testset "Partial operator with PHS3" begin
-            basis = PHS(3; poly_deg = 2)
+            basis = PHS(3; poly_deg=2)
             ℒ = Partial(1, 1)
 
             function loss_partial_weights(pts)
-                pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
+                pts_vec = [SVector{2}(pts[2*i-1], pts[2*i]) for i in 1:N]
                 W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
                 return sum(W.nzval .^ 2)
             end
@@ -295,17 +299,17 @@ end
 
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
-                    test_gradient_vs_fd(loss_partial_weights, pts_flat, backend; rtol = 1.0e-3)
+                    test_gradient_vs_fd(loss_partial_weights, pts_flat, backend; rtol=1.0e-3)
                 end
             end
         end
 
         @testset "Laplacian operator with PHS3" begin
-            basis = PHS(3; poly_deg = 2)
+            basis = PHS(3; poly_deg=2)
             ℒ = Laplacian()
 
             function loss_laplacian_weights(pts)
-                pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
+                pts_vec = [SVector{2}(pts[2*i-1], pts[2*i]) for i in 1:N]
                 W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
                 return sum(W.nzval .^ 2)
             end
@@ -315,7 +319,7 @@ end
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
                     test_gradient_vs_fd(
-                        loss_laplacian_weights, pts_flat, backend; rtol = 1.0e-3
+                        loss_laplacian_weights, pts_flat, backend; rtol=1.0e-3
                     )
                 end
             end
@@ -323,11 +327,11 @@ end
 
         @testset "Different PHS orders for Laplacian" begin
             for n in [1, 3, 5, 7]
-                basis = PHS(n; poly_deg = 1)
+                basis = PHS(n; poly_deg=1)
                 ℒ = Laplacian()
 
                 function loss_laplacian_phs_order(pts)
-                    pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
+                    pts_vec = [SVector{2}(pts[2*i-1], pts[2*i]) for i in 1:N]
                     W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
                     return sum(W.nzval .^ 2)
                 end
@@ -340,7 +344,7 @@ end
                         fd_grad = FD.grad(FD.central_fdm(5, 1), loss_laplacian_phs_order, pts_flat)[1]
                         # PHS1 may have zero gradient for some configurations
                         @test !all(iszero, di_grad) || n == 1
-                        @test isapprox(di_grad, fd_grad; rtol = 1.0e-2)
+                        @test isapprox(di_grad, fd_grad; rtol=1.0e-2)
                     end
                 end
             end
@@ -350,7 +354,7 @@ end
             N_1d = 10
             points_1d = [SVector{1}(0.1 + 0.8 * i / N_1d) for i in 1:N_1d]
             adjl_1d = RadialBasisFunctions.find_neighbors(points_1d, 5)
-            basis_1d = PHS(3; poly_deg = 2)
+            basis_1d = PHS(3; poly_deg=2)
             ℒ_1d = Partial(1, 1)
 
             function loss_partial_weights_1d(pts)
@@ -366,7 +370,7 @@ end
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
                     test_gradient_vs_fd(
-                        loss_partial_weights_1d, pts_flat_1d, backend; rtol = 1.0e-3
+                        loss_partial_weights_1d, pts_flat_1d, backend; rtol=1.0e-3
                     )
                 end
             end
@@ -377,18 +381,18 @@ end
             N_3d = 64
             points_3d = [
                 SVector{3}(
-                        0.1 + 0.8 * ((i * 7 + 3) % N_3d) / N_3d,
-                        0.1 + 0.8 * ((i * 11 + 5) % N_3d) / N_3d,
-                        0.1 + 0.8 * ((i * 13 + 7) % N_3d) / N_3d,
-                    ) for i in 1:N_3d
+                    0.1 + 0.8 * ((i * 7 + 3) % N_3d) / N_3d,
+                    0.1 + 0.8 * ((i * 11 + 5) % N_3d) / N_3d,
+                    0.1 + 0.8 * ((i * 13 + 7) % N_3d) / N_3d,
+                ) for i in 1:N_3d
             ]
             adjl_3d = RadialBasisFunctions.find_neighbors(points_3d, 20)
-            basis_3d = PHS(3; poly_deg = 2)
+            basis_3d = PHS(3; poly_deg=2)
             ℒ_3d = Partial(1, 1)
 
             function loss_partial_weights_3d(pts)
                 pts_vec = [
-                    SVector{3}(pts[3 * i - 2], pts[3 * i - 1], pts[3 * i]) for i in 1:N_3d
+                    SVector{3}(pts[3*i-2], pts[3*i-1], pts[3*i]) for i in 1:N_3d
                 ]
                 W = RadialBasisFunctions._build_weights(
                     ℒ_3d, pts_vec, pts_vec, adjl_3d, basis_3d
@@ -401,7 +405,7 @@ end
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
                     test_gradient_vs_fd(
-                        loss_partial_weights_3d, pts_flat_3d, backend; rtol = 1.0e-3
+                        loss_partial_weights_3d, pts_flat_3d, backend; rtol=1.0e-3
                     )
                 end
             end
@@ -411,19 +415,19 @@ end
             N_3d_y = 64
             points_3d_y = [
                 SVector{3}(
-                        0.1 + 0.8 * ((i * 7 + 3) % N_3d_y) / N_3d_y,
-                        0.1 + 0.8 * ((i * 11 + 5) % N_3d_y) / N_3d_y,
-                        0.1 + 0.8 * ((i * 13 + 7) % N_3d_y) / N_3d_y,
-                    ) for i in 1:N_3d_y
+                    0.1 + 0.8 * ((i * 7 + 3) % N_3d_y) / N_3d_y,
+                    0.1 + 0.8 * ((i * 11 + 5) % N_3d_y) / N_3d_y,
+                    0.1 + 0.8 * ((i * 13 + 7) % N_3d_y) / N_3d_y,
+                ) for i in 1:N_3d_y
             ]
             adjl_3d_y = RadialBasisFunctions.find_neighbors(points_3d_y, 20)
-            basis_3d_y = PHS(3; poly_deg = 2)
+            basis_3d_y = PHS(3; poly_deg=2)
             ℒ_3d_y = Partial(1, 2)
 
             function loss_partial_weights_3d_y(pts)
                 pts_vec = [
-                    SVector{3}(pts[3 * i - 2], pts[3 * i - 1], pts[3 * i]) for
-                        i in 1:N_3d_y
+                    SVector{3}(pts[3*i-2], pts[3*i-1], pts[3*i]) for
+                    i in 1:N_3d_y
                 ]
                 W = RadialBasisFunctions._build_weights(
                     ℒ_3d_y, pts_vec, pts_vec, adjl_3d_y, basis_3d_y
@@ -436,7 +440,7 @@ end
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
                     test_gradient_vs_fd(
-                        loss_partial_weights_3d_y, pts_flat_3d_y, backend; rtol = 1.0e-3
+                        loss_partial_weights_3d_y, pts_flat_3d_y, backend; rtol=1.0e-3
                     )
                 end
             end
@@ -446,19 +450,19 @@ end
             N_3d_z = 64
             points_3d_z = [
                 SVector{3}(
-                        0.1 + 0.8 * ((i * 7 + 3) % N_3d_z) / N_3d_z,
-                        0.1 + 0.8 * ((i * 11 + 5) % N_3d_z) / N_3d_z,
-                        0.1 + 0.8 * ((i * 13 + 7) % N_3d_z) / N_3d_z,
-                    ) for i in 1:N_3d_z
+                    0.1 + 0.8 * ((i * 7 + 3) % N_3d_z) / N_3d_z,
+                    0.1 + 0.8 * ((i * 11 + 5) % N_3d_z) / N_3d_z,
+                    0.1 + 0.8 * ((i * 13 + 7) % N_3d_z) / N_3d_z,
+                ) for i in 1:N_3d_z
             ]
             adjl_3d_z = RadialBasisFunctions.find_neighbors(points_3d_z, 20)
-            basis_3d_z = PHS(3; poly_deg = 2)
+            basis_3d_z = PHS(3; poly_deg=2)
             ℒ_3d_z = Partial(1, 3)
 
             function loss_partial_weights_3d_z(pts)
                 pts_vec = [
-                    SVector{3}(pts[3 * i - 2], pts[3 * i - 1], pts[3 * i]) for
-                        i in 1:N_3d_z
+                    SVector{3}(pts[3*i-2], pts[3*i-1], pts[3*i]) for
+                    i in 1:N_3d_z
                 ]
                 W = RadialBasisFunctions._build_weights(
                     ℒ_3d_z, pts_vec, pts_vec, adjl_3d_z, basis_3d_z
@@ -471,18 +475,18 @@ end
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
                     test_gradient_vs_fd(
-                        loss_partial_weights_3d_z, pts_flat_3d_z, backend; rtol = 1.0e-3
+                        loss_partial_weights_3d_z, pts_flat_3d_z, backend; rtol=1.0e-3
                     )
                 end
             end
         end
 
         @testset "2D Partial(1,2) operator with PHS3" begin
-            basis = PHS(3; poly_deg = 2)
+            basis = PHS(3; poly_deg=2)
             ℒ_y = Partial(1, 2)
 
             function loss_partial_y_weights(pts)
-                pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
+                pts_vec = [SVector{2}(pts[2*i-1], pts[2*i]) for i in 1:N]
                 W = RadialBasisFunctions._build_weights(ℒ_y, pts_vec, pts_vec, adjl, basis)
                 return sum(W.nzval .^ 2)
             end
@@ -492,7 +496,7 @@ end
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
                     test_gradient_vs_fd(
-                        loss_partial_y_weights, pts_flat, backend; rtol = 1.0e-3
+                        loss_partial_y_weights, pts_flat, backend; rtol=1.0e-3
                     )
                 end
             end
@@ -500,11 +504,11 @@ end
 
         @testset "Different PHS orders" begin
             for n in [1, 3, 5, 7]
-                basis = PHS(n; poly_deg = 1)
+                basis = PHS(n; poly_deg=1)
                 ℒ = Partial(1, 1)
 
                 function loss_phs_order(pts)
-                    pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
+                    pts_vec = [SVector{2}(pts[2*i-1], pts[2*i]) for i in 1:N]
                     W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
                     return sum(W.nzval .^ 2)
                 end
@@ -517,18 +521,18 @@ end
                         fd_grad = FD.grad(FD.central_fdm(5, 1), loss_phs_order, pts_flat)[1]
                         # PHS1 may have zero gradient for some configurations
                         @test !all(iszero, di_grad) || n == 1
-                        @test isapprox(di_grad, fd_grad; rtol = 1.0e-2)
+                        @test isapprox(di_grad, fd_grad; rtol=1.0e-2)
                     end
                 end
             end
         end
 
         @testset "IMQ basis with Partial operator" begin
-            basis = IMQ(1.0; poly_deg = 2)
+            basis = IMQ(1.0; poly_deg=2)
             ℒ = Partial(1, 1)
 
             function loss_imq_partial(pts)
-                pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
+                pts_vec = [SVector{2}(pts[2*i-1], pts[2*i]) for i in 1:N]
                 W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
                 return sum(W.nzval .^ 2)
             end
@@ -537,17 +541,17 @@ end
 
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
-                    test_gradient_vs_fd(loss_imq_partial, pts_flat, backend; rtol = 1.0e-3)
+                    test_gradient_vs_fd(loss_imq_partial, pts_flat, backend; rtol=1.0e-3)
                 end
             end
         end
 
         @testset "IMQ basis with Laplacian operator" begin
-            basis = IMQ(1.0; poly_deg = 2)
+            basis = IMQ(1.0; poly_deg=2)
             ℒ = Laplacian()
 
             function loss_imq_laplacian(pts)
-                pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
+                pts_vec = [SVector{2}(pts[2*i-1], pts[2*i]) for i in 1:N]
                 W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
                 return sum(W.nzval .^ 2)
             end
@@ -556,17 +560,17 @@ end
 
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
-                    test_gradient_vs_fd(loss_imq_laplacian, pts_flat, backend; rtol = 1.0e-3)
+                    test_gradient_vs_fd(loss_imq_laplacian, pts_flat, backend; rtol=1.0e-3)
                 end
             end
         end
 
         @testset "Gaussian basis with Partial operator" begin
-            basis = Gaussian(1.0; poly_deg = 2)
+            basis = Gaussian(1.0; poly_deg=2)
             ℒ = Partial(1, 1)
 
             function loss_gaussian_partial(pts)
-                pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
+                pts_vec = [SVector{2}(pts[2*i-1], pts[2*i]) for i in 1:N]
                 W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
                 return sum(W.nzval .^ 2)
             end
@@ -576,18 +580,18 @@ end
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
                     test_gradient_vs_fd(
-                        loss_gaussian_partial, pts_flat, backend; rtol = 1.0e-3
+                        loss_gaussian_partial, pts_flat, backend; rtol=1.0e-3
                     )
                 end
             end
         end
 
         @testset "Gaussian basis with Laplacian operator" begin
-            basis = Gaussian(1.0; poly_deg = 2)
+            basis = Gaussian(1.0; poly_deg=2)
             ℒ = Laplacian()
 
             function loss_gaussian_laplacian(pts)
-                pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
+                pts_vec = [SVector{2}(pts[2*i-1], pts[2*i]) for i in 1:N]
                 W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
                 return sum(W.nzval .^ 2)
             end
@@ -597,7 +601,7 @@ end
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
                     test_gradient_vs_fd(
-                        loss_gaussian_laplacian, pts_flat, backend; rtol = 1.0e-3
+                        loss_gaussian_laplacian, pts_flat, backend; rtol=1.0e-3
                     )
                 end
             end
@@ -606,11 +610,11 @@ end
         @testset "Different shape parameters" begin
             for ε in [0.5, 1.0, 2.0]
                 @testset "IMQ with ε=$ε" begin
-                    basis = IMQ(ε; poly_deg = 2)
+                    basis = IMQ(ε; poly_deg=2)
                     ℒ = Partial(1, 1)
 
                     function loss_imq_shape(pts)
-                        pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
+                        pts_vec = [SVector{2}(pts[2*i-1], pts[2*i]) for i in 1:N]
                         W = RadialBasisFunctions._build_weights(
                             ℒ, pts_vec, pts_vec, adjl, basis
                         )
@@ -622,18 +626,18 @@ end
                     for (name, backend) in AD_BACKENDS
                         @testset "$name" begin
                             test_gradient_vs_fd(
-                                loss_imq_shape, pts_flat, backend; rtol = 1.0e-2
+                                loss_imq_shape, pts_flat, backend; rtol=1.0e-2
                             )
                         end
                     end
                 end
 
                 @testset "Gaussian with ε=$ε" begin
-                    basis = Gaussian(ε; poly_deg = 2)
+                    basis = Gaussian(ε; poly_deg=2)
                     ℒ = Partial(1, 1)
 
                     function loss_gaussian_shape(pts)
-                        pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
+                        pts_vec = [SVector{2}(pts[2*i-1], pts[2*i]) for i in 1:N]
                         W = RadialBasisFunctions._build_weights(
                             ℒ, pts_vec, pts_vec, adjl, basis
                         )
@@ -645,7 +649,7 @@ end
                     for (name, backend) in AD_BACKENDS
                         @testset "$name" begin
                             test_gradient_vs_fd(
-                                loss_gaussian_shape, pts_flat, backend; rtol = 1.0e-2
+                                loss_gaussian_shape, pts_flat, backend; rtol=1.0e-2
                             )
                         end
                     end
@@ -689,7 +693,7 @@ end
 
         # Adjacency list fixed once: topology does not change under perturbation
         adjl_grid = RadialBasisFunctions.find_neighbors(points_grid, 14)
-        basis_grid = PHS(3; poly_deg = 2)
+        basis_grid = PHS(3; poly_deg=2)
 
         # Function values fixed at original positions.
         # sin(πx)cos(πy) is not in the quadratic polynomial span, so
@@ -697,7 +701,7 @@ end
         f_vals_grid = [sin(π * p[1]) * cos(π * p[2]) for p in points_grid]
 
         function loss_lap_application(pts_flat)
-            pts = [SVector{2}(pts_flat[2 * i - 1], pts_flat[2 * i]) for i in 1:N_grid]
+            pts = [SVector{2}(pts_flat[2*i-1], pts_flat[2*i]) for i in 1:N_grid]
             W = RadialBasisFunctions._build_weights(
                 Laplacian(), pts, pts, adjl_grid, basis_grid
             )
@@ -712,7 +716,7 @@ end
 
         @testset "Mooncake" begin
             test_gradient_vs_fd(
-                loss_lap_application, pts_flat_grid, MOONCAKE_BACKEND; rtol = 1.0e-3
+                loss_lap_application, pts_flat_grid, MOONCAKE_BACKEND; rtol=1.0e-3
             )
         end
     end
@@ -755,7 +759,7 @@ end
 
         # Fixed adjacency list — topology does not change under perturbation
         adjl_pde = RadialBasisFunctions.find_neighbors(points_pde, 14)
-        basis_pde = PHS(3; poly_deg = 2)
+        basis_pde = PHS(3; poly_deg=2)
 
         # Quadratic test function: f(x,y) = x²+y², ∇²f = 4 (constant, no approx error)
         f_exact_pde = [p[1]^2 + p[2]^2 for p in points_pde]
@@ -776,7 +780,7 @@ end
 
         # AD test
         function loss_pde(pts_flat)
-            pts = [SVector{2}(pts_flat[2 * i - 1], pts_flat[2 * i]) for i in 1:N_pde]
+            pts = [SVector{2}(pts_flat[2*i-1], pts_flat[2*i]) for i in 1:N_pde]
             W = RadialBasisFunctions._build_weights(
                 Laplacian(), pts, pts, adjl_pde, basis_pde
             )
@@ -790,7 +794,7 @@ end
         @test loss_pde(pts_flat_pde) > 0
 
         @testset "Mooncake" begin
-            test_gradient_vs_fd(loss_pde, pts_flat_pde, MOONCAKE_BACKEND; rtol = 1.0e-3)
+            test_gradient_vs_fd(loss_pde, pts_flat_pde, MOONCAKE_BACKEND; rtol=1.0e-3)
         end
     end
 end

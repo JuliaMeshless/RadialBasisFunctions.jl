@@ -1,5 +1,5 @@
 #=
-Shared AD utilities that depend on operator types (Partial, Laplacian).
+Shared AD utilities that depend on operator types (Partial, MixedPartial, Laplacian).
 
 Must be included AFTER operator definitions since it dispatches on Partial/Laplacian types.
 Used by Enzyme and Mooncake extensions via import.
@@ -11,6 +11,7 @@ Used by Enzyme and Mooncake extensions via import.
 Map operator instance to its abstract type for dispatch in AD rules.
 """
 _optype(::Partial) = Partial
+_optype(::MixedPartial) = MixedPartial
 _optype(::Laplacian) = Laplacian
 
 """
@@ -19,9 +20,16 @@ _optype(::Laplacian) = Laplacian
 Get gradient functions for the given operator type and basis.
 Returns (grad_Lφ_x, grad_Lφ_xi) tuple.
 """
-_get_grad_funcs(::Type{<:Partial}, basis, ℒ) = (
-    grad_applied_partial_wrt_x(basis, ℒ.dim),
-    grad_applied_partial_wrt_xi(basis, ℒ.dim),
+function _get_grad_funcs(::Type{<:Partial}, basis, ℒ)
+    if ℒ.order == 1
+        return (grad_applied_partial_wrt_x(basis, ℒ.dim), grad_applied_partial_wrt_xi(basis, ℒ.dim))
+    else
+        return (grad_applied_second_partial_wrt_x(basis, ℒ.dim), grad_applied_second_partial_wrt_xi(basis, ℒ.dim))
+    end
+end
+_get_grad_funcs(::Type{<:MixedPartial}, basis, ℒ) = (
+    grad_applied_mixed_partial_wrt_x(basis, ℒ.dim1, ℒ.dim2),
+    grad_applied_mixed_partial_wrt_xi(basis, ℒ.dim1, ℒ.dim2),
 )
 _get_grad_funcs(::Type{<:Laplacian}, basis, ℒ) = (
     grad_applied_laplacian_wrt_x(basis),
@@ -39,9 +47,24 @@ Returns `(poly_backward!, ∂Lφ_∂ε_fn)` keyword arguments.
 """
 function _get_rhs_closures(::Type{<:Partial}, ℒ, basis)
     dim = ℒ.dim
+    if ℒ.order == 1
+        poly_backward! = (Δeval_point, Δb, k, nmon, num_ops) ->
+            _backward_partial_polynomial_section!(Δeval_point, Δb, k, nmon, dim, num_ops)
+        ∂Lφ_∂ε_fn = (x, xi) -> ∂Partial_φ_∂ε(basis, dim, x, xi)
+        return poly_backward!, ∂Lφ_∂ε_fn
+    else
+        poly_backward! = (Δeval_point, Δb, k, nmon, num_ops) ->
+            _backward_second_partial_polynomial_section!(Δeval_point, Δb, k, nmon, dim, num_ops)
+        ∂Lφ_∂ε_fn = (x, xi) -> ∂SecondPartial_φ_∂ε(basis, dim, x, xi)
+        return poly_backward!, ∂Lφ_∂ε_fn
+    end
+end
+
+function _get_rhs_closures(::Type{<:MixedPartial}, ℒ, basis)
+    d1, d2 = ℒ.dim1, ℒ.dim2
     poly_backward! = (Δeval_point, Δb, k, nmon, num_ops) ->
-    _backward_partial_polynomial_section!(Δeval_point, Δb, k, nmon, dim, num_ops)
-    ∂Lφ_∂ε_fn = (x, xi) -> ∂Partial_φ_∂ε(basis, dim, x, xi)
+        _backward_mixed_partial_polynomial_section!(Δeval_point, Δb, k, nmon, d1, d2, num_ops)
+    ∂Lφ_∂ε_fn = (x, xi) -> ∂MixedPartial_φ_∂ε(basis, d1, d2, x, xi)
     return poly_backward!, ∂Lφ_∂ε_fn
 end
 
@@ -61,21 +84,21 @@ matrix `Δw` given the eval index, neighbor list, and stencil size. This abstrac
 the different ways each AD framework stores cotangents (dense matrix, nzval vector, etc.).
 """
 function build_weights_pullback_loop!(
-        Δdata::Vector{Vector{T}},
-        Δeval::Vector{Vector{T}},
-        Δε_acc::Base.RefValue{T},
-        ΔW_extractor,
-        cache::WeightsBuildForwardCache,
-        adjl::AbstractVector,
-        eval_points::AbstractVector,
-        data::AbstractVector,
-        basis::AbstractRadialBasis,
-        mon::MonomialBasis,
-        ℒ,
-        ::Type{OpType},
-        grad_Lφ_x,
-        grad_Lφ_xi,
-    ) where {T, OpType}
+    Δdata::Vector{Vector{T}},
+    Δeval::Vector{Vector{T}},
+    Δε_acc::Base.RefValue{T},
+    ΔW_extractor,
+    cache::WeightsBuildForwardCache,
+    adjl::AbstractVector,
+    eval_points::AbstractVector,
+    data::AbstractVector,
+    basis::AbstractRadialBasis,
+    mon::MonomialBasis,
+    ℒ,
+    ::Type{OpType},
+    grad_Lφ_x,
+    grad_Lφ_xi,
+) where {T,OpType}
     N_eval = length(eval_points)
     k = cache.k
     dim_space = length(first(data))
@@ -98,8 +121,8 @@ function build_weights_pullback_loop!(
                 Δlocal_data, Δeval_pt, Δε_acc, Δw, stencil_cache, collect(1:k),
                 eval_point, local_data, basis, mon, k,
                 grad_Lφ_x, grad_Lφ_xi;
-                poly_backward! = poly_backward!,
-                ∂Lφ_∂ε_fn = ∂Lφ_∂ε_fn,
+                (poly_backward!)=poly_backward!,
+                ∂Lφ_∂ε_fn=∂Lφ_∂ε_fn,
             )
 
             for (local_idx, global_idx) in enumerate(neighbors)

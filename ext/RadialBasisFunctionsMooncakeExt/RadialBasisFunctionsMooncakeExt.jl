@@ -25,7 +25,8 @@ using SparseArrays: SparseMatrixCSC
 import RadialBasisFunctions: _eval_op, RadialBasisOperator, Interpolator
 import RadialBasisFunctions: AbstractPHS, IMQ, Gaussian
 import RadialBasisFunctions: AbstractRadialBasis, Jacobian
-import RadialBasisFunctions: _build_weights, Partial, Laplacian, MonomialBasis, _optype
+import RadialBasisFunctions: _build_weights, Partial, MixedPartial, Laplacian, MonomialBasis, _optype
+import RadialBasisFunctions: MixedPartial
 import RadialBasisFunctions: _interpolator_point_gradient!
 import RadialBasisFunctions: _interpolator_constructor_backward, _build_collocation_matrix!
 
@@ -45,13 +46,13 @@ const ∇ = RadialBasisFunctions.∇
 # This method bridges the gap by incrementing fdata in-place
 
 function Mooncake.increment_and_get_rdata!(
-        f::Vector{<:Mooncake.Tangent}, ::Mooncake.NoRData, t::Vector{SVector{N, T}}
-    ) where {N, T}
+    f::Vector{<:Mooncake.Tangent}, ::Mooncake.NoRData, t::Vector{SVector{N,T}}
+) where {N,T}
     for i in eachindex(f, t)
         old_data = f[i].fields.data
         sv = t[i]
         new_data = ntuple(j -> old_data[j] + sv[j], Val(N))
-        f[i] = typeof(f[i])((data = new_data,))
+        f[i] = typeof(f[i])((data=new_data,))
     end
     return Mooncake.NoRData()
 end
@@ -62,13 +63,13 @@ end
 # A single @is_primitive + rrule!! covers all AbstractRadialBasis types.
 # Output is Float64 scalar → rdata is Float64, fdata is NoFData.
 
-Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{<:AbstractRadialBasis, Vector{Float64}, Vector{Float64}}
+Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{<:AbstractRadialBasis,Vector{Float64},Vector{Float64}}
 
 function Mooncake.rrule!!(
-        basis_cd::CoDual{<:AbstractRadialBasis},
-        x::CoDual{Vector{Float64}},
-        xi::CoDual{Vector{Float64}},
-    )
+    basis_cd::CoDual{<:AbstractRadialBasis},
+    x::CoDual{Vector{Float64}},
+    xi::CoDual{Vector{Float64}},
+)
     basis_val = primal(basis_cd)
     x_val, xi_val = primal(x), primal(xi)
     y = basis_val(x_val, xi_val)
@@ -93,13 +94,13 @@ end
 # =============================================================================
 # Output is Vector{Float64} → fdata is Vector{Float64}, rdata is NoRData.
 
-Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{typeof(_eval_op), RadialBasisOperator, Vector{Float64}}
+Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{typeof(_eval_op),RadialBasisOperator,Vector{Float64}}
 
 function Mooncake.rrule!!(
-        ::CoDual{typeof(_eval_op)},
-        op::CoDual{<:RadialBasisOperator},
-        x::CoDual{Vector{Float64}},
-    )
+    ::CoDual{typeof(_eval_op)},
+    op::CoDual{<:RadialBasisOperator},
+    x::CoDual{Vector{Float64}},
+)
     operator = primal(op)
     y = _eval_op(operator, primal(x))
     y_codual = zero_fcodual(y)
@@ -117,13 +118,13 @@ end
 # =============================================================================
 # Output is Matrix{Float64} → fdata is Matrix{Float64}, rdata is NoRData.
 
-Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{typeof(_eval_op), RadialBasisOperator{<:Jacobian}, Vector{Float64}}
+Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{typeof(_eval_op),RadialBasisOperator{<:Jacobian},Vector{Float64}}
 
 function Mooncake.rrule!!(
-        ::CoDual{typeof(_eval_op)},
-        op::CoDual{<:RadialBasisOperator{<:Jacobian{D}}},
-        x::CoDual{Vector{Float64}},
-    ) where {D}
+    ::CoDual{typeof(_eval_op)},
+    op::CoDual{<:RadialBasisOperator{<:Jacobian{D}}},
+    x::CoDual{Vector{Float64}},
+) where {D}
     operator = primal(op)
     y = _eval_op(operator, primal(x))
     y_codual = zero_fcodual(y)
@@ -143,12 +144,12 @@ end
 # Operator Call Syntax Rules: op(x)
 # =============================================================================
 
-Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{RadialBasisOperator, Vector{Float64}}
+Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{RadialBasisOperator,Vector{Float64}}
 
 function Mooncake.rrule!!(
-        op::CoDual{<:RadialBasisOperator},
-        x::CoDual{Vector{Float64}},
-    )
+    op::CoDual{<:RadialBasisOperator},
+    x::CoDual{Vector{Float64}},
+)
     operator = primal(op)
     !RadialBasisFunctions.is_cache_valid(operator) && RadialBasisFunctions.update_weights!(operator)
     y = _eval_op(operator, primal(x))
@@ -163,12 +164,12 @@ function Mooncake.rrule!!(
 end
 
 # Vector-valued operator call syntax
-Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{RadialBasisOperator{<:Jacobian}, Vector{Float64}}
+Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{RadialBasisOperator{<:Jacobian},Vector{Float64}}
 
 function Mooncake.rrule!!(
-        op::CoDual{<:RadialBasisOperator{<:Jacobian{D}}},
-        x::CoDual{Vector{Float64}},
-    ) where {D}
+    op::CoDual{<:RadialBasisOperator{<:Jacobian{D}}},
+    x::CoDual{Vector{Float64}},
+) where {D}
     operator = primal(op)
     !RadialBasisFunctions.is_cache_valid(operator) && RadialBasisFunctions.update_weights!(operator)
     y = _eval_op(operator, primal(x))
@@ -193,15 +194,15 @@ end
 # LAPACK foreigncalls). The backward pass uses the implicit function theorem.
 
 Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{
-    Type{Interpolator}, AbstractVector, AbstractVector, <:AbstractRadialBasis,
+    Type{Interpolator},AbstractVector,AbstractVector,<:AbstractRadialBasis,
 }
 
 function Mooncake.rrule!!(
-        ::CoDual{Type{Interpolator}},
-        x_cd::CoDual{<:AbstractVector},
-        y_cd::CoDual{<:AbstractVector},
-        basis_cd::CoDual{<:AbstractRadialBasis},
-    )
+    ::CoDual{Type{Interpolator}},
+    x_cd::CoDual{<:AbstractVector},
+    y_cd::CoDual{<:AbstractVector},
+    basis_cd::CoDual{<:AbstractRadialBasis},
+)
     x_val = primal(x_cd)
     y_val = primal(y_cd)
     basis_val = primal(basis_cd)
@@ -218,13 +219,13 @@ function Mooncake.rrule!!(
     b = vcat(y_val, zeros(data_type, npoly))
     w = A \ b
 
-    interp = Interpolator(x_val, y_val, w[1:k], w[(k + 1):end], basis_val, mon)
+    interp = Interpolator(x_val, y_val, w[1:k], w[(k+1):end], basis_val, mon)
     interp_cd = zero_fcodual(interp)
     interp_fdata = interp_cd.dx
 
     basis_zero_rdata = Mooncake.zero_rdata(basis_val)
 
-    function interpolator_ctor_pb!!(::Union{NoRData, Mooncake.RData})
+    function interpolator_ctor_pb!!(::Union{NoRData,Mooncake.RData})
         Δrbf = interp_fdata.data.rbf_weights
         Δmon = interp_fdata.data.monomial_weights
         Δy = _interpolator_constructor_backward(Δrbf, Δmon, A, k)
@@ -240,12 +241,12 @@ end
 # =============================================================================
 # Output is Float64 scalar → rdata is Float64.
 
-Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{<:Interpolator, Vector{Float64}}
+Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{<:Interpolator,Vector{Float64}}
 
 function Mooncake.rrule!!(
-        interp_cd::CoDual{<:Interpolator},
-        x::CoDual{Vector{Float64}},
-    )
+    interp_cd::CoDual{<:Interpolator},
+    x::CoDual{Vector{Float64}},
+)
     interp = primal(interp_cd)
     x_val = primal(x)
     y = interp(x_val)
@@ -262,8 +263,9 @@ end
 # Native rrule!! for _build_weights
 # =============================================================================
 
-Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{typeof(_build_weights), Laplacian, AbstractVector, AbstractVector, AbstractVector, <:AbstractRadialBasis}
-Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{typeof(_build_weights), <:Partial, AbstractVector, AbstractVector, AbstractVector, <:AbstractRadialBasis}
+Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{typeof(_build_weights),Laplacian,AbstractVector,AbstractVector,AbstractVector,<:AbstractRadialBasis}
+Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{typeof(_build_weights),<:Partial,AbstractVector,AbstractVector,AbstractVector,<:AbstractRadialBasis}
+Mooncake.@is_primitive Mooncake.DefaultCtx Tuple{typeof(_build_weights),<:MixedPartial,AbstractVector,AbstractVector,AbstractVector,<:AbstractRadialBasis}
 
 # =============================================================================
 # Shared helpers for _build_weights rrule!! implementations
@@ -293,13 +295,13 @@ Mooncake represents SVector{N,T} tangents as Tangent{@NamedTuple{data::NTuple{N,
 so we reconstruct the tangent with incremented tuple values.
 """
 function _accumulate_into_mooncake_fdata!(
-        fdata::Vector{<:Mooncake.Tangent}, Δraw::Vector{Vector{T}}, dim_space::Int
-    ) where {T}
+    fdata::Vector{<:Mooncake.Tangent}, Δraw::Vector{Vector{T}}, dim_space::Int
+) where {T}
     for i in eachindex(fdata)
         old_data = fdata[i].fields.data
         Δ = Δraw[i]
         new_data = ntuple(d -> old_data[d] + Δ[d], Val(dim_space))
-        fdata[i] = typeof(fdata[i])((data = new_data,))
+        fdata[i] = typeof(fdata[i])((data=new_data,))
     end
     return
 end
@@ -311,9 +313,9 @@ Create shared pullback closure that runs `build_weights_pullback_loop!` and accu
 gradients into Mooncake fdata. Returns ε gradient value for basis rdata construction.
 """
 function _mooncake_build_weights_pullback(
-        W_fdata, W, data, eval_points, cache, adj, pts, eval_pts, bas, mon, ℒ,
-        ::Type{OpType}, dim_space,
-    ) where {OpType}
+    W_fdata, W, data, eval_points, cache, adj, pts, eval_pts, bas, mon, ℒ,
+    ::Type{OpType}, dim_space,
+) where {OpType}
     grad_Lφ_x, grad_Lφ_xi = _get_grad_funcs(OpType, bas, ℒ)
 
     function _shared_pb!!(ΔW_rdata)
@@ -343,18 +345,18 @@ function _mooncake_build_weights_pullback(
 end
 
 # =============================================================================
-# rrule!! wrappers for _build_weights (2 per basis group × 2 op types = 4 total)
+# rrule!! wrappers for _build_weights (2 basis groups × 3 op types)
 # =============================================================================
 
-# PHS bases (Laplacian + Partial)
+# PHS bases (Laplacian + Partial + MixedPartial)
 function Mooncake.rrule!!(
-        ::CoDual{typeof(_build_weights)},
-        op::CoDual{<:Union{Laplacian, Partial}},
-        data::CoDual{<:AbstractVector},
-        eval_points::CoDual{<:AbstractVector},
-        adjl::CoDual{<:AbstractVector},
-        basis::CoDual{<:AbstractPHS},
-    )
+    ::CoDual{typeof(_build_weights)},
+    op::CoDual{<:Union{Laplacian,Partial,MixedPartial}},
+    data::CoDual{<:AbstractVector},
+    eval_points::CoDual{<:AbstractVector},
+    adjl::CoDual{<:AbstractVector},
+    basis::CoDual{<:AbstractPHS},
+)
     ℒ, pts, eval_pts, adj, bas = primal(op), primal(data), primal(eval_points), primal(adjl), primal(basis)
     OpType = _optype(ℒ)
     W, W_codual, cache, mon, dim_space = _mooncake_build_weights_forward(ℒ, pts, eval_pts, adj, bas, OpType)
@@ -368,15 +370,15 @@ function Mooncake.rrule!!(
     return W_codual, pb!!
 end
 
-# IMQ/Gaussian bases (Laplacian + Partial) — need ε gradient in rdata
+# IMQ/Gaussian bases (Laplacian + Partial + MixedPartial) — need ε gradient in rdata
 function Mooncake.rrule!!(
-        ::CoDual{typeof(_build_weights)},
-        op::CoDual{<:Union{Laplacian, Partial}},
-        data::CoDual{<:AbstractVector},
-        eval_points::CoDual{<:AbstractVector},
-        adjl::CoDual{<:AbstractVector},
-        basis::CoDual{<:Union{IMQ, Gaussian}},
-    )
+    ::CoDual{typeof(_build_weights)},
+    op::CoDual{<:Union{Laplacian,Partial,MixedPartial}},
+    data::CoDual{<:AbstractVector},
+    eval_points::CoDual{<:AbstractVector},
+    adjl::CoDual{<:AbstractVector},
+    basis::CoDual{<:Union{IMQ,Gaussian}},
+)
     ℒ, pts, eval_pts, adj, bas = primal(op), primal(data), primal(eval_points), primal(adjl), primal(basis)
     OpType = _optype(ℒ)
     W, W_codual, cache, mon, dim_space = _mooncake_build_weights_forward(ℒ, pts, eval_pts, adj, bas, OpType)
@@ -386,7 +388,7 @@ function Mooncake.rrule!!(
     function pb!!(ΔW_rdata)
         Δε = shared_pb!!(ΔW_rdata)
         basis_rdata = Mooncake.RData{@NamedTuple{ε::TD, poly_deg::Mooncake.NoRData}}(
-            (ε = Δε, poly_deg = NoRData())
+            (ε=Δε, poly_deg=NoRData())
         )
         return NoRData(), NoRData(), NoRData(), NoRData(), NoRData(), basis_rdata
     end

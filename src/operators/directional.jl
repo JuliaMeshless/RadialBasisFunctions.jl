@@ -3,10 +3,10 @@
 
 Operator for the directional derivative (∇f⋅v), the inner product of the gradient and a direction vector.
 """
-struct Directional{Dim, T} <: AbstractOperator{0}
+struct Directional{Dim,T} <: AbstractOperator{0}
     v::T
 end
-Directional{Dim}(v) where {Dim} = Directional{Dim, typeof(v)}(v)
+Directional{Dim}(v) where {Dim} = Directional{Dim,typeof(v)}(v)
 
 # Primary interface using unified keyword constructor
 """
@@ -46,44 +46,44 @@ end
 
 # Backward compatible positional signatures
 function directional(
-        data::AbstractVector, v::AbstractVector, basis::AbstractRadialBasis; kw...
-    )
+    data::AbstractVector, v::AbstractVector, basis::AbstractRadialBasis; kw...
+)
     Dim = length(first(data))
-    return RadialBasisOperator(Directional{Dim}(v), data; basis = basis, kw...)
+    return RadialBasisOperator(Directional{Dim}(v), data; basis=basis, kw...)
 end
 
 function directional(
-        data::AbstractVector,
-        eval_points::AbstractVector,
-        v::AbstractVector,
-        basis::AbstractRadialBasis = PHS(3; poly_deg = 2);
-        kw...,
-    )
+    data::AbstractVector,
+    eval_points::AbstractVector,
+    v::AbstractVector,
+    basis::AbstractRadialBasis=PHS(3; poly_deg=2);
+    kw...,
+)
     Dim = length(first(data))
     return RadialBasisOperator(
-        Directional{Dim}(v), data; eval_points = eval_points, basis = basis, kw...
+        Directional{Dim}(v), data; eval_points=eval_points, basis=basis, kw...
     )
 end
 
 # Hermite backward compatibility (positional boundary arguments)
 function directional(
-        data::AbstractVector,
-        eval_points::AbstractVector,
-        v::AbstractVector,
-        basis::AbstractRadialBasis,
-        is_boundary::Vector{Bool},
-        boundary_conditions::Vector{<:BoundaryCondition},
-        normals::Vector{<:AbstractVector};
-        kw...,
-    )
+    data::AbstractVector,
+    eval_points::AbstractVector,
+    v::AbstractVector,
+    basis::AbstractRadialBasis,
+    is_boundary::Vector{Bool},
+    boundary_conditions::Vector{<:BoundaryCondition},
+    normals::Vector{<:AbstractVector};
+    kw...,
+)
     Dim = length(first(data))
-    hermite = (is_boundary = is_boundary, bc = boundary_conditions, normals = normals)
+    hermite = (is_boundary=is_boundary, bc=boundary_conditions, normals=normals)
     return RadialBasisOperator(
         Directional{Dim}(v),
         data;
-        eval_points = eval_points,
-        basis = basis,
-        hermite = hermite,
+        eval_points=eval_points,
+        basis=basis,
+        hermite=hermite,
         kw...,
     )
 end
@@ -121,26 +121,47 @@ function _combine_directional_weights(weights, v, Dim::Int)
     end
 end
 
+# Helper: build directional weights by composing Partial(1, d) weight matrices
+function _combine_partial_weights(v, data, eval_points, adjl, basis, Dim::Int; device=CPU())
+    if length(v) == Dim
+        return sum(1:Dim) do d
+            if device isa CPU
+                v[d] * _build_weights(Partial(1, d), data, eval_points, adjl, basis)
+            else
+                v[d] * _build_weights(Partial(1, d), data, eval_points, adjl, basis; device=device)
+            end
+        end
+    else
+        return sum(1:Dim) do d
+            vd = Diagonal(getindex.(v, d))
+            if device isa CPU
+                vd * _build_weights(Partial(1, d), data, eval_points, adjl, basis)
+            else
+                vd * _build_weights(Partial(1, d), data, eval_points, adjl, basis; device=device)
+            end
+        end
+    end
+end
+
 # Custom _build_weights: standard (non-Hermite) path
-function _build_weights(ℒ::Directional{Dim}, data, eval_points, adjl, basis; device = CPU()) where {Dim}
+function _build_weights(ℒ::Directional{Dim}, data, eval_points, adjl, basis; device=CPU()) where {Dim}
     v = ℒ.v
     _validate_directional_vector(v, Dim, length(data))
-    weights = _build_weights(Jacobian{Dim}(), data, eval_points, adjl, basis; device = device)
-    return _combine_directional_weights(weights, v, Dim)
+    return _combine_partial_weights(v, data, eval_points, adjl, basis, Dim; device=device)
 end
 
 # Custom _build_weights: Hermite path (with boundary conditions)
 function _build_weights(
-        ℒ::Directional{Dim},
-        data::AbstractVector,
-        eval_points::AbstractVector,
-        adjl::AbstractVector,
-        basis::AbstractRadialBasis,
-        is_boundary::Vector{Bool},
-        boundary_conditions::Vector{<:BoundaryCondition},
-        normals::Vector{<:AbstractVector};
-        device = CPU(),
-    ) where {Dim}
+    ℒ::Directional{Dim},
+    data::AbstractVector,
+    eval_points::AbstractVector,
+    adjl::AbstractVector,
+    basis::AbstractRadialBasis,
+    is_boundary::Vector{Bool},
+    boundary_conditions::Vector{<:BoundaryCondition},
+    normals::Vector{<:AbstractVector};
+    device=CPU(),
+) where {Dim}
     v = ℒ.v
     _validate_directional_vector(v, Dim, length(data))
 
@@ -162,7 +183,7 @@ function _build_weights(
         is_boundary,
         boundary_conditions,
         normals;
-        device = device,
+        device=device,
     )
 
     return _combine_directional_weights(weights, v, Dim)
