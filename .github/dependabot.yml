@@ -1,25 +1,21 @@
-# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
 version: 2
-enable-beta-ecosystems: true # Julia ecosystem
 updates:
+  # Keep GitHub Actions up to date
   - package-ecosystem: "github-actions"
-    directory: "/" # Location of package manifests
+    directory: "/"
     schedule:
       interval: "weekly"
-    ignore:
-      - dependency-name: "crate-ci/typos"
-        update-types: ["version-update:semver-patch", "version-update:semver-minor"]
-  - package-ecosystem: "julia"
-    directories:
-      - "/"
-      - "/docs"
-    schedule:
-      interval: "daily"
     groups:
-      all-julia-packages:
+      github-actions:
         patterns:
           - "*"
-    ignore:
-      - dependency-name: "Statistics"
-      - dependency-name: "LinearAlgebra"
-      - dependency-name: "Random"
+
+  # Keep Julia dependencies up to date
+  - package-ecosystem: "julia"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      julia-deps:
+        patterns:
+          - "*"
