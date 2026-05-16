@@ -48,12 +48,12 @@ Returns `(poly_backward!, ∂Lφ_∂ε_fn)` keyword arguments.
 function _get_rhs_closures(::Type{<:Partial}, ℒ, basis)
     dim = ℒ.dim
     if ℒ.order == 1
-        poly_backward! = (Δeval_point, Δb, k, nmon, num_ops) ->
-            _backward_partial_polynomial_section!(Δeval_point, Δb, k, nmon, dim, num_ops)
+        poly_backward! = (Δeval_point, Δb, k, nmon, num_ops, eval_point) ->
+            _backward_partial_polynomial_section!(Δeval_point, Δb, k, nmon, dim, num_ops, eval_point)
         ∂Lφ_∂ε_fn = (x, xi) -> ∂Partial_φ_∂ε(basis, dim, x, xi)
         return poly_backward!, ∂Lφ_∂ε_fn
     else
-        poly_backward! = (Δeval_point, Δb, k, nmon, num_ops) ->
+        poly_backward! = (Δeval_point, Δb, k, nmon, num_ops, eval_point) ->
             _backward_second_partial_polynomial_section!(Δeval_point, Δb, k, nmon, dim, num_ops)
         ∂Lφ_∂ε_fn = (x, xi) -> ∂SecondPartial_φ_∂ε(basis, dim, x, xi)
         return poly_backward!, ∂Lφ_∂ε_fn
@@ -62,7 +62,7 @@ end
 
 function _get_rhs_closures(::Type{<:MixedPartial}, ℒ, basis)
     d1, d2 = ℒ.dim1, ℒ.dim2
-    poly_backward! = (Δeval_point, Δb, k, nmon, num_ops) ->
+    poly_backward! = (Δeval_point, Δb, k, nmon, num_ops, eval_point) ->
         _backward_mixed_partial_polynomial_section!(Δeval_point, Δb, k, nmon, d1, d2, num_ops)
     ∂Lφ_∂ε_fn = (x, xi) -> ∂MixedPartial_φ_∂ε(basis, d1, d2, x, xi)
     return poly_backward!, ∂Lφ_∂ε_fn

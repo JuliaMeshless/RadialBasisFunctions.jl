@@ -195,7 +195,7 @@ function backward_rhs!(
 
     # Polynomial section (only for Partial)
     if poly_backward! !== nothing && nmon > 0
-        poly_backward!(Δeval_point, Δb, k, nmon, num_ops)
+        poly_backward!(Δeval_point, Δb, k, nmon, num_ops, eval_point)
     end
 
     return nothing
@@ -226,17 +226,16 @@ function _backward_partial_polynomial_section!(
     nmon::Int,
     dim::Int,
     num_ops::Int,
+    eval_point,
 ) where {T}
     D = length(Δeval_point)
 
-    # The contribution depends on spatial dimension and polynomial degree
-    # For poly_deg=2, we have known patterns of non-zero second derivatives
     if D == 1
-        _backward_partial_poly_1d!(Δeval_point, Δb, k, nmon, dim, num_ops)
+        _backward_partial_poly_1d!(Δeval_point, Δb, k, nmon, dim, num_ops, eval_point)
     elseif D == 2
-        _backward_partial_poly_2d!(Δeval_point, Δb, k, nmon, dim, num_ops)
+        _backward_partial_poly_2d!(Δeval_point, Δb, k, nmon, dim, num_ops, eval_point)
     elseif D == 3
-        _backward_partial_poly_3d!(Δeval_point, Δb, k, nmon, dim, num_ops)
+        _backward_partial_poly_3d!(Δeval_point, Δb, k, nmon, dim, num_ops, eval_point)
     else
         error("Polynomial backward pass not implemented for D=$D (only D=1,2,3 supported)")
     end
@@ -251,6 +250,7 @@ function _backward_partial_poly_1d!(
     nmon::Int,
     dim::Int,
     num_ops::Int,
+    eval_point,
 ) where {T}
     # 1D monomials up to degree 2: 1, x, x²
     # ∂/∂x gives: 0, 1, 2x
@@ -259,6 +259,13 @@ function _backward_partial_poly_1d!(
     if nmon >= 3
         @inbounds for op_idx in 1:num_ops
             Δeval_point[1] += Δb[k+3, op_idx] * 2
+        end
+    end
+    # poly_deg=3: 1, x, x², x³ (nmon=4)
+    # ∂(x³)/∂x = 3x², ∂²/∂x²[3x²] = 6x
+    if nmon >= 4
+        @inbounds for op_idx in 1:num_ops
+            Δeval_point[1] += Δb[k+4, op_idx] * 6 * eval_point[1]
         end
     end
     return nothing
@@ -272,37 +279,37 @@ function _backward_partial_poly_2d!(
     nmon::Int,
     dim::Int,
     num_ops::Int,
+    eval_point,
 ) where {T}
-    # 2D monomials with poly_deg=2: 1, x, y, xy, x², y² (nmon=6)
-    # 2D monomials with poly_deg=1: 1, x, y (nmon=3)
-    # 2D monomials with poly_deg=0: 1 (nmon=1)
+    # For each monomial x^ex * y^ey, compute ∂²p/∂x[q]∂x[dim] at eval_point.
+    # The monomial ordering matches multiexponents(3, deg): first two components are
+    # (ex, ey), third is the complementary exponent (deg - ex - ey).
+    deg = _infer_poly_degree_from_nmon(2, nmon)
+    ex_tuples = collect(Vector{Int}, multiexponents(3, deg))
 
-    if nmon < 4
-        # poly_deg <= 1: all second derivatives are zero
-        return nothing
-    end
+    @inbounds for j in 1:nmon
+        ex_j = ex_tuples[j]
+        e_dim = ex_j[dim]  # exponent of the operator dimension
+        e_dim == 0 && continue  # ∂p/∂x[dim] = 0, no contribution
 
-    # For poly_deg=2 (nmon=6):
-    # ∂/∂x gives: 0, 1, 0, y, 2x, 0
-    # ∂/∂y gives: 0, 0, 1, x, 0, 2y
-    #
-    # Second derivatives for ∂/∂x (dim=1):
-    #   ∂(y)/∂y = 1 at index k+4, contributes to Δeval_point[2]
-    #   ∂(2x)/∂x = 2 at index k+5, contributes to Δeval_point[1]
-    #
-    # Second derivatives for ∂/∂y (dim=2):
-    #   ∂(x)/∂x = 1 at index k+4, contributes to Δeval_point[1]
-    #   ∂(2y)/∂y = 2 at index k+6, contributes to Δeval_point[2]
+        other_dim = 3 - dim  # 1→2, 2→1
+        e_other = ex_j[other_dim]
 
-    if dim == 1  # ∂/∂x operator
-        @inbounds for op_idx in 1:num_ops
-            Δeval_point[2] += Δb[k+4, op_idx]  # from xy term: ∂(y)/∂y = 1
-            Δeval_point[1] += Δb[k+5, op_idx] * 2  # from x² term: ∂(2x)/∂x = 2
-        end
-    elseif dim == 2  # ∂/∂y operator
-        @inbounds for op_idx in 1:num_ops
-            Δeval_point[1] += Δb[k+4, op_idx]  # from xy term: ∂(x)/∂x = 1
-            Δeval_point[2] += Δb[k+6, op_idx] * 2  # from y² term: ∂(2y)/∂y = 2
+        for q in 1:2
+            if q == dim
+                # ∂²p/∂x[dim]²: coeff = e_dim * (e_dim - 1), remaining power = e_dim - 2
+                e_dim >= 2 || continue
+                coeff = e_dim * (e_dim - 1)
+                val = eval_point[dim]^(e_dim - 2) * eval_point[other_dim]^e_other
+            else
+                # ∂²p/∂x[dim]∂x[q]: coeff = e_dim * e_q, remaining: e_dim-1, e_q-1
+                e_other >= 1 || continue
+                coeff = e_dim * e_other
+                val = eval_point[dim]^(e_dim - 1) * eval_point[other_dim]^(e_other - 1)
+            end
+            for op_idx in 1:num_ops
+                Δeval_point[q] += Δb[k+j, op_idx] * T(coeff) * val
+            end
         end
     end
 
@@ -317,6 +324,7 @@ function _backward_partial_poly_3d!(
     nmon::Int,
     dim::Int,
     num_ops::Int,
+    eval_point,
 ) where {T}
     # 3D monomials with poly_deg=2: 1, x, y, z, xy, xz, yz, x², y², z² (nmon=10)
     # 3D monomials with poly_deg=1: 1, x, y, z (nmon=4)
@@ -351,6 +359,66 @@ function _backward_partial_poly_3d!(
             Δeval_point[1] += Δb[k+6, op_idx]  # from xz: ∂(x)/∂x = 1
             Δeval_point[2] += Δb[k+7, op_idx]  # from yz: ∂(y)/∂y = 1
             Δeval_point[3] += Δb[k+10, op_idx] * 2  # from z²: ∂(2z)/∂z = 2
+        end
+    end
+
+    # poly_deg=3 (nmon=20): cubic monomials x³, x²y, x²z, xy², xyz, xz², y³, y²z, yz², z³
+    # At indices k+11..k+20. Their second derivatives are linear in eval_point.
+    if nmon >= 20
+        if dim == 1  # ∂/∂x operator
+            @inbounds for op_idx in 1:num_ops
+                # k+11: x³ → ∂²/∂x∂x[3x²] = 6x
+                Δeval_point[1] += Δb[k+11, op_idx] * 6 * eval_point[1]
+                # k+12: x²y → ∂²/∂x∂x[2xy]=2y, ∂²/∂x∂y[2xy]=2x
+                Δeval_point[1] += Δb[k+12, op_idx] * 2 * eval_point[2]
+                Δeval_point[2] += Δb[k+12, op_idx] * 2 * eval_point[1]
+                # k+13: x²z → ∂²/∂x∂x[2xz]=2z, ∂²/∂x∂z[2xz]=2x
+                Δeval_point[1] += Δb[k+13, op_idx] * 2 * eval_point[3]
+                Δeval_point[3] += Δb[k+13, op_idx] * 2 * eval_point[1]
+                # k+14: xy² → ∂²/∂x∂y[y²]=2y
+                Δeval_point[2] += Δb[k+14, op_idx] * 2 * eval_point[2]
+                # k+15: xyz → ∂²/∂x∂y[yz]=z, ∂²/∂x∂z[yz]=y
+                Δeval_point[2] += Δb[k+15, op_idx] * eval_point[3]
+                Δeval_point[3] += Δb[k+15, op_idx] * eval_point[2]
+                # k+16: xz² → ∂²/∂x∂z[z²]=2z
+                Δeval_point[3] += Δb[k+16, op_idx] * 2 * eval_point[3]
+            end
+        elseif dim == 2  # ∂/∂y operator
+            @inbounds for op_idx in 1:num_ops
+                # k+12: x²y → ∂²/∂y∂x[x²]=2x
+                Δeval_point[1] += Δb[k+12, op_idx] * 2 * eval_point[1]
+                # k+14: xy² → ∂²/∂y∂x[2xy]=2y, ∂²/∂y∂y[2xy]=2x
+                Δeval_point[1] += Δb[k+14, op_idx] * 2 * eval_point[2]
+                Δeval_point[2] += Δb[k+14, op_idx] * 2 * eval_point[1]
+                # k+15: xyz → ∂²/∂y∂x[yz]=z, ∂²/∂y∂z[yz]=y
+                Δeval_point[1] += Δb[k+15, op_idx] * eval_point[3]
+                Δeval_point[3] += Δb[k+15, op_idx] * eval_point[2]
+                # k+17: y³ → ∂²/∂y∂y[3y²]=6y
+                Δeval_point[2] += Δb[k+17, op_idx] * 6 * eval_point[2]
+                # k+18: y²z → ∂²/∂y∂y[2yz]=2z, ∂²/∂y∂z[2yz]=2y
+                Δeval_point[2] += Δb[k+18, op_idx] * 2 * eval_point[3]
+                Δeval_point[3] += Δb[k+18, op_idx] * 2 * eval_point[2]
+                # k+19: yz² → ∂²/∂y∂z[z²]=2z
+                Δeval_point[3] += Δb[k+19, op_idx] * 2 * eval_point[3]
+            end
+        elseif dim == 3  # ∂/∂z operator
+            @inbounds for op_idx in 1:num_ops
+                # k+13: x²z → ∂²/∂z∂x[2xz]=2x
+                Δeval_point[1] += Δb[k+13, op_idx] * 2 * eval_point[1]
+                # k+15: xyz → ∂²/∂z∂x[yz]=y, ∂²/∂z∂y[yz]=x
+                Δeval_point[1] += Δb[k+15, op_idx] * eval_point[2]
+                Δeval_point[2] += Δb[k+15, op_idx] * eval_point[1]
+                # k+16: xz² → ∂²/∂z∂x[2xz]=2z, ∂²/∂z∂z[2xz]=2x
+                Δeval_point[1] += Δb[k+16, op_idx] * 2 * eval_point[3]
+                Δeval_point[3] += Δb[k+16, op_idx] * 2 * eval_point[1]
+                # k+18: y²z → ∂²/∂z∂y[2yz]=2z, ∂²/∂z∂z[2yz]=2y
+                Δeval_point[2] += Δb[k+18, op_idx] * 2 * eval_point[3]
+                Δeval_point[3] += Δb[k+18, op_idx] * 2 * eval_point[2]
+                # k+19: yz² → ∂²/∂z∂z[yz]=2z
+                Δeval_point[3] += Δb[k+19, op_idx] * 2 * eval_point[3]
+                # k+20: z³ → ∂²/∂z∂z[3z²]=6z
+                Δeval_point[3] += Δb[k+20, op_idx] * 6 * eval_point[3]
+            end
         end
     end
 
