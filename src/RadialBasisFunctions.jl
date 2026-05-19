@@ -94,6 +94,7 @@ export Identity, ScaledOperator, @operator
 
 # Shared AD utilities (depends on Partial/Laplacian types defined above)
 include("solve/ad_shared.jl")
+export _build_weights_and_cache, _pullback_weights!
 
 include("interpolation.jl")
 include("interpolation_backward.jl")

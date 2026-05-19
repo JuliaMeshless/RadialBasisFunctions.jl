@@ -134,3 +134,70 @@ function build_weights_pullback_loop!(
 
     return nothing
 end
+
+# ============================================================================
+# Cached forward/backward API — no Mooncake required
+# ============================================================================
+
+"""
+    _build_weights_and_cache(ℒ, data, eval_points, adjl, basis)
+
+Like `_build_weights(ℒ, data, eval_points, adjl, basis)` but returns
+`(W, cache)` where `cache` is a `WeightsBuildForwardCache` for use with
+`_pullback_weights!`.
+
+Assumes CPU execution, no boundary conditions.
+"""
+function _build_weights_and_cache(ℒ, data, eval_points, adjl, basis)
+    dim = length(first(data))
+    mon = MonomialBasis(dim, basis.poly_deg)
+    ℒmon = ℒ(mon)
+    ℒrbf = ℒ(basis)
+    OpType = _optype(ℒ)
+    return _forward_with_cache(data, eval_points, adjl, basis, ℒrbf, ℒmon, mon, OpType)
+end
+
+"""
+    _pullback_weights!(
+        Δdata, Δeval_points, ΔW_nzval, W, cache, data, eval_points, adjl, basis, ℒ,
+    )
+
+Propagate gradient from weight-matrix nonzeros back to point coordinates.
+Computes `∂L/∂data` and `∂L/∂eval_points` given `∂L/∂W`.
+
+- `Δdata`, `Δeval_points`: output buffers (`Vector{Vector{Float64}}`), populated in-place
+  (caller must zero them first or allocate fresh).
+- `ΔW_nzval`: gradient w.r.t. each nonzero entry of `W`.
+- `W`, `cache`: from a prior `_build_weights_and_cache` call on the same operator.
+- `ℒ`: operator (e.g. `Partial(2, 1)`).
+
+Does **not** use Mooncake — pure Julia linear algebra.
+"""
+function _pullback_weights!(
+    Δdata::Vector{Vector{T}},
+    Δeval_points::Vector{Vector{T}},
+    ΔW_nzval::Vector{Float64},
+    W::SparseMatrixCSC,
+    cache::WeightsBuildForwardCache{T},
+    data::AbstractVector,
+    eval_points::AbstractVector,
+    adjl::AbstractVector,
+    basis::AbstractRadialBasis,
+    ℒ,
+) where {T}
+    dim_space = length(first(data))
+    mon = MonomialBasis(dim_space, basis.poly_deg)
+    OpType = _optype(ℒ)
+    grad_Lφ_x, grad_Lφ_xi = _get_grad_funcs(OpType, basis, ℒ)
+    Δε_acc = Ref(zero(T))
+
+    ΔW_extractor = (eval_idx, neighbors, k) ->
+        extract_stencil_cotangent_from_nzval(ΔW_nzval, W, eval_idx, neighbors, k)
+
+    build_weights_pullback_loop!(
+        Δdata, Δeval_points, Δε_acc, ΔW_extractor,
+        cache, adjl, eval_points, data, basis, mon, ℒ, OpType,
+        grad_Lφ_x, grad_Lφ_xi,
+    )
+    return nothing
+end
