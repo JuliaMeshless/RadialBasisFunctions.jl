@@ -15,7 +15,7 @@ Special cases:
 - Robin: α≠0, β≠0
 - Internal: α=0, β=0 (sentinel for interior points)
 """
-struct BoundaryCondition{T <: Real}
+struct BoundaryCondition{T}
     α::T
     β::T
 
@@ -36,10 +36,10 @@ is_robin(bc::BoundaryCondition) = !iszero(bc.α) && !iszero(bc.β)
 is_internal(bc::BoundaryCondition) = iszero(bc.α) && iszero(bc.β)
 
 # Constructors
-Dirichlet((::Type{T}) = Float64) where {T <: Real} = BoundaryCondition(one(T), zero(T))
-Neumann((::Type{T}) = Float64) where {T <: Real} = BoundaryCondition(zero(T), one(T))
+Dirichlet((::Type{T}) = Float64) where {T} = BoundaryCondition(one(T), zero(T))
+Neumann((::Type{T}) = Float64) where {T} = BoundaryCondition(zero(T), one(T))
 Robin(α::Real, β::Real) = BoundaryCondition(α, β)
-Internal((::Type{T}) = Float64) where {T <: Real} = BoundaryCondition(zero(T), zero(T))
+Internal((::Type{T}) = Float64) where {T} = BoundaryCondition(zero(T), zero(T))
 
 # ============================================================================
 # Hermite Stencil Data
@@ -60,7 +60,7 @@ Fields:
 Note: For interior points (is_boundary[i] == false), boundary_conditions[i]
 and normals[i] contain sentinel values and should not be accessed.
 """
-struct HermiteStencilData{T <: Real}
+struct HermiteStencilData{T}
     data::AbstractVector{Vector{T}}
     is_boundary::Vector{Bool}
     boundary_conditions::Vector{BoundaryCondition{T}}
@@ -73,7 +73,7 @@ struct HermiteStencilData{T <: Real}
             boundary_conditions::Vector{BoundaryCondition{T}},
             normals::AbstractVector{<:AbstractVector{T}},
             poly_workspace::Vector{T} = Vector{T}(undef, 0),
-        ) where {T <: Real}
+        ) where {T}
         @assert length(data) ==
             length(is_boundary) ==
             length(boundary_conditions) ==
@@ -90,7 +90,7 @@ struct HermiteStencilData{T <: Real}
 end
 
 """Pre-allocation constructor for HermiteStencilData"""
-function HermiteStencilData{T}(k::Int, dim::Int, nmon::Int = 0) where {T <: Real}
+function HermiteStencilData{T}(k::Int, dim::Int, nmon::Int = 0) where {T}
     data = [Vector{T}(undef, dim) for _ in 1:k]
     is_boundary = Vector{Bool}(falses(k))
     boundary_conditions = [Internal(T) for _ in 1:k]
