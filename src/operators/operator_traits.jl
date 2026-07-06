@@ -54,13 +54,13 @@ eigenvalue problems.
 is_self_adjoint(::AbstractOperator) = false
 is_self_adjoint(::Laplacian) = true
 is_self_adjoint(::Identity) = true
-is_self_adjoint(::Regrid) = false
 
 """
-    derivative_order(op) -> Int
+    derivative_order(op) -> Union{Int, Missing}
 
 Total order of differentiation. Useful for estimating required polynomial degree
-and stencil size.
+and stencil size. Returns `missing` for `Custom` operators, whose derivative
+order cannot be inferred from the wrapped function.
 """
 derivative_order(::Identity) = 0
 derivative_order(::Regrid) = 0
@@ -75,6 +75,4 @@ derivative_order(::Curl) = 1
 derivative_order(::StrainRate) = 1
 derivative_order(::RotationRate) = 1
 derivative_order(s::ScaledOperator) = derivative_order(s.op)
-function derivative_order(::Custom)
-    throw(ArgumentError("derivative_order is not defined for Custom operators"))
-end
+derivative_order(::Custom) = missing
