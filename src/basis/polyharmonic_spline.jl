@@ -75,21 +75,6 @@ function (op::∇{<:PHS1})(x, xᵢ, normal)
     return -normal / (r + AVOID_INF) + dot_normal * (x .- xᵢ) / (r^3 + AVOID_INF)
 end
 
-# D - directional derivative
-function (op::D{<:PHS1})(x, xᵢ)
-    r = euclidean(x, xᵢ)
-    return LinearAlgebra.dot(op.v, x .- xᵢ) / (r + AVOID_INF)
-end
-
-# D² - directional second derivative
-function (op::D²{<:PHS1})(x, xᵢ)
-    r = euclidean(x, xᵢ)
-    dot_v1_v2 = LinearAlgebra.dot(op.v1, op.v2)
-    dot_v1_r = LinearAlgebra.dot(op.v1, x .- xᵢ)
-    dot_v2_r = LinearAlgebra.dot(op.v2, x .- xᵢ)
-    return dot_v1_v2 / (r + AVOID_INF) - (dot_v1_r * dot_v2_r) / (r^3 + AVOID_INF)
-end
-
 # H - Hessian matrix
 function (op::H{<:PHS1})(x, xᵢ)
     r = euclidean(x, xᵢ)
@@ -174,21 +159,6 @@ function (op::∇{<:PHS3})(x, xᵢ, normal)
     r = euclidean(x, xᵢ)
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
     return -3 * (normal * r + dot_normal * (x .- xᵢ) / (r + AVOID_INF))
-end
-
-# D - directional derivative
-function (op::D{<:PHS3})(x, xᵢ)
-    r = euclidean(x, xᵢ)
-    return 3 * LinearAlgebra.dot(op.v, x .- xᵢ) * r
-end
-
-# D² - directional second derivative
-function (op::D²{<:PHS3})(x, xᵢ)
-    r = euclidean(x, xᵢ)
-    dot_v1_v2 = LinearAlgebra.dot(op.v1, op.v2)
-    dot_v1_r = LinearAlgebra.dot(op.v1, x .- xᵢ)
-    dot_v2_r = LinearAlgebra.dot(op.v2, x .- xᵢ)
-    return 3 * (dot_v1_v2 * r + dot_v1_r * dot_v2_r / (r + AVOID_INF))
 end
 
 # H - Hessian matrix
@@ -277,21 +247,6 @@ function (op::∇{<:PHS5})(x, xᵢ, normal)
     return -5 * (normal * r^3 + 3 * dot_normal * (x .- xᵢ) * r)
 end
 
-# D - directional derivative
-function (op::D{<:PHS5})(x, xᵢ)
-    r = euclidean(x, xᵢ)
-    return 5 * LinearAlgebra.dot(op.v, x .- xᵢ) * r^3
-end
-
-# D² - directional second derivative
-function (op::D²{<:PHS5})(x, xᵢ)
-    r = euclidean(x, xᵢ)
-    dot_v1_v2 = LinearAlgebra.dot(op.v1, op.v2)
-    dot_v1_r = LinearAlgebra.dot(op.v1, x .- xᵢ)
-    dot_v2_r = LinearAlgebra.dot(op.v2, x .- xᵢ)
-    return 5 * (dot_v1_v2 * r^3 + 3 * dot_v1_r * dot_v2_r * r)
-end
-
 # H - Hessian matrix
 function (op::H{<:PHS5})(x, xᵢ)
     r = euclidean(x, xᵢ)
@@ -376,21 +331,6 @@ function (op::∇{<:PHS7})(x, xᵢ, normal)
     r = euclidean(x, xᵢ)
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
     return -7 * (normal * r^5 + 5 * dot_normal * (x .- xᵢ) * r^3)
-end
-
-# D - directional derivative
-function (op::D{<:PHS7})(x, xᵢ)
-    r = euclidean(x, xᵢ)
-    return 7 * LinearAlgebra.dot(op.v, x .- xᵢ) * r^5
-end
-
-# D² - directional second derivative
-function (op::D²{<:PHS7})(x, xᵢ)
-    r = euclidean(x, xᵢ)
-    dot_v1_v2 = LinearAlgebra.dot(op.v1, op.v2)
-    dot_v1_r = LinearAlgebra.dot(op.v1, x .- xᵢ)
-    dot_v2_r = LinearAlgebra.dot(op.v2, x .- xᵢ)
-    return 7 * (dot_v1_v2 * r^5 + 5 * dot_v1_r * dot_v2_r * r^3)
 end
 
 # H - Hessian matrix

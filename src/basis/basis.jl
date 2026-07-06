@@ -50,28 +50,6 @@ struct ∇²{B <: AbstractRadialBasis}
 end
 
 """
-    D{B<:AbstractRadialBasis,V}
-
-Directional derivative operator functor. Construct with `D(basis, v)`.
-Computes the derivative of the basis function in direction `v`.
-"""
-struct D{B <: AbstractRadialBasis, V}
-    basis::B
-    v::V
-end
-
-"""
-    D²{B<:AbstractRadialBasis,V1,V2}
-
-Directional second derivative operator functor. Construct with `D²(basis, v1, v2)`.
-"""
-struct D²{B <: AbstractRadialBasis, V1, V2}
-    basis::B
-    v1::V1
-    v2::V2
-end
-
-"""
     H{B<:AbstractRadialBasis}
 
 Hessian operator functor. Construct with `H(basis)`.

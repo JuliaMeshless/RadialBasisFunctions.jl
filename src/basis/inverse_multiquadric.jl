@@ -42,24 +42,6 @@ function (op::∇{<:IMQ})(x, xᵢ)
     return (xᵢ .- x) * (ε2 / sqrt((ε2 * sqeuclidean(x, xᵢ) + 1)^3))
 end
 
-# D - directional derivative
-function (op::D{<:IMQ})(x, xᵢ)
-    ε2 = op.basis.ε^2
-    return LinearAlgebra.dot(op.v, xᵢ .- x) * (ε2 / sqrt((ε2 * sqeuclidean(x, xᵢ) + 1)^3))
-end
-
-# D² - directional second derivative
-function (op::D²{<:IMQ})(x, xᵢ)
-    ε2 = op.basis.ε^2
-    ε4 = ε2^2
-    Δ = x .- xᵢ
-    s = ε2 * sqeuclidean(x, xᵢ) + 1
-    dot_v1_v2 = LinearAlgebra.dot(op.v1, op.v2)
-    dot_v1_r = LinearAlgebra.dot(op.v1, Δ)
-    dot_v2_r = LinearAlgebra.dot(op.v2, Δ)
-    return 3 * ε4 * dot_v1_r * dot_v2_r / sqrt(s^5) - ε2 * dot_v1_v2 / sqrt(s^3)
-end
-
 # H - Hessian matrix
 function (op::H{<:IMQ})(x, xᵢ)
     ε2 = op.basis.ε^2
