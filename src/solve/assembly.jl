@@ -178,35 +178,14 @@ end
 # ============================================================================
 
 """
-    _build_stencil!(A, b, ℒrbf, ℒmon, data, eval_point, basis, mon, k)
-
-Assemble complete stencil: build collocation matrix, build RHS, solve for weights.
-Works for both interior stencils (AbstractVector) and Hermite stencils (HermiteStencilData)
-via dispatch helpers in `_build_collocation_matrix!` and `_build_rhs!`.
-
-Returns: weights (first k rows of solution, size k×num_ops)
-"""
-function _build_stencil!(
-        A,
-        b,
-        ℒrbf,
-        ℒmon,
-        data,
-        eval_point,
-        basis::AbstractRadialBasis,
-        mon::MonomialBasis,
-        k::Int,
-    )
-    _build_collocation_matrix!(A, data, basis, mon, k)
-    _build_rhs!(b, ℒrbf, ℒmon, data, eval_point, basis, mon, k)
-    return (A \ b)[1:k, :]
-end
-
-"""
     _build_stencil!(λ, A, b, ℒrbf, ℒmon, data, eval_point, basis, mon, k)
 
-In-place variant: writes solution into pre-allocated `λ` buffer, returns view of first k rows.
-Avoids allocating the solution vector and the slice on every call.
+Assemble complete stencil: build collocation matrix, build RHS, solve for weights
+in the pre-allocated `λ` buffer. Works for both interior stencils (AbstractVector)
+and Hermite stencils (HermiteStencilData) via dispatch helpers in
+`_build_collocation_matrix!` and `_build_rhs!`.
+
+Returns: view of the first k rows of `λ` (size k×num_ops).
 """
 function _build_stencil!(
         λ,
@@ -229,11 +208,6 @@ end
 # CPU: Symmetric → bunchkaufman (optimal for symmetric indefinite)
 function _solve_system!(λ, A::Symmetric, b)
     return ldiv!(λ, bunchkaufman!(A, true), b)
-end
-
-# Generic fallback: uses \ which dispatches to cuSOLVER on GPU, LAPACK on CPU
-function _solve_system!(λ, A::AbstractMatrix, b)
-    return λ .= A \ b
 end
 
 # Dispatch helpers: Vector gets 1D view, Matrix gets 2D slice view
