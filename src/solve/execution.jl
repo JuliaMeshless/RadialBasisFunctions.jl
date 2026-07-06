@@ -8,17 +8,19 @@ using LinearAlgebra: Symmetric
 # ============================================================================
 
 """
-    allocate_sparse_arrays(TD, k, N_eval, num_ops, adjl, boundary_data)
+    allocate_sparse_arrays(TD, k, N_eval, num_ops, adjl, boundary_data, global_to_boundary)
 
 Allocate sparse matrix arrays for COO format sparse matrix construction.
 Exactly counts non-zeros: interior points get k entries, Dirichlet points get 1 entry.
 """
 function allocate_sparse_arrays(
-        TD, k::Int, N_eval::Int, num_ops::Int, adjl, boundary_data::BoundaryData
+        TD, k::Int, N_eval::Int, num_ops::Int, adjl, boundary_data::BoundaryData,
+        global_to_boundary::Vector{Int},
     )
     # Count exact non-zeros needed
     total_nnz, row_offsets = count_nonzeros(
-        adjl, boundary_data.is_boundary, boundary_data.boundary_conditions
+        adjl, boundary_data.is_boundary, boundary_data.boundary_conditions,
+        global_to_boundary,
     )
 
     I = Vector{Int}(undef, total_nnz)
@@ -35,11 +37,11 @@ Count exact number of non-zero entries for optimized allocation.
 Returns (total_nnz, row_offsets) where row_offsets[i] is the starting position for row i.
 """
 function count_nonzeros(
-        adjl, is_boundary::Vector{Bool}, boundary_conditions::Vector{<:BoundaryCondition}
+        adjl, is_boundary::Vector{Bool}, boundary_conditions::Vector{<:BoundaryCondition},
+        global_to_boundary::Vector{Int} = construct_global_to_boundary(is_boundary),
     )
     N_eval = length(adjl)
     row_offsets = Vector{Int}(undef, N_eval + 1)
-    global_to_boundary = construct_global_to_boundary(is_boundary)
 
     total_nnz = 0
     row_offsets[1] = 1  # 1-based indexing
@@ -151,9 +153,11 @@ function build_weights_kernel(
     num_ops = _num_ops(ℒrbf)
     N_eval = length(eval_points)
 
+    global_to_boundary = construct_global_to_boundary(boundary_data.is_boundary)
+
     # Allocate sparse arrays
     I, J, V, row_offsets = allocate_sparse_arrays(
-        TD, k, N_eval, num_ops, adjl, boundary_data
+        TD, k, N_eval, num_ops, adjl, boundary_data, global_to_boundary
     )
 
     # Calculate batches
@@ -162,7 +166,7 @@ function build_weights_kernel(
     # Launch kernel
     launch_kernel!(
         I, J, V, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
-        boundary_data, row_offsets, batch_size, N_eval, n_batches,
+        boundary_data, global_to_boundary, row_offsets, batch_size, N_eval, n_batches,
         k, nmon, num_ops, device,
     )
 
@@ -181,7 +185,7 @@ Handles Dirichlet/Interior/Hermite stencil classification via dispatch.
 """
 function launch_kernel!(
         I, J, V, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
-        boundary_data::BoundaryData, row_offsets,
+        boundary_data::BoundaryData, global_to_boundary, row_offsets,
         batch_size, N_eval, n_batches, k, nmon, num_ops, device,
     )
     TD = eltype(first(data))
@@ -189,7 +193,6 @@ function launch_kernel!(
 
     # Pre-allocate Hermite workspace for each batch (includes polynomial workspace)
     batch_hermite_datas = [HermiteStencilData{TD}(k, dim, nmon) for _ in 1:n_batches]
-    global_to_boundary = construct_global_to_boundary(boundary_data.is_boundary)
 
     @kernel function weight_kernel(
             I, J, V, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
