@@ -17,12 +17,14 @@ basis = PHS(3; poly_deg = 2)
 SUITE["Partial"] = let s = BenchmarkGroup()
     s["build weights"] = @benchmarkable update_weights!($∂x)
     s["eval"] = @benchmarkable ∂x($y)
+    s
 end
 
 grad = gradient(x, basis)
 SUITE["Gradient"] = let s = BenchmarkGroup()
     s["build weights"] = @benchmarkable update_weights!($grad)
     s["eval"] = @benchmarkable grad($y)
+    s
 end
 
 v = SVector(2.0, 1.0, 0.5)
@@ -31,6 +33,7 @@ v /= norm(v)
 SUITE["Directional"] = let s = BenchmarkGroup()
     s["build weights"] = @benchmarkable update_weights!($∇v)
     s["eval"] = @benchmarkable ∇v($y)
+    s
 end
 
 v = map(1:length(x)) do i
@@ -41,6 +44,7 @@ end
 SUITE["Directional (per point)"] = let s = BenchmarkGroup()
     s["build weights"] = @benchmarkable update_weights!($∇v)
     s["eval"] = @benchmarkable ∇v($y)
+    s
 end
 
 # 2D unit square with mixed BCs: Dirichlet on x=0/x=1, Neumann on y=0/y=1.
