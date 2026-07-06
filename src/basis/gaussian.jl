@@ -39,22 +39,6 @@ function (op::∇{<:Gaussian})(x, xᵢ)
     return -2 * ε2 * (x .- xᵢ) * exp(-ε2 * sqeuclidean(x, xᵢ))
 end
 
-# D - directional derivative
-function (op::D{<:Gaussian})(x, xᵢ)
-    ε2 = op.basis.ε^2
-    return -2 * ε2 * LinearAlgebra.dot(op.v, x .- xᵢ) * exp(-ε2 * sqeuclidean(x, xᵢ))
-end
-
-# D² - directional second derivative
-function (op::D²{<:Gaussian})(x, xᵢ)
-    ε2 = op.basis.ε^2
-    φ = exp(-ε2 * sqeuclidean(x, xᵢ))
-    dot_v1_v2 = LinearAlgebra.dot(op.v1, op.v2)
-    dot_v1_r = LinearAlgebra.dot(op.v1, x .- xᵢ)
-    dot_v2_r = LinearAlgebra.dot(op.v2, x .- xᵢ)
-    return (4 * ε2^2 * dot_v1_r * dot_v2_r - 2 * ε2 * dot_v1_v2) * φ
-end
-
 # H - Hessian matrix
 function (op::H{<:Gaussian})(x, xᵢ)
     ε2 = op.basis.ε^2
