@@ -17,7 +17,7 @@ module RadialBasisFunctionsMooncakeExt
 using RadialBasisFunctions
 using Mooncake
 using Mooncake: CoDual, NoFData, NoRData, primal, zero_fcodual
-using StaticArrays: SVector
+using StaticArraysCore: SVector
 using LinearAlgebra: Symmetric
 using SparseArrays: SparseMatrixCSC
 
