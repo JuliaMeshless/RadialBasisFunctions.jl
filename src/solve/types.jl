@@ -74,10 +74,21 @@ struct HermiteStencilData{T <: Real}
             normals::AbstractVector{<:AbstractVector{T}},
             poly_workspace::Vector{T} = Vector{T}(undef, 0),
         ) where {T <: Real}
-        @assert length(data) ==
-            length(is_boundary) ==
-            length(boundary_conditions) ==
-            length(normals)
+        if !(
+                length(data) ==
+                    length(is_boundary) ==
+                    length(boundary_conditions) ==
+                    length(normals)
+            )
+            throw(
+                DimensionMismatch(
+                    "HermiteStencilData requires equal lengths, got data = " *
+                        "$(length(data)), is_boundary = $(length(is_boundary)), " *
+                        "boundary_conditions = $(length(boundary_conditions)), " *
+                        "normals = $(length(normals))",
+                ),
+            )
+        end
 
         # Convert to Vector{Vector{T}} for internal storage
         data_vectors = [Vector{T}(point) for point in data]

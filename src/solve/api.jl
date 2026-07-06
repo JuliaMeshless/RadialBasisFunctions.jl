@@ -73,6 +73,48 @@ end
 # Hermite Path (With Boundary Conditions)
 # ============================================================================
 
+_supports_normal_form(f, x, n) = applicable(f, x, x, n)
+_supports_normal_form(fs::Tuple, x, n) = all(f -> _supports_normal_form(f, x, n), fs)
+
+function _check_normal_form_support(ℒrbf, basis, data, boundary_conditions, normals)
+    needs_normal = any(bc -> is_neumann(bc) || is_robin(bc), boundary_conditions)
+    if needs_normal && !_supports_normal_form(ℒrbf, first(data), first(normals))
+        throw(
+            ArgumentError(
+                "Neumann/Robin boundary conditions require the operator's basis action to " *
+                    "support the normal-derivative form ℒrbf(x, xᵢ, normal), which is not " *
+                    "implemented for $(typeof(ℒrbf)) with $(nameof(typeof(basis))). Normal-form " *
+                    "methods currently exist only for PHS bases with the ∂, ∇, ∂², and ∇² " *
+                    "operators. For IMQ/Gaussian support, see " *
+                    "https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/136",
+            ),
+        )
+    end
+    return nothing
+end
+
+function _validate_boundary_inputs(data, is_boundary, boundary_conditions, normals)
+    if length(is_boundary) != length(data)
+        throw(
+            DimensionMismatch(
+                "length(is_boundary) = $(length(is_boundary)) must equal the number of " *
+                    "data points ($(length(data)))",
+            ),
+        )
+    end
+    n_boundary = count(is_boundary)
+    if length(boundary_conditions) != n_boundary || length(normals) != n_boundary
+        throw(
+            DimensionMismatch(
+                "boundary_conditions ($(length(boundary_conditions))) and normals " *
+                    "($(length(normals))) must each have one entry per boundary point " *
+                    "(count(is_boundary) = $n_boundary)",
+            ),
+        )
+    end
+    return nothing
+end
+
 """
     _build_weights(data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
                   is_boundary, boundary_conditions, normals;
@@ -95,6 +137,8 @@ function _build_weights(
         batch_size::Int = 10,
         device = CPU(),
     )
+    _validate_boundary_inputs(data, is_boundary, boundary_conditions, normals)
+    _check_normal_form_support(ℒrbf, basis, data, boundary_conditions, normals)
     boundary_data = BoundaryData(is_boundary, boundary_conditions, normals)
     return build_weights_kernel(
         data,
