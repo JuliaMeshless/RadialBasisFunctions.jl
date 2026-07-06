@@ -23,9 +23,10 @@ import RadialBasisFunctions as RBF
         k = 3
         nmon = 2  # 1D linear: [1, x]
         n = k + nmon
-        λ_std = zeros(Float64, n, 1)
+        # Single (non-tuple) operators pair with Vector buffers, matching _prepare_buffer
+        λ_std = zeros(Float64, n)
         A_std = Symmetric(zeros(Float64, n, n), :U)
-        b_std = zeros(Float64, n, 1)
+        b_std = zeros(Float64, n)
 
         ℒrbf(x1, x2) = basis(x1, x2)  # Identity on RBF
         ℒmon(arr, x) = mon(arr, x)     # Identity on monomial
@@ -35,7 +36,7 @@ import RadialBasisFunctions as RBF
             λ_std, A_std, b_std, ℒrbf, ℒmon, data, eval_point, basis, mon, k
         )
 
-        @test size(weights_std) == (k, 1)
+        @test size(weights_std) == (k,)
         @test all(isfinite.(weights_std))
     end
 
@@ -57,9 +58,10 @@ import RadialBasisFunctions as RBF
             [1.0],    # Outward normal for boundary point 3 (rightward)
         ]
 
-        # Create HermiteStencilData
+        # Create HermiteStencilData with a workspace sized for the monomial basis
+        # (Neumann collocation entries write ∂ₙ of the monomials into it)
         hermite_data = RBF.HermiteStencilData(
-            data, is_boundary, boundary_conditions, normals
+            data, is_boundary, boundary_conditions, normals, zeros(nmon)
         )
 
         # Test collocation matrix
