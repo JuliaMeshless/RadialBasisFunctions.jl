@@ -54,6 +54,7 @@ function _mono_rhs!(bmono, ℒmon, mon, eval_point, data::HermiteStencilData, k)
         data.boundary_conditions[eval_idx],
         data.normals[eval_idx],
         data.poly_workspace,
+        data.normal_workspace,
     )
 end
 
@@ -374,7 +375,7 @@ function hermite_poly_dispatch!(
     mon(a, xi)
 
     # Compute ∂ₙP(xi) into workspace
-    ∂_normal(mon, ni)(workspace, xi)
+    ∂_normal!(workspace, data.normal_workspace, mon, ni, xi)
 
     # Combine: a = α*P + β*∂ₙP
     α_val, β_val = α(bc), β(bc)
@@ -408,7 +409,8 @@ Apply boundary conditions to RBF operator evaluation.
 end
 
 """
-    hermite_mono_rhs!(bmono, ℒmon, mon, eval_point, is_bound, bc, normal, workspace)
+    hermite_mono_rhs!(bmono, ℒmon, mon, eval_point, is_bound, bc, normal,
+                      workspace, normal_workspace)
 
 Apply boundary conditions to monomial operator evaluation.
 Dispatches based on boundary point type for type stability.
@@ -422,10 +424,11 @@ Dispatches based on boundary point type for type stability.
         bc::BoundaryCondition,
         normal,
         workspace::AbstractVector,
+        normal_workspace::AbstractVector,
     )
     pt = point_type(is_bound, bc)
     return hermite_mono_rhs_dispatch!(
-        bmono, pt, ℒmon, mon, eval_point, bc, normal, workspace
+        bmono, pt, ℒmon, mon, eval_point, bc, normal, workspace, normal_workspace
     )
 end
 
@@ -439,6 +442,7 @@ function hermite_mono_rhs_dispatch!(
         bc,
         normal,
         workspace,
+        normal_workspace,
     )
     ℒmon(bmono, eval_point)
     return nothing
@@ -446,13 +450,14 @@ end
 
 # NeumannRobin: α*ℒ(P) + β*ℒ(∂ₙP) using pre-allocated workspace
 function hermite_mono_rhs_dispatch!(
-        bmono, ::NeumannRobinPoint, ℒmon, mon::MonomialBasis, eval_point, bc, normal, workspace
+        bmono, ::NeumannRobinPoint, ℒmon, mon::MonomialBasis, eval_point, bc, normal,
+        workspace, normal_workspace,
     )
     # Compute P(eval_point) into bmono
     mon(bmono, eval_point)
 
     # Compute ∂ₙP(eval_point) into workspace
-    ∂_normal(mon, normal)(workspace, eval_point)
+    ∂_normal!(workspace, normal_workspace, mon, normal, eval_point)
 
     # Combine: bmono = α*P + β*∂ₙP
     α_val, β_val = α(bc), β(bc)
