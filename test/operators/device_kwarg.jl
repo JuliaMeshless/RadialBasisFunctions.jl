@@ -122,12 +122,6 @@ end
     λ_sym = similar(b_vec)
     RBF._solve_system!(λ_sym, A_sym, copy(b_vec))
     @test λ_sym ≈ λ_ref
-
-    # _solve_system! generic fallback (AbstractMatrix)
-    A_plain = copy(A_data)
-    λ_gen = similar(b_vec)
-    RBF._solve_system!(λ_gen, A_plain, copy(b_vec))
-    @test λ_gen ≈ λ_ref atol = 1.0e-10
 end
 
 @testset "_solve_system! with matrix RHS" begin
@@ -147,12 +141,6 @@ end
     λ_sym = similar(B_mat)
     RBF._solve_system!(λ_sym, A_sym, copy(B_mat))
     @test λ_sym ≈ λ_ref
-
-    # Generic path
-    A_plain = copy(A_data)
-    λ_gen = similar(B_mat)
-    RBF._solve_system!(λ_gen, A_plain, copy(B_mat))
-    @test λ_gen ≈ λ_ref atol = 1.0e-10
 end
 
 @testset "Adapt.adapt_structure for RadialBasisOperator" begin

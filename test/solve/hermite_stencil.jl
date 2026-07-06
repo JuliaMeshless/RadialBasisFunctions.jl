@@ -23,17 +23,16 @@ import RadialBasisFunctions as RBF
         k = 3
         nmon = 2  # 1D linear: [1, x]
         n = k + nmon
+        λ_std = zeros(Float64, n, 1)
         A_std = Symmetric(zeros(Float64, n, n), :U)
         b_std = zeros(Float64, n, 1)
 
-        # Create identity operator (interpolation)
-        identity_op = x -> x
         ℒrbf(x1, x2) = basis(x1, x2)  # Identity on RBF
         ℒmon(arr, x) = mon(arr, x)     # Identity on monomial
 
         # Test standard path - use plain data array
         weights_std = RBF._build_stencil!(
-            A_std, b_std, ℒrbf, ℒmon, data, eval_point, basis, mon, k
+            λ_std, A_std, b_std, ℒrbf, ℒmon, data, eval_point, basis, mon, k
         )
 
         @test size(weights_std) == (k, 1)
