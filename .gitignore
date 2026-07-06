@@ -23,3 +23,6 @@ Manifest.toml
 # Local Claude Code artifacts
 .claude/
 
+
+# Syncthing/iCloud conflict copies
+*sync-conflict*

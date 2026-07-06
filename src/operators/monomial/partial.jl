@@ -324,7 +324,6 @@ end
 function ∂²(::MonomialBasis{3, 2}, ::Val{3})
     function basis!(b, x)
         T = eltype(x)
-        T = eltype(x)
         b[1] = zero(T)
         b[2] = zero(T)
         b[3] = zero(T)
