@@ -103,13 +103,21 @@ function _get_monomial_basis(::Val{Dim}, ::Val{Deg}) where {Dim, Deg}
     return build_monomial_basis(ids)
 end
 
+# scalar loop: `b[ids[i][k]] *= x[i]` materializes a temporary array per index list
+function _monomial_products!(b, ids, x)
+    @inbounds for i in eachindex(ids)
+        xᵢ = x[i]
+        for id in ids[i], j in id
+            b[j] *= xᵢ
+        end
+    end
+    return nothing
+end
+
 function build_monomial_basis(ids::Vector{Vector{Vector{T}}}) where {T <: Int}
     function basis!(b::AbstractVector{B}, x::AbstractVector) where {B}
         b .= one(B)
-        # TODO flatten loop - why does it allocate here
-        @views @inbounds for i in eachindex(ids), k in eachindex(ids[i])
-            b[ids[i][k]] *= x[i]
-        end
+        _monomial_products!(b, ids, x)
         return nothing
     end
     return basis!
