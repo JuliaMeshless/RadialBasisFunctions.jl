@@ -174,6 +174,14 @@ struct InteriorStencil <: StencilType end  # All neighbors are interior
 struct DirichletStencil <: StencilType end  # Eval point is Dirichlet BC
 struct HermiteStencil <: StencilType end    # Mixed interior/boundary
 
+"""Early-exit scan; avoids materializing `is_boundary[neighbors]` per stencil."""
+@inline function _any_boundary(is_boundary, neighbors)
+    for n in neighbors
+        is_boundary[n] && return true
+    end
+    return false
+end
+
 """
     classify_stencil(is_boundary, boundary_conditions, eval_idx,
                     neighbors, global_to_boundary)
@@ -187,7 +195,7 @@ function classify_stencil(
         neighbors::Vector{Int},
         global_to_boundary::Vector{Int},
     ) where {T}
-    if sum(is_boundary[neighbors]) == 0
+    if !_any_boundary(is_boundary, neighbors)
         return InteriorStencil()
     elseif is_boundary[eval_idx] &&
             is_dirichlet(boundary_conditions[global_to_boundary[eval_idx]])
