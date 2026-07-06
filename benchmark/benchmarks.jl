@@ -43,6 +43,37 @@ SUITE["Directional (per point)"] = let s = BenchmarkGroup()
     s["eval"] = @benchmarkable ∇v($y)
 end
 
+# 2D unit square with mixed BCs: Dirichlet on x=0/x=1, Neumann on y=0/y=1.
+# Each edge owns one corner so boundary membership is exact and duplicate-free.
+n_edge = 25
+t_edge = range(0, 1; length = n_edge + 1)
+left = [SVector(0.0, t) for t in t_edge[2:end]]
+right = [SVector(1.0, t) for t in t_edge[1:(end - 1)]]
+bottom = [SVector(t, 0.0) for t in t_edge[1:(end - 1)]]
+top = [SVector(t, 1.0) for t in t_edge[2:end]]
+boundary = vcat(left, right, bottom, top)
+interior = SVector{2}.(HaltonPoint(2)[1:900])
+xh = vcat(boundary, interior)
+hermite = (
+    is_boundary = vcat(fill(true, length(boundary)), fill(false, length(interior))),
+    bc = vcat(fill(Dirichlet(), 2 * n_edge), fill(Neumann(), 2 * n_edge)),
+    normals = vcat(
+        fill(SVector(-1.0, 0.0), n_edge),
+        fill(SVector(1.0, 0.0), n_edge),
+        fill(SVector(0.0, -1.0), n_edge),
+        fill(SVector(0.0, 1.0), n_edge),
+    ),
+)
+adjl_h = find_neighbors(xh, 25)
+SUITE["Hermite"]["build weights"] = @benchmarkable laplacian(
+    $xh; basis = $basis, adjl = $adjl_h, hermite = $hermite
+)
+
+xi = SVector{2}.(HaltonPoint(2)[1:500])
+itp = Interpolator(xi, f.(xi), basis)
+xe = SVector{2}.(HaltonPoint(2)[501:600])
+SUITE["Interpolator"]["eval (poly)"] = @benchmarkable itp($xe)
+
 x1 = SVector{3}(rand(3))
 x2 = SVector{3}(rand(3))
 
