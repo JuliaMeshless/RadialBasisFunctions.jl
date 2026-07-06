@@ -38,11 +38,11 @@ function autoselect_k(data::AbstractVector, basis::B) where {B <: AbstractRadial
 end
 
 function reorder_points!(
-        x::AbstractVector, adjl::AbstractVector{AbstractVector{T}}, k::T
+        x::AbstractVector, adjl::AbstractVector{<:AbstractVector{T}}, k::T
     ) where {T <: Int}
-    i = symrcm(adjl, ones(T, length(x)) .* k)
+    i = symrcm(adjl, fill(k, length(x)))
     permute!(x, i)
-    return nothing
+    return i
 end
 
 function reorder_points!(x::AbstractVector, k::T) where {T <: Int}
