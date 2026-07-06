@@ -153,3 +153,9 @@ if Base.find_package("Mooncake") !== nothing
         include("extensions/mooncake_ext.jl")
     end
 end
+
+if Base.find_package("Enzyme") !== nothing
+    @safetestset "Enzyme Extension" begin
+        include("extensions/enzyme_ext.jl")
+    end
+end
