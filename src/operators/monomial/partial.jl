@@ -339,32 +339,44 @@ function ∂²(::MonomialBasis{3, 2}, ::Val{3})
     return ℒMonomialBasis(3, 2, basis!)
 end
 
-# Add normal derivative functionality
-function ∂_normal(mb::MonomialBasis{Dim, Deg}, normal::AbstractVector) where {Dim, Deg}
-    function basis!(b, x)
-        T = eltype(x)
+"""
+    ∂_normal!(b, scratch, mb, normal, x)
 
-        for i in eachindex(b)
-            b[i] = zero(T)
-        end
+In-place normal derivative of the monomial basis: `b = Σ_d normal[d] * ∂_d P(x)`.
+`scratch` must have the same length as `b`.
+"""
+function ∂_normal!(
+        b::AbstractVector,
+        scratch::AbstractVector,
+        mb::MonomialBasis{Dim, Deg},
+        normal::AbstractVector,
+        x,
+    ) where {Dim, Deg}
+    T = eltype(x)
+    for i in eachindex(b)
+        b[i] = zero(T)
+    end
 
-        tmp = zeros(T, length(b)) #allocating (TODO: optimize)
-        for d in 1:Dim
-            if !iszero(normal[d])
-                # Get the partial derivative operator
-                op = ∂(mb, d)
-
-                # Apply partial derivative
-                fill!(tmp, zero(T))
-                op.f(tmp, x)
-
-                # Add scaled contribution to result
-                for i in eachindex(b)
-                    b[i] += normal[d] * tmp[i]
-                end
+    # Unrolled over dimensions so ∂(mb, Val(d)) is constructed type-stably
+    ntuple(Val(Dim)) do d
+        if !iszero(normal[d])
+            fill!(scratch, zero(T))
+            ∂(mb, Val(d)).f(scratch, x)
+            for i in eachindex(b)
+                b[i] += normal[d] * scratch[i]
             end
         end
+        return nothing
+    end
 
+    return nothing
+end
+
+# Allocating functor form (test/utility use; the solve hot path calls ∂_normal!)
+function ∂_normal(mb::MonomialBasis{Dim, Deg}, normal::AbstractVector) where {Dim, Deg}
+    function basis!(b, x)
+        scratch = zeros(eltype(x), length(b))
+        ∂_normal!(b, scratch, mb, normal, x)
         return nothing
     end
 

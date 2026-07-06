@@ -56,6 +56,7 @@ Fields:
 - `boundary_conditions`: BC for each point (use Internal() for interior)
 - `normals`: Normal vectors (zero for interior points)
 - `poly_workspace`: Pre-allocated buffer for polynomial operations (avoids allocations in hot path)
+- `normal_workspace`: Pre-allocated scratch for in-place normal-derivative evaluation
 - `eval_local_idx`: Local index of the evaluation point among the stencil points
   (set by `update_hermite_stencil_data!`; 0 when absent/unset)
 
@@ -68,6 +69,7 @@ struct HermiteStencilData{T <: Real}
     boundary_conditions::Vector{BoundaryCondition{T}}
     normals::Vector{Vector{T}}
     poly_workspace::Vector{T}  # Pre-allocated buffer for polynomial operations
+    normal_workspace::Vector{T}  # Scratch for in-place normal-derivative evaluation
     eval_local_idx::Base.RefValue{Int}
 
     function HermiteStencilData(
@@ -99,7 +101,7 @@ struct HermiteStencilData{T <: Real}
 
         return new{T}(
             data_vectors, is_boundary, boundary_conditions, normals_vectors,
-            poly_workspace, Ref(0),
+            poly_workspace, Vector{T}(undef, length(poly_workspace)), Ref(0),
         )
     end
 end
