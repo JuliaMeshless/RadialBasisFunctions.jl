@@ -98,10 +98,7 @@ end
 function build_monomial_basis(ids::Vector{Vector{Vector{T}}}, c::Vector{T}) where {T <: Int}
     function basis!(db::AbstractVector{B}, x::AbstractVector) where {B}
         db .= one(eltype(x))
-        # TODO optimize - allocations
-        @views @inbounds for i in eachindex(ids), j in eachindex(ids[i])
-            db[ids[i][j]] *= x[i]
-        end
+        _monomial_products!(db, ids, x)
         db .*= c
         return nothing
     end
