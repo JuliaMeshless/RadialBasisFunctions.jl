@@ -238,7 +238,11 @@ function _backward_partial_polynomial_section!(
     elseif D == 3
         _backward_partial_poly_3d!(Δeval_point, Δb, k, nmon, dim, num_ops)
     else
-        error("Polynomial backward pass not implemented for D=$D (only D=1,2,3 supported)")
+        throw(
+            ArgumentError(
+                "Polynomial backward pass not implemented for D=$D (only D=1,2,3 supported)",
+            ),
+        )
     end
     return nothing
 end
