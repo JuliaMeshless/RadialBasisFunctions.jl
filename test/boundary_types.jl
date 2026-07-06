@@ -132,7 +132,7 @@ end
         bcs = [Dirichlet(), Neumann()]
         normals = [[1.0, 0.0], [0.0, 1.0]]
 
-        @test_throws AssertionError RBF.HermiteStencilData(data, is_boundary, bcs, normals)
+        @test_throws DimensionMismatch RBF.HermiteStencilData(data, is_boundary, bcs, normals)
     end
 end
 
