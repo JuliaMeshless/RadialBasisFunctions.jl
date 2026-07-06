@@ -32,8 +32,18 @@ end
 # Compute monomial RHS - dispatch on data type
 _mono_rhs!(bmono, ℒmon, mon, eval_point, data::AbstractVector, k) = ℒmon(bmono, eval_point)
 function _mono_rhs!(bmono, ℒmon, mon, eval_point, data::HermiteStencilData, k)
-    eval_idx = findfirst(i -> data.data[i] == eval_point, 1:k)
-    @assert eval_idx !== nothing "Evaluation point not found in stencil"
+    eval_idx = data.eval_local_idx[]
+    if eval_idx == 0
+        # Fallback scan for callers that bypass update_hermite_stencil_data!
+        for i in 1:k
+            if data.data[i] == eval_point
+                eval_idx = i
+                break
+            end
+        end
+        eval_idx == 0 &&
+            throw(ArgumentError("evaluation point not found in stencil data"))
+    end
     @assert !is_dirichlet(data.boundary_conditions[eval_idx]) "Dirichlet eval nodes handled at higher level"
     return hermite_mono_rhs!(
         bmono,

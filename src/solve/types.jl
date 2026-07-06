@@ -56,16 +56,19 @@ Fields:
 - `boundary_conditions`: BC for each point (use Internal() for interior)
 - `normals`: Normal vectors (zero for interior points)
 - `poly_workspace`: Pre-allocated buffer for polynomial operations (avoids allocations in hot path)
+- `eval_local_idx`: Local index of the evaluation point among the stencil points
+  (set by `update_hermite_stencil_data!`; 0 when absent/unset)
 
 Note: For interior points (is_boundary[i] == false), boundary_conditions[i]
 and normals[i] contain sentinel values and should not be accessed.
 """
 struct HermiteStencilData{T <: Real}
-    data::AbstractVector{Vector{T}}
+    data::Vector{Vector{T}}
     is_boundary::Vector{Bool}
     boundary_conditions::Vector{BoundaryCondition{T}}
     normals::Vector{Vector{T}}
     poly_workspace::Vector{T}  # Pre-allocated buffer for polynomial operations
+    eval_local_idx::Base.RefValue{Int}
 
     function HermiteStencilData(
             data::AbstractVector{<:AbstractVector{T}},
@@ -95,7 +98,8 @@ struct HermiteStencilData{T <: Real}
         normals_vectors = [Vector{T}(normal) for normal in normals]
 
         return new{T}(
-            data_vectors, is_boundary, boundary_conditions, normals_vectors, poly_workspace
+            data_vectors, is_boundary, boundary_conditions, normals_vectors,
+            poly_workspace, Ref(0),
         )
     end
 end
@@ -115,10 +119,14 @@ end
 """
     update_hermite_stencil_data!(hermite_data, global_data, neighbors,
                                  is_boundary, boundary_conditions, normals,
-                                 global_to_boundary)
+                                 global_to_boundary[, eval_point])
 
 Populate local Hermite stencil data from global arrays.
 Used within kernels to extract boundary info for specific neighborhoods.
+
+When `eval_point` is given, caches its local index (first stencil point equal by
+value, 0 if absent) in `hermite_data.eval_local_idx` so RHS assembly avoids a
+per-operator search.
 """
 function update_hermite_stencil_data!(
         hermite_data::HermiteStencilData{T},
@@ -128,13 +136,20 @@ function update_hermite_stencil_data!(
         boundary_conditions::Vector{BoundaryCondition{T}},
         normals::AbstractVector{<:AbstractVector{T}},
         global_to_boundary::Vector{Int},
+        eval_point = nothing,
     ) where {T}
     k = length(neighbors)
+    hermite_data.eval_local_idx[] = 0
 
     @inbounds for local_idx in 1:k
         global_idx = neighbors[local_idx]
         hermite_data.data[local_idx] .= global_data[global_idx]
         hermite_data.is_boundary[local_idx] = is_boundary[global_idx]
+
+        if eval_point !== nothing && hermite_data.eval_local_idx[] == 0 &&
+                global_data[global_idx] == eval_point
+            hermite_data.eval_local_idx[] = local_idx
+        end
 
         if is_boundary[global_idx]
             boundary_idx = global_to_boundary[global_idx]
@@ -154,14 +169,14 @@ end
 # ============================================================================
 
 """
-    BoundaryData{T}
+    BoundaryData{T,V}
 
 Wrapper for global boundary information (replaces fragile tuples).
 """
-struct BoundaryData{T}
+struct BoundaryData{T, V <: AbstractVector{T}}
     is_boundary::Vector{Bool}
     boundary_conditions::Vector{BoundaryCondition{T}}
-    normals::Vector{<:AbstractVector{T}}
+    normals::Vector{V}
 end
 
 # ============================================================================

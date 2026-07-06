@@ -241,7 +241,7 @@ function launch_kernel!(
                 # Mixed interior/boundary stencil
                 update_hermite_stencil_data!(
                     hermite_data, data, neighbors, is_boundary,
-                    boundary_conditions, normals, global_to_boundary,
+                    boundary_conditions, normals, global_to_boundary, eval_point,
                 )
                 weights = _build_stencil!(
                     λ, A, b, ℒrbf, ℒmon, hermite_data, eval_point, basis, mon, k
