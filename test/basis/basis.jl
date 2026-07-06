@@ -1,11 +1,6 @@
 using RadialBasisFunctions
 import RadialBasisFunctions as RBF
 
-@testset "Pretty Printing" begin
-    superscripts = ("", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹")
-    @test all(RBF.unicode_order.(Val.(1:9)) .== superscripts)
-end
-
 @testset "Basis - General Utils" begin
     m = MonomialBasis(2, 3)
     @test dim(m) == 2

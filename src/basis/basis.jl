@@ -83,14 +83,3 @@ function (op::∂mixed)(x, xᵢ)
     end
     return H(op.basis)(x, xᵢ)[op.dim1, op.dim2]
 end
-
-# pretty printing
-unicode_order(::Val{1}) = ""
-unicode_order(::Val{2}) = "²"
-unicode_order(::Val{3}) = "³"
-unicode_order(::Val{4}) = "⁴"
-unicode_order(::Val{5}) = "⁵"
-unicode_order(::Val{6}) = "⁶"
-unicode_order(::Val{7}) = "⁷"
-unicode_order(::Val{8}) = "⁸"
-unicode_order(::Val{9}) = "⁹"
