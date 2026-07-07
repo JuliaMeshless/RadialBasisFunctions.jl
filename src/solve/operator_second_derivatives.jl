@@ -24,14 +24,20 @@ negate_grad(grad_fn) = (x, xi) -> -grad_fn(x, xi)
 """
     _hessian_row(basis, x, xᵢ, dim)
 
-Compute ∂/∂x[j] of [∂φ/∂x[dim]] as an `SVector`: row `dim` of the Hessian
-of `φ(x, xᵢ)` w.r.t. `x`, extracted from the basis Hessian functor `H(basis)`.
+Compute ∂/∂x[j] of [∂φ/∂x[dim]]: row `dim` of the Hessian of `φ(x, xᵢ)`
+w.r.t. `x`, extracted from the basis Hessian functor `H(basis)`. Static
+points take an `SVector` fast path; generic vectors return a `Vector`.
 """
 function _hessian_row(
         basis::AbstractRadialBasis, x::StaticArraysCore.StaticVector{N, T}, xᵢ, dim::Int
     ) where {N, T}
     Hφ = H(basis)(x, xᵢ)
     return StaticArraysCore.SVector{N, T}(ntuple(j -> Hφ[dim, j], Val(N)))
+end
+
+function _hessian_row(basis::AbstractRadialBasis, x::AbstractVector, xᵢ, dim::Int)
+    Hφ = H(basis)(x, xᵢ)
+    return [Hφ[dim, j] for j in eachindex(x)]
 end
 
 """
@@ -53,6 +59,15 @@ function _hessian_row(
     return StaticArraysCore.SVector{N, T}(
         ntuple(j -> j == dim ? 1 / r - δ_d^2 / r3 : -δ_d * δ[j] / r3, Val(N))
     )
+end
+
+function _hessian_row(::PHS1, x::AbstractVector, xᵢ, dim::Int)
+    r = euclidean(x, xᵢ)
+    r < oftype(r, 1.0e-12) && return zero(x)
+    δ = x .- xᵢ
+    δ_d = δ[dim]
+    r3 = r^3
+    return [j == dim ? 1 / r - δ_d^2 / r3 : -δ_d * δ[j] / r3 for j in eachindex(x)]
 end
 
 # ============================================================================

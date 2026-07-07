@@ -97,7 +97,10 @@ end
 
 ad_backend = DI.AutoMooncake(; config = nothing)
 ad_pts_flat = vcat([collect(p) for p in ad_points]...)
-SUITE["AD"]["mooncake pullback"] = @benchmarkable DI.gradient($ad_loss, $ad_backend, $ad_pts_flat)
+ad_prep = DI.prepare_gradient(ad_loss, ad_backend, ad_pts_flat)
+SUITE["AD"]["mooncake pullback"] = @benchmarkable DI.gradient(
+    $ad_loss, $ad_prep, $ad_backend, $ad_pts_flat
+)
 
 x1 = SVector{3}(rand(3))
 x2 = SVector{3}(rand(3))
