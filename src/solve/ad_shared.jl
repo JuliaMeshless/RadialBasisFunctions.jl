@@ -111,3 +111,36 @@ function build_weights_pullback_loop!(
 
     return nothing
 end
+
+"""
+    run_build_weights_pullback(ΔW_extractor, cache, adjl, eval_points, data, basis,
+        mon, ℒ, OpType, grad_Lφ_x, grad_Lφ_xi)
+
+Allocate cotangent buffers, run `build_weights_pullback_loop!`, and return
+`(Δdata, Δeval, Δε_acc)`. Shared by the Enzyme and Mooncake extensions.
+"""
+function run_build_weights_pullback(
+        ΔW_extractor,
+        cache::WeightsBuildForwardCache{T},
+        adjl::AbstractVector,
+        eval_points::AbstractVector,
+        data::AbstractVector,
+        basis::AbstractRadialBasis,
+        mon::MonomialBasis,
+        ℒ,
+        ::Type{OpType},
+        grad_Lφ_x,
+        grad_Lφ_xi,
+    ) where {T, OpType}
+    dim_space = length(first(data))
+    Δdata = [zeros(T, dim_space) for _ in 1:length(data)]
+    Δeval = [zeros(T, dim_space) for _ in 1:length(eval_points)]
+    Δε_acc = Ref(zero(T))
+
+    build_weights_pullback_loop!(
+        Δdata, Δeval, Δε_acc, ΔW_extractor, cache, adjl,
+        eval_points, data, basis, mon, ℒ, OpType, grad_Lφ_x, grad_Lφ_xi,
+    )
+
+    return Δdata, Δeval, Δε_acc
+end

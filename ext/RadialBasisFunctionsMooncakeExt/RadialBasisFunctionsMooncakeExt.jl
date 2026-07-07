@@ -32,7 +32,7 @@ import RadialBasisFunctions: _interpolator_constructor_backward, _build_collocat
 # Import backward pass support from main package
 import RadialBasisFunctions: _forward_with_cache
 import RadialBasisFunctions: extract_stencil_cotangent_from_nzval, _get_grad_funcs
-import RadialBasisFunctions: build_weights_pullback_loop!
+import RadialBasisFunctions: run_build_weights_pullback
 
 # Import gradient function
 const ∇ = RadialBasisFunctions.∇
@@ -307,7 +307,7 @@ end
 """
     _mooncake_build_weights_pullback(...)
 
-Create shared pullback closure that runs `build_weights_pullback_loop!` and accumulates
+Create shared pullback closure that runs `run_build_weights_pullback` and accumulates
 gradients into Mooncake fdata. Returns ε gradient value for basis rdata construction.
 """
 function _mooncake_build_weights_pullback(
@@ -318,16 +318,8 @@ function _mooncake_build_weights_pullback(
 
     function _shared_pb!!(ΔW_rdata)
         ΔW_nzval = W_fdata.data.nzval
-        TD = eltype(first(pts))
-        N_data = length(pts)
-        N_eval = length(eval_pts)
 
-        Δdata_raw = [zeros(TD, dim_space) for _ in 1:N_data]
-        Δeval_raw = [zeros(TD, dim_space) for _ in 1:N_eval]
-        Δε_acc = Ref(zero(TD))
-
-        build_weights_pullback_loop!(
-            Δdata_raw, Δeval_raw, Δε_acc,
+        Δdata_raw, Δeval_raw, Δε_acc = run_build_weights_pullback(
             (eval_idx, neighbors, k) -> extract_stencil_cotangent_from_nzval(ΔW_nzval, W, eval_idx, neighbors, k),
             cache, adj, eval_pts, pts, bas, mon, ℒ, OpType,
             grad_Lφ_x, grad_Lφ_xi
