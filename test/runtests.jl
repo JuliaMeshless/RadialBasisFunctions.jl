@@ -136,6 +136,10 @@ end
     include("solve/integration/partial_y_end_to_end.jl")
 end
 
+@safetestset "Float32 Support" begin
+    include("float32.jl")
+end
+
 if Base.find_package("LuxCore") !== nothing
     @safetestset "Lux RBFLayer" begin
         include("extensions/lux_ext.jl")
