@@ -140,7 +140,7 @@ end
 # only meaningful when every such term contracts identically.
 function _check_same_contraction(ops)
     leads = filter(
-        op -> op isa AbstractGradientOperator{<:Any, 0}, map(_leading_op, ops)
+        op -> op isa AbstractJacobianOperator{<:Any, 0}, map(_leading_op, ops)
     )
     length(leads) < 2 && return nothing
     lead = first(leads)
