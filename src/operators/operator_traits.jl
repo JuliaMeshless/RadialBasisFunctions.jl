@@ -24,6 +24,8 @@ const VectorFieldOperator = Union{Divergence, Curl, StrainRate, RotationRate}
 
 requires_vector_input(::AbstractOperator) = false
 requires_vector_input(::VectorFieldOperator) = true
+requires_vector_input(s::ScaledOperator) = requires_vector_input(s.op)
+requires_vector_input(s::SumOperator) = any(requires_vector_input, s.ops)
 
 """
     is_symmetric(op) -> Bool

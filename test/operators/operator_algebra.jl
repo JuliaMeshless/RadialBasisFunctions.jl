@@ -148,3 +148,44 @@ end
     # scalar action + per-dimension tuple action cannot combine at weight build
     @test_throws ArgumentError (Laplacian() + Divergence{2}())(pts)
 end
+
+@testset "Heterogeneous gradient-family sums are rejected" begin
+    @test_throws ArgumentError Divergence{2}() + Curl{2}()
+    @test_throws ArgumentError Curl{2}() + Divergence{2}()
+    @test_throws ArgumentError StrainRate{2}() + RotationRate{2}()
+    @test_throws ArgumentError Divergence{2}() - Curl{2}()
+    @test_throws ArgumentError 2.0 * Divergence{2}() + Curl{2}()
+    # precomputed-weights path routes through the same check
+    @test_throws ArgumentError divergence(pts) + curl(pts)
+    # homogeneous sums remain valid
+    @test (Divergence{2}() + Divergence{2}()) isa SumOperator
+    @test (StrainRate{2}() + StrainRate{2}()) isa SumOperator
+end
+
+@testset "requires_vector_input forwards through composition" begin
+    @test requires_vector_input(Divergence{2}() + Divergence{2}())
+    @test requires_vector_input(2.0 * Divergence{2}())
+    @test !requires_vector_input(Laplacian() + Laplacian())
+    @test !requires_vector_input(2.0 * Laplacian())
+    q = quadratic.(pts)
+    @test_throws ArgumentError (Divergence{2}() + Divergence{2}())(pts)(q)
+    @test_throws ArgumentError (2.0 * Divergence{2}())(pts)(q)
+end
+
+@testset "In-place evaluation of composed rank-0 operators" begin
+    v = hcat(vfx.(pts), vfy.(pts))
+    op = (Divergence{2}() + Divergence{2}())(pts)
+    y = zeros(length(pts))
+    op(y, v)
+    @test isapprox(y, op(v); rtol = 1.0e-10)
+    scaled = (2.0 * Divergence{2}())(pts)
+    ys = zeros(length(pts))
+    scaled(ys, v)
+    @test isapprox(ys, 2.0 .* divergence(pts)(v); rtol = 1.0e-10)
+    # scalar composed sums keep working in-place
+    lap_sum = (Laplacian() + Laplacian())(pts)
+    q = quadratic.(pts)
+    yl = zeros(length(pts))
+    lap_sum(yl, q)
+    @test isapprox(yl, lap_sum(q); rtol = 1.0e-10)
+end

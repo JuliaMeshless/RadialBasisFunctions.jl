@@ -130,7 +130,32 @@ _terms(op::AbstractOperator) = (op,)
 _terms(s::SumOperator) = s.ops
 
 function Base.:+(op1::AbstractOperator{N}, op2::AbstractOperator{N}) where {N}
-    return SumOperator{N}((_terms(op1)..., _terms(op2)...))
+    ops = (_terms(op1)..., _terms(op2)...)
+    _check_same_contraction(ops)
+    return SumOperator{N}(ops)
+end
+
+# Rank-0 gradient-family operators share the identical tuple-of-∂ basis action;
+# their math lives solely in per-type _eval_op contractions, so summed weights are
+# only meaningful when every such term contracts identically.
+function _check_same_contraction(ops)
+    leads = filter(
+        op -> op isa AbstractGradientOperator{<:Any, 0}, map(_leading_op, ops)
+    )
+    length(leads) < 2 && return nothing
+    lead = first(leads)
+    for op in Base.tail(leads)
+        nameof(typeof(op)) === nameof(typeof(lead)) || throw(
+            ArgumentError(
+                "Cannot sum operators with different contraction semantics: " *
+                    "$(print_op(lead)) and $(print_op(op)). These operators share " *
+                    "identical gradient weights and differ only in how the weights " *
+                    "are contracted, so their sum is not expressible as a single " *
+                    "weighted operator."
+            )
+        )
+    end
+    return nothing
 end
 Base.:-(op1::AbstractOperator{N}, op2::AbstractOperator{N}) where {N} = op1 + (-op2)
 
@@ -205,6 +230,12 @@ function _eval_op(op::RadialBasisOperator{<:SumOperator{0}}, x::AbstractMatrix)
 end
 function _eval_op(op::RadialBasisOperator{<:ScaledOperator{0}}, x::AbstractMatrix)
     return _eval_op(_rewrap_leading(op), x)
+end
+function _eval_op(op::RadialBasisOperator{<:SumOperator{0}}, y, x)
+    return _eval_op(_rewrap_leading(op), y, x)
+end
+function _eval_op(op::RadialBasisOperator{<:ScaledOperator{0}}, y, x)
+    return _eval_op(_rewrap_leading(op), y, x)
 end
 
 # ============================================================================
