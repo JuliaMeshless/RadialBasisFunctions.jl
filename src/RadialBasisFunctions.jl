@@ -19,7 +19,7 @@ export MonomialBasis
 export degree, dim
 
 include("utils.jl")
-export find_neighbors, reorder_points!
+export find_neighbors, autoselect_k, reorder_points!
 
 include("solve/types.jl")
 export BoundaryCondition, Dirichlet, Neumann, Robin, Internal

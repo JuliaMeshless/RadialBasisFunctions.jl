@@ -29,6 +29,11 @@ end
 """
     autoselect_k(data::Vector, basis<:AbstractRadialBasis)
 
+Return the stencil size `k` (number of nearest neighbors per stencil) used by
+default when constructing operators: `min(N, max(2*binomial(m+d, d), 2d+1))`
+where `N = length(data)`, `m` is the polynomial degree of `basis`, and `d` is
+the spatial dimension.
+
 See Bayona, 2017 - https://doi.org/10.1016/j.jcp.2016.12.008
 """
 function autoselect_k(data::AbstractVector, basis::B) where {B <: AbstractRadialBasis}
