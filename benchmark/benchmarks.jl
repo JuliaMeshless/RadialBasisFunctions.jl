@@ -3,6 +3,8 @@ using RadialBasisFunctions
 using StaticArraysCore
 using HaltonSequences
 using LinearAlgebra
+import DifferentiationInterface as DI
+using Mooncake: Mooncake
 
 f(x) = 1 + sin(4 * x[1]) + cos(3 * x[1]) + sin(2 * x[2])
 N = 100_000
@@ -77,6 +79,25 @@ xi = SVector{2}.(HaltonPoint(2)[1:500])
 itp = Interpolator(xi, f.(xi), basis)
 xe = SVector{2}.(HaltonPoint(2)[501:600])
 SUITE["Interpolator"]["eval (poly)"] = @benchmarkable itp($xe)
+
+# Mooncake pullback of sum(laplacian-applied field squared) w.r.t. point positions,
+# mirroring the _build_weights differentiation API in test/extensions/autodiff_di.jl
+ad_N = 300
+ad_points = SVector{2}.(HaltonPoint(2)[1:ad_N])
+ad_v = f.(ad_points)
+ad_adjl = find_neighbors(ad_points, 15)
+ad_basis = PHS(3; poly_deg = 2)
+ad_ℒ = RadialBasisFunctions.Laplacian()
+
+function ad_loss(pts)
+    pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:ad_N]
+    W = RadialBasisFunctions._build_weights(ad_ℒ, pts_vec, pts_vec, ad_adjl, ad_basis)
+    return sum((W * ad_v) .^ 2)
+end
+
+ad_backend = DI.AutoMooncake(; config = nothing)
+ad_pts_flat = vcat([collect(p) for p in ad_points]...)
+SUITE["AD"]["mooncake pullback"] = @benchmarkable DI.gradient($ad_loss, $ad_backend, $ad_pts_flat)
 
 x1 = SVector{3}(rand(3))
 x2 = SVector{3}(rand(3))
