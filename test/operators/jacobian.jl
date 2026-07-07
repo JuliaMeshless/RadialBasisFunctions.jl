@@ -112,7 +112,7 @@ end
     eval_points = SVector{2}.(HaltonPoint(2)[(N + 1):(N + 100)])
     u = sin.(getindex.(points, 1)) .+ cos.(getindex.(points, 2))
 
-    op = jacobian(points, eval_points, PHS(3; poly_deg = 2))
+    op = jacobian(points; eval_points = eval_points, basis = PHS(3; poly_deg = 2))
     J = op(u)
 
     @test size(J) == (100, 2)
@@ -151,7 +151,7 @@ end
     eval_pt = [SVector{2}(0.5, 0.5)]
     u = sin.(getindex.(points, 1)) .+ cos.(getindex.(points, 2))
 
-    op = jacobian(points, eval_pt, PHS(3; poly_deg = 2))
+    op = jacobian(points; eval_points = eval_pt, basis = PHS(3; poly_deg = 2))
 
     # Weights should be SparseVectors, not matrices
     @test op.weights[1] isa SparseVector
@@ -177,7 +177,7 @@ end
     u2 = getindex.(points, 1) .^ 2 .+ getindex.(points, 2) .^ 2
     u = hcat(u1, u2)
 
-    op = jacobian(points, eval_pt, PHS(3; poly_deg = 2))
+    op = jacobian(points; eval_points = eval_pt, basis = PHS(3; poly_deg = 2))
     J = op(u)
 
     # Result should be a D_in × D Matrix, not 1×D_in×D tensor
@@ -228,7 +228,7 @@ end
         tensor_input[:, i, j] = (i + j) .* x_coords .+ (i - j) .* y_coords
     end
 
-    op = jacobian(points, eval_pt, PHS(3; poly_deg = 2))
+    op = jacobian(points; eval_points = eval_pt, basis = PHS(3; poly_deg = 2))
 
     @test op.weights[1] isa SparseVector
     @test op.weights[2] isa SparseVector
