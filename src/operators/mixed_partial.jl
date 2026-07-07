@@ -54,42 +54,6 @@ function mixed_partial(
     return RadialBasisOperator(MixedPartial(dim1, dim2), data; basis = basis, kw...)
 end
 
-function mixed_partial(
-        data::AbstractVector,
-        eval_points::AbstractVector,
-        dim1::Int,
-        dim2::Int,
-        basis::AbstractRadialBasis = PHS(3; poly_deg = 2);
-        kw...,
-    )
-    return RadialBasisOperator(
-        MixedPartial(dim1, dim2), data; eval_points = eval_points, basis = basis, kw...
-    )
-end
-
-# Hermite backward compatibility (positional boundary arguments)
-function mixed_partial(
-        data::AbstractVector,
-        eval_points::AbstractVector,
-        dim1::Int,
-        dim2::Int,
-        basis::AbstractRadialBasis,
-        is_boundary::Vector{Bool},
-        boundary_conditions::Vector{<:BoundaryCondition},
-        normals::Vector{<:AbstractVector};
-        kw...,
-    )
-    hermite = (is_boundary = is_boundary, bc = boundary_conditions, normals = normals)
-    return RadialBasisOperator(
-        MixedPartial(dim1, dim2),
-        data;
-        eval_points = eval_points,
-        basis = basis,
-        hermite = hermite,
-        kw...,
-    )
-end
-
 # One-shot convenience
 """
     mixed_partial(data, dim1, dim2, x; basis=PHS(3; poly_deg=2), k, adjl)

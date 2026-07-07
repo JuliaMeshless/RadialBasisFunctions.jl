@@ -40,30 +40,6 @@ function gradient(data::AbstractVector{<:AbstractVector}, basis::AbstractRadialB
     return jacobian(data, basis; kw...)
 end
 
-function gradient(
-        data::AbstractVector{<:AbstractVector},
-        eval_points::AbstractVector{<:AbstractVector},
-        basis::AbstractRadialBasis = PHS(3; poly_deg = 2);
-        kw...,
-    )
-    return jacobian(data, eval_points, basis; kw...)
-end
-
-# Hermite backward compatibility
-function gradient(
-        data::AbstractVector{<:AbstractVector},
-        eval_points::AbstractVector{<:AbstractVector},
-        basis::AbstractRadialBasis,
-        is_boundary::Vector{Bool},
-        boundary_conditions::Vector{<:BoundaryCondition},
-        normals::Vector{<:AbstractVector};
-        kw...,
-    )
-    return jacobian(
-        data, eval_points, basis, is_boundary, boundary_conditions, normals; kw...
-    )
-end
-
 # One-shot convenience (delegate to jacobian's one-shot)
 """
     gradient(data, x; basis=PHS(3; poly_deg=2), k, adjl)

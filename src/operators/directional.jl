@@ -52,42 +52,6 @@ function directional(
     return RadialBasisOperator(Directional{Dim}(v), data; basis = basis, kw...)
 end
 
-function directional(
-        data::AbstractVector,
-        eval_points::AbstractVector,
-        v::AbstractVector,
-        basis::AbstractRadialBasis = PHS(3; poly_deg = 2);
-        kw...,
-    )
-    Dim = length(first(data))
-    return RadialBasisOperator(
-        Directional{Dim}(v), data; eval_points = eval_points, basis = basis, kw...
-    )
-end
-
-# Hermite backward compatibility (positional boundary arguments)
-function directional(
-        data::AbstractVector,
-        eval_points::AbstractVector,
-        v::AbstractVector,
-        basis::AbstractRadialBasis,
-        is_boundary::Vector{Bool},
-        boundary_conditions::Vector{<:BoundaryCondition},
-        normals::Vector{<:AbstractVector};
-        kw...,
-    )
-    Dim = length(first(data))
-    hermite = (is_boundary = is_boundary, bc = boundary_conditions, normals = normals)
-    return RadialBasisOperator(
-        Directional{Dim}(v),
-        data;
-        eval_points = eval_points,
-        basis = basis,
-        hermite = hermite,
-        kw...,
-    )
-end
-
 # ============================================================================
 # Custom weight-building logic for Directional operator
 # The directional derivative is computed by combining Jacobian weights with
