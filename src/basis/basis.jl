@@ -10,6 +10,13 @@ abstract type AbstractRadialBasis <: AbstractBasis end
 
 # Operator functor types - callable structs for RBF differential operators
 # These replace closures with proper multiple dispatch
+#
+# Two basis-differentiation protocols share the names ∂/∇/∂²/∇²/H/∂mixed (load-bearing,
+# do not unify): for AbstractRadialBasis they are the functor STRUCTS below, evaluated
+# as (x, xᵢ) -> scalar; for MonomialBasis they are factory FUNCTIONS returning an
+# ℒMonomialBasis that fills the differentiated monomial vector in place (see
+# operators/monomial/monomial.jl). Operator actions such as (op::Partial)(basis) are
+# written once and serve both.
 
 """
     ∂{B<:AbstractRadialBasis}

@@ -1,3 +1,15 @@
+"""
+    ℒMonomialBasis{Dim,Deg,F}
+
+A differentiated `MonomialBasis`: wraps an in-place evaluator `f(b, x)` that fills `b`
+with the operator applied to each monomial term at `x`.
+
+This is the monomial half of the package's two basis-differentiation protocols: for
+`MonomialBasis`, `∂`/`∇`/`∂²`/`∇²`/`H`/`∂mixed` are factory functions returning an
+`ℒMonomialBasis`, whereas for `AbstractRadialBasis` the same names are functor structs
+(see `src/basis/basis.jl`). Operator actions such as `(op::Partial)(basis)` are written
+once and serve both protocols.
+"""
 struct ℒMonomialBasis{Dim, Deg, F <: Function}
     f::F
     function ℒMonomialBasis(dim::T, deg::T, f) where {T <: Int}

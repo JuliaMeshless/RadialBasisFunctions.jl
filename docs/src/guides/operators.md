@@ -178,6 +178,17 @@ Available functor types (accessed via `RadialBasisFunctions.∂` etc.):
 
 These functors are the interface between operators and [Custom Operators](@ref "Custom Operators"). See that page for how to use them.
 
+### Two differentiation protocols
+
+The names `∂`, `∂²`, `∇`, `∇²`, `H`, and `∂mixed` deliberately serve **two protocols**, selected by the basis type:
+
+| Basis | What `∂(basis, dim)` returns | How it evaluates |
+|:---|:---|:---|
+| `AbstractRadialBasis` (PHS, IMQ, Gaussian) | A functor **struct** (`∂`, `∇²`, …, defined in `src/basis/basis.jl`) | `(x, xᵢ) -> scalar` |
+| `MonomialBasis` | A **factory function** result: `ℒMonomialBasis` (defined in `src/operators/monomial/monomial.jl`) | in-place `(b, x)` fill of the differentiated monomial vector |
+
+This dual identity is load-bearing: an operator action like `(op::Partial)(basis) = ∂(basis, op.order, op.dim)` is written once, and weight building applies it to the RBF basis for the collocation rows and to the `MonomialBasis` for the polynomial-augmentation rows — each returning the form the assembly kernels expect. When adding a basis or operator, implement both halves; do not try to unify them.
+
 ## Operator Algebra
 
 Built `RadialBasisOperator`s can be combined with `+` and `-`. This operates on precomputed weights and returns a new operator:
