@@ -107,8 +107,11 @@ export is_self_adjoint, derivative_order
 
 # Some consts and aliases
 const Δ = ∇² # some people like this notation for the Laplacian
-@inline avoid_inf(::Type{T}) where {T <: AbstractFloat} = T(1.0e-16)
-@inline avoid_inf(x::Real) = avoid_inf(typeof(float(x)))
+# max guards Float16, where T(1e-16) underflows to zero
+@inline avoid_inf(::Type{T}) where {T <: AbstractFloat} = max(T(1.0e-16), floatmin(T))
+@inline avoid_inf(x::AbstractFloat) = avoid_inf(typeof(x))
+# non-AbstractFloat Reals (e.g. ForwardDiff.Dual) get a promoted constant with zero partials
+@inline avoid_inf(x::Real) = oftype(float(x), 1.0e-16)
 
 using PrecompileTools
 @setup_workload begin
