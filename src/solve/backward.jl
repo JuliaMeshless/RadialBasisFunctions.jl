@@ -12,7 +12,7 @@ Key steps per stencil:
 5. Chain through collocation: accumulate to Δdata[neighbors]
 =#
 
-using LinearAlgebra: mul!
+using LinearAlgebra: ldiv!, mul!
 
 """
     backward_linear_solve!(ΔA, Δb, Δw, cache)
@@ -44,8 +44,8 @@ function backward_linear_solve!(
     Δλ[1:k, :] .= Δw
 
     # Solve adjoint system: A'η = Δλ
-    # The matrix is symmetric, so A' = A
-    η = cache.A_mat \ Δλ
+    # The matrix is symmetric, so A' = A; reuse the cached factorization (O(n²))
+    η = ldiv!(cache.A_fact, Δλ)
 
     # ΔA = -η * λᵀ (outer product, accumulated across operators)
     # Use BLAS mul! for O(n²) instead of scalar triple loop
