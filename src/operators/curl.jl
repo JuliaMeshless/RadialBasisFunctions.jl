@@ -21,33 +21,9 @@ end
 # ============================================================================
 
 # 2D curl: (N×2) → (N,)  =  ∂u₂/∂x₁ − ∂u₁/∂x₂
-function _eval_op(op::RadialBasisOperator{<:Curl{2}}, x::AbstractMatrix)
-    N_eval = length(op.eval_points)
-    T = promote_type(eltype(x), eltype(first(op.weights)))
-    out = similar(x, T, N_eval)
-    # out = ∂/∂x₁ * u₂
-    mul!(out, op.weights[1], view(x, :, 2))
-    # out -= ∂/∂x₂ * u₁
-    mul!(out, op.weights[2], view(x, :, 1), -one(T), one(T))
-    return out
-end
-
 # 3D curl: (N×3) → (N×3)
-function _eval_op(op::RadialBasisOperator{<:Curl{3}}, x::AbstractMatrix)
-    N_eval = length(op.eval_points)
-    T = promote_type(eltype(x), eltype(first(op.weights)))
-    out = similar(x, T, N_eval, 3)
-    # component 1: ∂u₃/∂x₂ − ∂u₂/∂x₃
-    mul!(view(out, :, 1), op.weights[2], view(x, :, 3))
-    mul!(view(out, :, 1), op.weights[3], view(x, :, 2), -one(T), one(T))
-    # component 2: ∂u₁/∂x₃ − ∂u₃/∂x₁
-    mul!(view(out, :, 2), op.weights[3], view(x, :, 1))
-    mul!(view(out, :, 2), op.weights[1], view(x, :, 3), -one(T), one(T))
-    # component 3: ∂u₂/∂x₁ − ∂u₁/∂x₂
-    mul!(view(out, :, 3), op.weights[1], view(x, :, 2))
-    mul!(view(out, :, 3), op.weights[2], view(x, :, 1), -one(T), one(T))
-    return out
-end
+_alloc_output(::Curl{2}, x, ::Type{T}, n) where {T} = similar(x, T, n)
+_alloc_output(::Curl{3}, x, ::Type{T}, n) where {T} = similar(x, T, n, 3)
 
 # In-place 2D
 function _eval_op(op::RadialBasisOperator{<:Curl{2}}, y::AbstractVector, x::AbstractMatrix)

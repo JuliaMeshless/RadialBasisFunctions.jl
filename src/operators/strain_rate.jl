@@ -13,30 +13,9 @@ struct StrainRate{Dim} <: AbstractGradientOperator{Dim, 0} end
 # Evaluation — vector field input only
 # ============================================================================
 
-function _eval_op(op::RadialBasisOperator{<:StrainRate}, x::AbstractMatrix)
-    D = length(op.weights)
-    N_eval = length(op.eval_points)
-    T = promote_type(eltype(x), eltype(first(op.weights)))
-    out = similar(x, T, N_eval, D, D)
-    half = T(0.5)
-    n_unique = _num_sym(D)
-    for k in 1:n_unique
-        i, j = _kth_sym_pair(k, D)
-        if i == j
-            # εᵢᵢ = ∂uᵢ/∂xᵢ
-            mul!(view(out, :, i, i), op.weights[i], view(x, :, i))
-        else
-            # εᵢⱼ = ½(∂uᵢ/∂xⱼ + ∂uⱼ/∂xᵢ)
-            mul!(view(out, :, i, j), op.weights[j], view(x, :, i))
-            mul!(view(out, :, i, j), op.weights[i], view(x, :, j), one(T), one(T))
-            view(out, :, i, j) .*= half
-            copyto!(view(out, :, j, i), view(out, :, i, j))
-        end
-    end
-    return out
-end
+_alloc_output(::StrainRate{Dim}, x, ::Type{T}, n) where {Dim, T} = similar(x, T, n, Dim, Dim)
 
-# In-place
+# In-place; εᵢᵢ = ∂uᵢ/∂xᵢ, εᵢⱼ = ½(∂uᵢ/∂xⱼ + ∂uⱼ/∂xᵢ)
 function _eval_op(
         op::RadialBasisOperator{<:StrainRate}, y::AbstractArray{<:Any, 3}, x::AbstractMatrix
     )
