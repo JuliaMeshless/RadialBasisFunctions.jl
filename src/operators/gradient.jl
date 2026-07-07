@@ -51,6 +51,8 @@ u = sin.(getindex.(points, 1))
 ∇u = gradient(points, u)  # One-shot gradient computation
 ```
 """
-gradient(data::AbstractVector{<:AbstractVector}, x; kw...) = jacobian(data, x; kw...)
+function gradient(data::AbstractVector{<:AbstractVector}, x::AbstractArray{<:Number}; kw...)
+    return jacobian(data, x; kw...)
+end
 
 # Note: No print_op needed - gradient returns a Jacobian operator, which has its own print_op

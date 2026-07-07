@@ -67,7 +67,7 @@ end
 
 One-shot convenience function that creates a Hessian operator and applies it to field `x`.
 """
-function hessian(data::AbstractVector{<:AbstractVector}, x; kw...)
+function hessian(data::AbstractVector{<:AbstractVector}, x::AbstractArray{<:Number}; kw...)
     op = hessian(data; kw...)
     return op(x)
 end
