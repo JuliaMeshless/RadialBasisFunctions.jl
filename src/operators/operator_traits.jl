@@ -53,6 +53,8 @@ eigenvalue problems.
 is_self_adjoint(::AbstractOperator) = false
 is_self_adjoint(::Laplacian) = true
 is_self_adjoint(::Identity) = true
+is_self_adjoint(s::ScaledOperator) = is_self_adjoint(s.op)
+is_self_adjoint(s::SumOperator) = all(is_self_adjoint, s.ops)
 
 """
     derivative_order(op) -> Union{Int, Missing}
@@ -70,4 +72,6 @@ derivative_order(::AbstractJacobianOperator) = 1
 derivative_order(::Hessian) = 2
 derivative_order(::Directional) = 1
 derivative_order(s::ScaledOperator) = derivative_order(s.op)
+# maximum propagates missing: max(x, missing) === missing
+derivative_order(s::SumOperator) = maximum(derivative_order, s.ops)
 derivative_order(::Custom) = missing
