@@ -22,6 +22,19 @@ abstract type AbstractOperator{N} end
 (op::AbstractOperator)(data::AbstractVector; kw...) = RadialBasisOperator(op, data; kw...)
 
 """
+    AbstractGradientOperator{Dim,N} <: AbstractOperator{N}
+
+Abstract supertype for operators whose action on a basis is the tuple of first
+partial derivatives `(∂₁, …, ∂_Dim)`: [`Jacobian`](@ref), `Divergence`, `Curl`,
+`StrainRate`, and `RotationRate`.
+"""
+abstract type AbstractGradientOperator{Dim, N} <: AbstractOperator{N} end
+
+function (op::AbstractGradientOperator{Dim, N})(basis::AbstractBasis) where {Dim, N}
+    return ntuple(dim -> ∂(basis, dim), Dim)
+end
+
+"""
     struct RadialBasisOperator
 
 Operator of data using a radial basis with potential monomial augmentation.
