@@ -83,7 +83,7 @@ include("operators/rotation_rate.jl")
 export RotationRate, rotation_rate
 
 include("operators/virtual.jl")
-export ∂virtual
+export VirtualPartial, ∂virtual
 
 include("operators/monomial/monomial.jl")
 
