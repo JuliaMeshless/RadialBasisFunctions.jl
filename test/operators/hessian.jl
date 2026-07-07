@@ -82,7 +82,7 @@ end
 
 @testset "Different evaluation points" begin
     eval_pts = SVector{2}.(HaltonPoint(2)[(N + 1):(N + 100)])
-    op = hessian(points, eval_pts, PHS(3; poly_deg = 4))
+    op = hessian(points; eval_points = eval_pts, basis = PHS(3; poly_deg = 4))
     Hu = op(u)
 
     @test size(Hu) == (100, 2, 2)
@@ -92,7 +92,7 @@ end
 
 @testset "Single eval point" begin
     eval_pt = [SVector{2}(0.5, 0.5)]
-    op = hessian(points, eval_pt, PHS(3; poly_deg = 4))
+    op = hessian(points; eval_points = eval_pt, basis = PHS(3; poly_deg = 4))
 
     @test op.weights[1] isa SparseVector
     @test length(op.weights) == 3
@@ -134,7 +134,7 @@ end
 
 @testset "Single eval point - Vector field" begin
     eval_pt = [SVector{2}(0.5, 0.5)]
-    op = hessian(points, eval_pt, PHS(3; poly_deg = 4))
+    op = hessian(points; eval_points = eval_pt, basis = PHS(3; poly_deg = 4))
     Hu = op(u_vec)
     @test Hu isa Array{<:Any, 3}
     @test size(Hu) == (2, 2, 2)
@@ -189,7 +189,7 @@ end
 
 @testset "Single eval point - Tensor field" begin
     eval_pt = [SVector{2}(0.5, 0.5)]
-    op = hessian(points, eval_pt, PHS(3; poly_deg = 4))
+    op = hessian(points; eval_points = eval_pt, basis = PHS(3; poly_deg = 4))
 
     @test op.weights[1] isa SparseVector
 

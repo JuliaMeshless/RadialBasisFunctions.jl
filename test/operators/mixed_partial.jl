@@ -51,7 +51,7 @@ end
 
 @testset "Different evaluation points" begin
     eval_pts = SVector{2}.(HaltonPoint(2)[(N + 1):(N + 100)])
-    ∂²xy = mixed_partial(x, eval_pts, 1, 2, PHS(3; poly_deg = 4))
+    ∂²xy = mixed_partial(x, 1, 2; eval_points = eval_pts, basis = PHS(3; poly_deg = 4))
     @test mean_percent_error(∂²xy(y), d2f_dxdy.(eval_pts)) < 10
 end
 

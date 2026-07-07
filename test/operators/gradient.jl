@@ -29,7 +29,7 @@ end
 
 @testset "Different Evaluation Points" begin
     x2 = map(x -> SVector{2}(rand(rng, 2)), 1:100)
-    ∇ = gradient(x, x2, PHS(3; poly_deg = 2))
+    ∇ = gradient(x; eval_points = x2, basis = PHS(3; poly_deg = 2))
     ∇y = ∇(y)
     @test ∇y isa Matrix
     @test size(∇y) == (100, 2)

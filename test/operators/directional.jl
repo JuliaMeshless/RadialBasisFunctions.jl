@@ -43,7 +43,7 @@ end
         v = SVector{2}(rand(rng, 2))
         return v /= norm(v)
     end
-    ∇v = directional(x, x2, v, PHS3(2))
+    ∇v = directional(x, v; eval_points = x2, basis = PHS3(2))
     exact = map((x, vv) -> SVector(df_dx(x), df_dy(x)) ⋅ vv, x2, v)
     @test mean_percent_error(∇v(y), exact) < 10
 end

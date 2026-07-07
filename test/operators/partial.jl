@@ -66,8 +66,8 @@ end
 
 @testset "Different Evaluation Points" begin
     x2 = map(x -> SVector{2}(rand(rng, 2)), 1:100)
-    ∂x = partial(x, x2, 1, 1, PHS(3; poly_deg = 2))
-    ∂y = partial(x, x2, 1, 2, PHS(3; poly_deg = 2))
+    ∂x = partial(x, 1, 1; eval_points = x2, basis = PHS(3; poly_deg = 2))
+    ∂y = partial(x, 1, 2; eval_points = x2, basis = PHS(3; poly_deg = 2))
     @test mean_percent_error(∂x(y), df_dx.(x2)) < 10
     @test mean_percent_error(∂y(y), df_dy.(x2)) < 10
 end

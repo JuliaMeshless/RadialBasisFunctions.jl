@@ -51,7 +51,11 @@ using SparseArrays
             data, is_boundary, bcs, normals = create_2d_domain()
 
             # Evaluate operator at data points
-            op = laplacian(data, data, basis_phs, is_boundary, bcs, normals)
+            op = laplacian(
+                data;
+                basis = basis_phs,
+                hermite = (is_boundary = is_boundary, bc = bcs, normals = normals),
+            )
 
             # u = x² + y² has Laplacian = 2 + 2 = 4 everywhere
             u = [x[1]^2 + x[2]^2 for x in data]
@@ -78,7 +82,11 @@ using SparseArrays
 
             # Use u = y² which has ∂u/∂n = 0 at both boundaries (since ∇u = (0, 2y) and normals are in x-direction)
             # Laplacian of y² is 2 everywhere
-            op = laplacian(data, data, basis_phs, is_boundary, bcs, normals)
+            op = laplacian(
+                data;
+                basis = basis_phs,
+                hermite = (is_boundary = is_boundary, bc = bcs, normals = normals),
+            )
             u = [x[2]^2 for x in data]
             result = op(u)
 
@@ -95,7 +103,11 @@ using SparseArrays
 
             # Use u = y² which has ∂u/∂n = 0 at second boundary
             # Laplacian of y² is 2 everywhere
-            op = laplacian(data, data, basis_phs, is_boundary, bcs, normals)
+            op = laplacian(
+                data;
+                basis = basis_phs,
+                hermite = (is_boundary = is_boundary, bc = bcs, normals = normals),
+            )
             u = [x[2]^2 for x in data]
             result = op(u)
 
@@ -113,7 +125,11 @@ using SparseArrays
             bcs = [RBF.Robin(1.0, 1.0), RBF.Robin(2.0, 3.0)]
             normals = [SVector(1.0, 0.0), SVector(-1.0, 0.0)]
 
-            op = laplacian(data, data, basis_phs, is_boundary, bcs, normals)
+            op = laplacian(
+                data;
+                basis = basis_phs,
+                hermite = (is_boundary = is_boundary, bc = bcs, normals = normals),
+            )
             u = [x[2]^2 for x in data]
             result = op(u)
 
@@ -125,7 +141,11 @@ using SparseArrays
         @testset "Gradient of Linear Function (Dirichlet BCs)" begin
             data, is_boundary, bcs, normals = create_2d_domain()
 
-            op = gradient(data, data, basis_phs, is_boundary, bcs, normals)
+            op = gradient(
+                data;
+                basis = basis_phs,
+                hermite = (is_boundary = is_boundary, bc = bcs, normals = normals),
+            )
 
             # u = 2x + 3y has gradient = (2, 3)
             u = [2.0 * x[1] + 3.0 * x[2] for x in data]
@@ -143,7 +163,11 @@ using SparseArrays
             normals = [SVector(1.0, 0.0), SVector(-1.0, 0.0)]
 
             # Use u = 3y which has gradient = (0, 3) and ∂u/∂n = 0 at both boundaries
-            op = gradient(data, data, basis_phs, is_boundary, bcs, normals)
+            op = gradient(
+                data;
+                basis = basis_phs,
+                hermite = (is_boundary = is_boundary, bc = bcs, normals = normals),
+            )
             u = [3.0 * x[2] for x in data]
             result = op(u)
 
@@ -157,7 +181,11 @@ using SparseArrays
             data, is_boundary, bcs, normals = create_2d_domain()
 
             # ∂/∂x operator
-            op = partial(data, data, 1, 1, basis_phs, is_boundary, bcs, normals)
+            op = partial(
+                data, 1, 1;
+                basis = basis_phs,
+                hermite = (is_boundary = is_boundary, bc = bcs, normals = normals),
+            )
 
             # u = 2x + 3y has ∂u/∂x = 2
             u = [2.0 * x[1] + 3.0 * x[2] for x in data]
@@ -172,7 +200,11 @@ using SparseArrays
             data, is_boundary, bcs, normals = create_2d_domain()
 
             # ∂/∂y operator
-            op = partial(data, data, 1, 2, basis_phs, is_boundary, bcs, normals)
+            op = partial(
+                data, 1, 2;
+                basis = basis_phs,
+                hermite = (is_boundary = is_boundary, bc = bcs, normals = normals),
+            )
 
             # u = 2x + 3y has ∂u/∂y = 3
             u = [2.0 * x[1] + 3.0 * x[2] for x in data]
@@ -188,7 +220,11 @@ using SparseArrays
 
             # Direction vector in x-direction
             v = SVector(1.0, 0.0)
-            op = directional(data, data, v, basis_phs, is_boundary, bcs, normals)
+            op = directional(
+                data, v;
+                basis = basis_phs,
+                hermite = (is_boundary = is_boundary, bc = bcs, normals = normals),
+            )
 
             # u = 2x + 3y has gradient = (2, 3), directional derivative in x-direction = 2
             u = [2.0 * x[1] + 3.0 * x[2] for x in data]
@@ -204,7 +240,11 @@ using SparseArrays
 
             # Per-point direction vectors (x-direction for all points)
             v = [SVector(1.0, 0.0) for _ in 1:length(data)]
-            op = directional(data, data, v, basis_phs, is_boundary, bcs, normals)
+            op = directional(
+                data, v;
+                basis = basis_phs,
+                hermite = (is_boundary = is_boundary, bc = bcs, normals = normals),
+            )
 
             # u = 2x + 3y has gradient = (2, 3), directional derivative in x-direction = 2
             u = [2.0 * x[1] + 3.0 * x[2] for x in data]
@@ -218,7 +258,11 @@ using SparseArrays
         @testset "Zero Function Gives Zero" begin
             data, is_boundary, bcs, normals = create_2d_domain()
 
-            lap_op = laplacian(data, data, basis_phs, is_boundary, bcs, normals)
+            lap_op = laplacian(
+                data;
+                basis = basis_phs,
+                hermite = (is_boundary = is_boundary, bc = bcs, normals = normals),
+            )
             u = zeros(length(data))
             result = lap_op(u)
 
@@ -236,7 +280,11 @@ using SparseArrays
             bcs = BoundaryCondition{Float64}[]  # Empty - properly typed
             normals = SVector{2, Float64}[]  # Empty
 
-            op = laplacian(data, data, basis_phs, is_boundary, bcs, normals)
+            op = laplacian(
+                data;
+                basis = basis_phs,
+                hermite = (is_boundary = is_boundary, bc = bcs, normals = normals),
+            )
             u = [x[1]^2 + x[2]^2 for x in data]
             result = op(u)
 
