@@ -1,5 +1,5 @@
 """
-    Curl{Dim} <: AbstractOperator{0}
+    Curl{Dim} <: AbstractGradientOperator{Dim,0}
 
 Operator for the curl of a vector field (∇×u).
 
@@ -9,15 +9,11 @@ Operator for the curl of a vector field (∇×u).
 Only defined for `Dim ∈ {2, 3}`. Weights are stored as `NTuple{Dim, SparseMatrixCSC}`,
 reusing the Jacobian weight-building infrastructure.
 """
-struct Curl{Dim} <: AbstractOperator{0}
+struct Curl{Dim} <: AbstractGradientOperator{Dim, 0}
     function Curl{Dim}() where {Dim}
         (Dim == 2 || Dim == 3) || throw(ArgumentError("Curl is only defined for 2D and 3D, got $(Dim)D"))
         return new{Dim}()
     end
-end
-
-function (::Curl{Dim})(basis::AbstractBasis) where {Dim}
-    return ntuple(dim -> ∂(basis, dim), Dim)
 end
 
 # ============================================================================

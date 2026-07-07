@@ -1,5 +1,5 @@
 """
-    Divergence{Dim} <: AbstractOperator{0}
+    Divergence{Dim} <: AbstractGradientOperator{Dim,0}
 
 Operator for the divergence of a vector field (∇⋅u = ∑ᵢ ∂uᵢ/∂xᵢ).
 
@@ -7,11 +7,7 @@ Takes a vector field (Matrix N×D) as input and produces a scalar field (Vector 
 Weights are stored as `NTuple{Dim, SparseMatrixCSC}`, one partial derivative matrix
 per spatial dimension, reusing the Jacobian weight-building infrastructure.
 """
-struct Divergence{Dim} <: AbstractOperator{0} end
-
-function (::Divergence{Dim})(basis::AbstractBasis) where {Dim}
-    return ntuple(dim -> ∂(basis, dim), Dim)
-end
+struct Divergence{Dim} <: AbstractGradientOperator{Dim, 0} end
 
 # ============================================================================
 # Evaluation — vector field input only

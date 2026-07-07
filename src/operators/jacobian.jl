@@ -1,5 +1,5 @@
 """
-    Jacobian{Dim} <: AbstractOperator{1}
+    Jacobian{Dim} <: AbstractGradientOperator{Dim,1}
 
 Operator type for computing Jacobians (and gradients as a special case).
 
@@ -16,11 +16,7 @@ Differentiation increases tensor rank by 1. The output gains a trailing dimensio
 - Matrix field `Array{T,3}` (N × D × D) → 3-tensor `Array{T,4}` (N_eval × D × D × D)
 - General: input shape `(N, dims...)` → output shape `(N_eval, dims..., D)`
 """
-struct Jacobian{Dim} <: AbstractOperator{1} end
-
-function (op::Jacobian{Dim})(basis::AbstractBasis) where {Dim}
-    return ntuple(dim -> ∂(basis, dim), Dim)
-end
+struct Jacobian{Dim} <: AbstractGradientOperator{Dim, 1} end
 
 # Primary interface using unified keyword constructor
 """

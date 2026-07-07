@@ -20,11 +20,10 @@ Whether the operator requires a vector field (matrix) as input rather than a sca
 Operators like [`Divergence`](@ref), [`Curl`](@ref), [`StrainRate`](@ref), and
 [`RotationRate`](@ref) act on vector fields and will error on scalar input.
 """
+const VectorFieldOperator = Union{Divergence, Curl, StrainRate, RotationRate}
+
 requires_vector_input(::AbstractOperator) = false
-requires_vector_input(::Divergence) = true
-requires_vector_input(::Curl) = true
-requires_vector_input(::StrainRate) = true
-requires_vector_input(::RotationRate) = true
+requires_vector_input(::VectorFieldOperator) = true
 
 """
     is_symmetric(op) -> Bool
@@ -67,12 +66,8 @@ derivative_order(::Regrid) = 0
 derivative_order(op::Partial) = op.order
 derivative_order(::MixedPartial) = 2
 derivative_order(::Laplacian) = 2
-derivative_order(::Jacobian) = 1
+derivative_order(::AbstractGradientOperator) = 1
 derivative_order(::Hessian) = 2
 derivative_order(::Directional) = 1
-derivative_order(::Divergence) = 1
-derivative_order(::Curl) = 1
-derivative_order(::StrainRate) = 1
-derivative_order(::RotationRate) = 1
 derivative_order(s::ScaledOperator) = derivative_order(s.op)
 derivative_order(::Custom) = missing
