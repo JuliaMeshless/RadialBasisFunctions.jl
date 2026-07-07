@@ -38,7 +38,7 @@ Mathematical derivation:
 function grad_partial_phs3_wrt_x(dim::Int)
     function grad_Lφ_x(x, xi)
         r = euclidean(x, xi)
-        r_safe = r + AVOID_INF
+        r_safe = r + avoid_inf(r)
         δ = x .- xi
         δ_d = δ[dim]
 
@@ -71,7 +71,7 @@ Mathematical derivation:
 function grad_laplacian_phs3_wrt_x()
     function grad_Lφ_x(x, xi)
         r = euclidean(x, xi)
-        r_safe = r + AVOID_INF
+        r_safe = r + avoid_inf(r)
         δ = x .- xi
         return 12 .* δ ./ r_safe
     end

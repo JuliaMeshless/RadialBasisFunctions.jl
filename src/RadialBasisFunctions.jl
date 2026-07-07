@@ -107,7 +107,8 @@ export is_self_adjoint, derivative_order
 
 # Some consts and aliases
 const Δ = ∇² # some people like this notation for the Laplacian
-const AVOID_INF = 1.0e-16
+@inline avoid_inf(::Type{T}) where {T <: AbstractFloat} = T(1.0e-16)
+@inline avoid_inf(x::Real) = avoid_inf(typeof(float(x)))
 
 using PrecompileTools
 @setup_workload begin
