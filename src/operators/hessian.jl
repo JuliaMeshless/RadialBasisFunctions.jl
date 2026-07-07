@@ -65,35 +65,6 @@ function hessian(data::AbstractVector{<:AbstractVector}, basis::AbstractRadialBa
     return RadialBasisOperator(Hessian{Dim}(), data; basis = basis, kw...)
 end
 
-function hessian(
-        data::AbstractVector{<:AbstractVector},
-        eval_points::AbstractVector{<:AbstractVector},
-        basis::AbstractRadialBasis = PHS(3; poly_deg = 2);
-        kw...,
-    )
-    Dim = length(first(data))
-    return RadialBasisOperator(
-        Hessian{Dim}(), data; eval_points = eval_points, basis = basis, kw...
-    )
-end
-
-# Hermite backward compatibility (positional boundary arguments)
-function hessian(
-        data::AbstractVector{<:AbstractVector},
-        eval_points::AbstractVector{<:AbstractVector},
-        basis::AbstractRadialBasis,
-        is_boundary::Vector{Bool},
-        boundary_conditions::Vector{<:BoundaryCondition},
-        normals::Vector{<:AbstractVector};
-        kw...,
-    )
-    Dim = length(first(data))
-    hermite = (is_boundary = is_boundary, bc = boundary_conditions, normals = normals)
-    return RadialBasisOperator(
-        Hessian{Dim}(), data; eval_points = eval_points, basis = basis, hermite = hermite, kw...
-    )
-end
-
 # One-shot convenience
 """
     hessian(data, x; basis=PHS(3; poly_deg=2), k, adjl)

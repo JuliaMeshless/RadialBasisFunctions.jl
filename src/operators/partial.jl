@@ -49,42 +49,6 @@ function partial(
     return RadialBasisOperator(Partial(order, dim), data; basis = basis, kw...)
 end
 
-function partial(
-        data::AbstractVector,
-        eval_points::AbstractVector,
-        order::Int,
-        dim::Int,
-        basis::AbstractRadialBasis = PHS(3; poly_deg = 2);
-        kw...,
-    )
-    return RadialBasisOperator(
-        Partial(order, dim), data; eval_points = eval_points, basis = basis, kw...
-    )
-end
-
-# Hermite backward compatibility (positional boundary arguments)
-function partial(
-        data::AbstractVector,
-        eval_points::AbstractVector,
-        order::Int,
-        dim::Int,
-        basis::AbstractRadialBasis,
-        is_boundary::Vector{Bool},
-        boundary_conditions::Vector{<:BoundaryCondition},
-        normals::Vector{<:AbstractVector};
-        kw...,
-    )
-    hermite = (is_boundary = is_boundary, bc = boundary_conditions, normals = normals)
-    return RadialBasisOperator(
-        Partial(order, dim),
-        data;
-        eval_points = eval_points,
-        basis = basis,
-        hermite = hermite,
-        kw...,
-    )
-end
-
 # Helper: dispatch to ∂ or ∂² based on order
 function ∂(basis::AbstractBasis, order::T, dim::T) where {T <: Int}
     if order == 1
