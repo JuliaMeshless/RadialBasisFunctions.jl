@@ -73,6 +73,7 @@ derivative_order(::Laplacian) = 2
 derivative_order(::AbstractJacobianOperator) = 1
 derivative_order(::Hessian) = 2
 derivative_order(::Directional) = 1
+derivative_order(::VirtualPartial) = 1
 derivative_order(s::ScaledOperator) = derivative_order(s.op)
 # maximum propagates missing: max(x, missing) === missing
 derivative_order(s::SumOperator) = maximum(derivative_order, s.ops)
