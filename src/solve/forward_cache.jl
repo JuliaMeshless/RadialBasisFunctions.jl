@@ -4,8 +4,12 @@ Forward pass with caching for backward pass of _build_weights differentiation ru
 This builds weights while storing intermediate results needed for the pullback.
 =#
 
-using LinearAlgebra: Symmetric, copytri!
+using LinearAlgebra: Symmetric, bunchkaufman!
 using SparseArrays: sparse
+
+# Rook pivoting matches the primal solve in `_solve_system!` (assembly.jl) so the
+# AD forward pass produces bitwise-identical weights.
+_stencil_factorization(A::AbstractMatrix) = bunchkaufman!(Symmetric(copy(A), :U), true)
 
 """
     _forward_with_cache(data, eval_points, adjl, basis, ℒrbf, ℒmon, mon, ℒType)
@@ -41,8 +45,9 @@ function _forward_with_cache(
     J = Vector{Int}(undef, nnz)
     V = Vector{TD}(undef, nnz)
 
-    # Allocate stencil caches
-    stencil_caches = Vector{StencilForwardCache{TD, Matrix{TD}}}(undef, N_eval)
+    # Allocate stencil caches (1×1 probe pins the concrete factorization type)
+    FT = typeof(_stencil_factorization(ones(TD, 1, 1)))
+    stencil_caches = Vector{StencilForwardCache{TD, Matrix{TD}, FT}}(undef, N_eval)
 
     # Pre-allocate workspace outside the loop
     A_full = zeros(TD, n, n)
@@ -67,8 +72,10 @@ function _forward_with_cache(
         b_vec = view(b, :, 1)
         _build_rhs!(b_vec, ℒrbf, ℒmon, local_data, eval_point, basis, mon, k)
 
-        # Solve (symmetric matrix, not positive definite due to zero block)
-        λ = Symmetric(A_full, :U) \ b
+        # Factorize once (symmetric indefinite due to zero block); the backward
+        # pass reuses the factorization for O(n²) adjoint solves
+        F = _stencil_factorization(A_full)
+        λ = F \ b
 
         # Store in COO format
         @inbounds for (local_idx, global_idx) in enumerate(neighbors)
@@ -78,10 +85,7 @@ function _forward_with_cache(
             pos += 1
         end
 
-        # Cache for backward pass - store full symmetric matrix
-        A_cached = copy(A_full)
-        copytri!(A_cached, 'U')
-        stencil_caches[eval_idx] = StencilForwardCache(copy(λ), A_cached, k, nmon)
+        stencil_caches[eval_idx] = StencilForwardCache(copy(λ), F, k, nmon)
     end
 
     # Construct sparse matrix
