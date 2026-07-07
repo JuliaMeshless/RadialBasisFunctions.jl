@@ -599,7 +599,12 @@ function LinearAlgebra.:⋅(
     return vec(sum(result; dims = 2))  # Sum across derivative dimension → Vector (N,)
 end
 
-# update weights
+"""
+    update_weights!(op::RadialBasisOperator)
+
+Rebuild the stencil weights of `op` from its current `data` and `eval_points`, then mark
+the weight cache as valid.
+"""
 function update_weights!(op::RadialBasisOperator)
     op.weights .= _build_weights(op.ℒ, op)
     validate_cache!(op)
