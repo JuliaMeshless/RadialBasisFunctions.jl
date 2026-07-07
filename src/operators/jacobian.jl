@@ -86,7 +86,7 @@ u = sin.(getindex.(points, 1))
 ∇u = jacobian(points, u)  # One-shot gradient computation
 ```
 """
-function jacobian(data::AbstractVector{<:AbstractVector}, x; kw...)
+function jacobian(data::AbstractVector{<:AbstractVector}, x::AbstractArray{<:Number}; kw...)
     op = jacobian(data; kw...)
     return op(x)
 end
