@@ -39,11 +39,12 @@ AbstractOperator{N}
 │   ├── Divergence       ∇⋅u (vector field → scalar)
 │   ├── Curl             ∇×u (vector field → scalar/vector)
 │   ├── Identity         f (function itself)
-│   ├── ScaledOperator   α * op
+│   ├── ScaledOperator   α * op (algebra result, any rank N)
+│   ├── SumOperator      op₁ + op₂ (algebra result, any rank N)
 │   ├── StrainRate       ½(∇u + (∇u)ᵀ)
 │   ├── RotationRate     ½(∇u − (∇u)ᵀ)
 │   ├── Regrid           interpolation to new points
-│   └── Custom{0}        user-defined / algebra result
+│   └── Custom{0}        user-defined
 ├── N=1 (rank-adding)
 │   ├── Jacobian          [∂fᵢ/∂xⱼ]
 │   └── Custom{1}         user-defined
