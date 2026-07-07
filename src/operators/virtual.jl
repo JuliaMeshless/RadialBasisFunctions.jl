@@ -19,6 +19,9 @@ operator is the partial derivative with respect to `dim`. Virtual operators inte
 data to structured points at a distance `Δ` for which standard finite difference formulas
 can be applied. The result is a standard [`RadialBasisOperator`](@ref), so weight caching
 and [`update_weights!`](@ref) come for free.
+
+Defaults to a forward difference (`backward=false`). Note the convenience form without
+`eval_points` instead defaults to a backward difference (`backward=true`).
 """
 function ∂virtual(
         data::AbstractVector,
@@ -42,6 +45,9 @@ where the operator is the partial derivative with respect to `dim`. Virtual oper
 interpolate the data to structured points at a distance `Δ` for which standard finite
 difference formulas can be applied. The result is a standard [`RadialBasisOperator`](@ref),
 so weight caching and [`update_weights!`](@ref) come for free.
+
+Defaults to a backward difference (`backward=true`), unlike the form with explicit
+`eval_points`, which defaults to forward (`backward=false`).
 """
 function ∂virtual(
         data::AbstractVector,
@@ -54,16 +60,19 @@ function ∂virtual(
     return ∂virtual(data, data, dim, Δ, basis; backward = backward, k = k)
 end
 
-# Custom _build_weights: difference of two Regrid weight builds. The shifted point set
-# finds its own neighbors so stencils follow the shifted evaluation points.
+# Custom _build_weights: difference of two Regrid weight builds. Both point sets find
+# their neighbors from the current data (adjl only supplies the stencil size) so that
+# rebuilds via update_weights! stay consistent after in-place data mutation.
 function _build_weights(ℒ::VirtualPartial, data, eval_points, adjl, basis; device = CPU())
     N = length(first(data))
     dx = zeros(eltype(first(data)), N)
     dx[ℒ.dim] = ℒ.Δ
 
-    self = _build_weights(Regrid(), data, eval_points, adjl, basis; device = device)
+    k = length(first(adjl))
+    self_adjl = find_neighbors(data, eval_points, k)
+    self = _build_weights(Regrid(), data, eval_points, self_adjl, basis; device = device)
     shifted = ℒ.backward ? eval_points .- Ref(dx) : eval_points .+ Ref(dx)
-    shifted_adjl = find_neighbors(data, shifted, length(first(adjl)))
+    shifted_adjl = find_neighbors(data, shifted, k)
     other = _build_weights(Regrid(), data, shifted, shifted_adjl, basis; device = device)
 
     return if ℒ.backward

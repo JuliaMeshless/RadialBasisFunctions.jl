@@ -77,3 +77,15 @@ end
         @test isapprox(∂x_forward(y), ∂x_backward(y); rtol = 100 * Δ)
     end
 end
+
+@testset "update_weights! after in-place data mutation" begin
+    xm = map(_ -> SVector{2}(rand(rng, 2)), 1:500)
+    xe = map(_ -> SVector{2}(0.1 .+ 0.8 .* rand(rng, 2)), 1:100)
+    op = ∂virtual(xm, xe, 1, Δ, PHS(3; poly_deg = 2))
+    for i in eachindex(xm)
+        xm[i] = xm[i] + SVector{2}(0.05 .* (rand(rng, 2) .- 0.5))
+    end
+    update_weights!(op)
+    fresh = ∂virtual(xm, xe, 1, Δ, PHS(3; poly_deg = 2))
+    @test op.weights == fresh.weights
+end
