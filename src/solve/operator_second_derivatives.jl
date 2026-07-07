@@ -18,41 +18,41 @@ All `_wrt_xi` functions are the negation of their `_wrt_x` counterparts by symme
 negate_grad(grad_fn) = (x, xi) -> -grad_fn(x, xi)
 
 # ============================================================================
-# PHS3: φ(r) = r³
-# First derivative: ∂φ/∂x[dim] = 3 * (x[dim] - xi[dim]) * r
+# ∂/∂x[j] of [∂φ/∂x[dim]]: row `dim` of the basis Hessian functor H(basis)
 # ============================================================================
 
 """
-    grad_partial_phs3_wrt_x(dim)
+    _hessian_row(basis, x, xᵢ, dim)
 
-Returns a function computing ∂/∂x[j] of [∂φ/∂x[dim]] for PHS3.
-
-Mathematical derivation:
-  ∂φ/∂x[dim] = 3 * δ_d * r  where δ_d = x[dim] - xi[dim], r = ||x - xi||
-
-  ∂²φ/∂x[j]∂x[dim] = 3 * (δ_{j,dim} * r + δ_d * δ_j / r)
-
-  For j == dim: 3 * (r + δ_d² / r)
-  For j != dim: 3 * δ_d * δ_j / r
+Compute ∂/∂x[j] of [∂φ/∂x[dim]] as an `SVector`: row `dim` of the Hessian
+of `φ(x, xᵢ)` w.r.t. `x`, extracted from the basis Hessian functor `H(basis)`.
 """
-function grad_partial_phs3_wrt_x(dim::Int)
-    function grad_Lφ_x(x, xi)
-        r = euclidean(x, xi)
-        r_safe = r + avoid_inf(r)
-        δ = x .- xi
-        δ_d = δ[dim]
+function _hessian_row(
+        basis::AbstractRadialBasis, x::StaticArraysCore.StaticVector{N, T}, xᵢ, dim::Int
+    ) where {N, T}
+    Hφ = H(basis)(x, xᵢ)
+    return StaticArraysCore.SVector{N, T}(ntuple(j -> Hφ[dim, j], Val(N)))
+end
 
-        result = similar(x, eltype(x))
-        @inbounds for j in eachindex(x)
-            if j == dim
-                result[j] = 3 * (r + δ_d^2 / r_safe)
-            else
-                result[j] = 3 * δ_d * δ[j] / r_safe
-            end
-        end
-        return result
-    end
-    return grad_Lφ_x
+"""
+    _hessian_row(::PHS1, x, xᵢ, dim)
+
+PHS1 needs exact handling: at r = 0 the derivatives of φ vanish so the gradient
+contribution is 0, but the raw `H{PHS1}` functor regularizes with `avoid_inf`
+(≈1e16 diagonals at r = 0, and an inexact r³ + 1e-16 denominator that distorts
+rows for r ≲ 1e-5), so the row is computed directly.
+"""
+function _hessian_row(
+        ::PHS1, x::StaticArraysCore.StaticVector{N, T}, xᵢ, dim::Int
+    ) where {N, T}
+    r = euclidean(x, xᵢ)
+    r < oftype(r, 1.0e-12) && return zero(StaticArraysCore.SVector{N, T})
+    δ = x .- xᵢ
+    δ_d = δ[dim]
+    r3 = r^3
+    return StaticArraysCore.SVector{N, T}(
+        ntuple(j -> j == dim ? 1 / r - δ_d^2 / r3 : -δ_d * δ[j] / r3, Val(N))
+    )
 end
 
 # ============================================================================
@@ -80,46 +80,7 @@ end
 
 # ============================================================================
 # PHS1: φ(r) = r
-# First derivative: ∂φ/∂x[dim] = (x[dim] - xi[dim]) / r
 # ============================================================================
-
-"""
-    grad_partial_phs1_wrt_x(dim)
-
-Returns a function computing ∂/∂x[j] of [∂φ/∂x[dim]] for PHS1.
-
-Mathematical derivation:
-  ∂φ/∂x[dim] = δ_d / r
-
-  ∂²φ/∂x[j]∂x[dim] = (δ_{j,dim} * r - δ_d * δ_j / r) / r²
-                   = δ_{j,dim} / r - δ_d * δ_j / r³
-
-Note: At r=0, the derivative is singular but we return 0 since the RBF value
-itself is 0 at r=0, so this term doesn't contribute to the gradient.
-"""
-function grad_partial_phs1_wrt_x(dim::Int)
-    function grad_Lφ_x(x, xi)
-        r = euclidean(x, xi)
-        # At r=0, PHS1 and its derivatives are 0, so gradient contribution is 0
-        if r < oftype(r, 1.0e-12)
-            return zero(x)
-        end
-        δ = x .- xi
-        δ_d = δ[dim]
-        r3 = r^3
-
-        result = similar(x, eltype(x))
-        @inbounds for j in eachindex(x)
-            if j == dim
-                result[j] = 1 / r - δ_d^2 / r3
-            else
-                result[j] = -δ_d * δ[j] / r3
-            end
-        end
-        return result
-    end
-    return grad_Lφ_x
-end
 
 """
     grad_laplacian_phs1_wrt_x()
@@ -148,39 +109,7 @@ end
 
 # ============================================================================
 # PHS5: φ(r) = r⁵
-# First derivative: ∂φ/∂x[dim] = 5 * (x[dim] - xi[dim]) * r³
 # ============================================================================
-
-"""
-    grad_partial_phs5_wrt_x(dim)
-
-Returns a function computing ∂/∂x[j] of [∂φ/∂x[dim]] for PHS5.
-
-Mathematical derivation:
-  ∂φ/∂x[dim] = 5 * δ_d * r³
-
-  ∂²φ/∂x[j]∂x[dim] = 5 * (δ_{j,dim} * r³ + δ_d * 3r * δ_j)
-                   = 5 * (δ_{j,dim} * r³ + 3 * δ_d * δ_j * r)
-"""
-function grad_partial_phs5_wrt_x(dim::Int)
-    function grad_Lφ_x(x, xi)
-        r = euclidean(x, xi)
-        r3 = r^3
-        δ = x .- xi
-        δ_d = δ[dim]
-
-        result = similar(x, eltype(x))
-        @inbounds for j in eachindex(x)
-            if j == dim
-                result[j] = 5 * (r3 + 3 * δ_d^2 * r)
-            else
-                result[j] = 5 * 3 * δ_d * δ[j] * r
-            end
-        end
-        return result
-    end
-    return grad_Lφ_x
-end
 
 """
     grad_laplacian_phs5_wrt_x()
@@ -202,39 +131,7 @@ end
 
 # ============================================================================
 # PHS7: φ(r) = r⁷
-# First derivative: ∂φ/∂x[dim] = 7 * (x[dim] - xi[dim]) * r⁵
 # ============================================================================
-
-"""
-    grad_partial_phs7_wrt_x(dim)
-
-Returns a function computing ∂/∂x[j] of [∂φ/∂x[dim]] for PHS7.
-
-Mathematical derivation:
-  ∂φ/∂x[dim] = 7 * δ_d * r⁵
-
-  ∂²φ/∂x[j]∂x[dim] = 7 * (δ_{j,dim} * r⁵ + δ_d * 5r³ * δ_j)
-"""
-function grad_partial_phs7_wrt_x(dim::Int)
-    function grad_Lφ_x(x, xi)
-        r = euclidean(x, xi)
-        r5 = r^5
-        r3 = r^3
-        δ = x .- xi
-        δ_d = δ[dim]
-
-        result = similar(x, eltype(x))
-        @inbounds for j in eachindex(x)
-            if j == dim
-                result[j] = 7 * (r5 + 5 * δ_d^2 * r3)
-            else
-                result[j] = 7 * 5 * δ_d * δ[j] * r3
-            end
-        end
-        return result
-    end
-    return grad_Lφ_x
-end
 
 """
     grad_laplacian_phs7_wrt_x()
@@ -251,51 +148,6 @@ function grad_laplacian_phs7_wrt_x()
         r3 = r^3
         δ = x .- xi
         return 280 .* r3 .* δ
-    end
-    return grad_Lφ_x
-end
-
-# ============================================================================
-# IMQ: φ(r) = 1/√(1 + (εr)²)
-# Let s = ε²r² + 1, then φ = 1/√s = s^(-1/2)
-# First derivative: ∂φ/∂x[dim] = -ε² * δ_d / s^(3/2)
-# ============================================================================
-
-"""
-    grad_partial_imq_wrt_x(ε, dim)
-
-Returns a function computing ∂/∂x[j] of [∂φ/∂x[dim]] for IMQ.
-
-Mathematical derivation:
-  Let s = ε²r² + 1, δ_d = x[dim] - xi[dim]
-  ∂φ/∂x[dim] = -ε² * δ_d / s^(3/2)
-
-  ∂²φ/∂x[j]∂x[dim] = -ε² * [δ_{j,dim} / s^(3/2) - δ_d * (3/2) * s^(-5/2) * 2ε² * δ_j]
-                   = -ε² * δ_{j,dim} / s^(3/2) + 3ε⁴ * δ_d * δ_j / s^(5/2)
-
-  For j == dim: -ε² / s^(3/2) + 3ε⁴ * δ_d² / s^(5/2)
-  For j != dim: 3ε⁴ * δ_d * δ_j / s^(5/2)
-"""
-function grad_partial_imq_wrt_x(ε::T, dim::Int) where {T}
-    ε2 = ε^2
-    ε4 = ε^4
-    function grad_Lφ_x(x, xi)
-        r2 = sqeuclidean(x, xi)
-        s = ε2 * r2 + 1
-        s32 = sqrt(s^3)
-        s52 = sqrt(s^5)
-        δ = x .- xi
-        δ_d = δ[dim]
-
-        result = similar(x, eltype(x))
-        @inbounds for j in eachindex(x)
-            if j == dim
-                result[j] = -ε2 / s32 + 3 * ε4 * δ_d^2 / s52
-            else
-                result[j] = 3 * ε4 * δ_d * δ[j] / s52
-            end
-        end
-        return result
     end
     return grad_Lφ_x
 end
@@ -328,47 +180,6 @@ function grad_laplacian_imq_wrt_x(ε::T) where {T}
         δ = x .- xi
         coeff = 3 * (D + 2) * ε4 / s52 - 15 * ε6 * r2 / s72
         return coeff .* δ
-    end
-    return grad_Lφ_x
-end
-
-# ============================================================================
-# Gaussian: φ(r) = exp(-(εr)²)
-# First derivative: ∂φ/∂x[dim] = -2ε² * δ_d * φ
-# ============================================================================
-
-"""
-    grad_partial_gaussian_wrt_x(ε, dim)
-
-Returns a function computing ∂/∂x[j] of [∂φ/∂x[dim]] for Gaussian.
-
-Mathematical derivation:
-  φ = exp(-ε²r²)
-  ∂φ/∂x[dim] = -2ε² * δ_d * φ
-
-  ∂²φ/∂x[j]∂x[dim] = φ * [-2ε² * δ_{j,dim} + 4ε⁴ * δ_d * δ_j]
-
-  For j == dim: φ * (4ε⁴ * δ_d² - 2ε²)
-  For j != dim: φ * 4ε⁴ * δ_d * δ_j
-"""
-function grad_partial_gaussian_wrt_x(ε::T, dim::Int) where {T}
-    ε2 = ε^2
-    ε4 = ε^4
-    function grad_Lφ_x(x, xi)
-        r2 = sqeuclidean(x, xi)
-        φ = exp(-ε2 * r2)
-        δ = x .- xi
-        δ_d = δ[dim]
-
-        result = similar(x, eltype(x))
-        @inbounds for j in eachindex(x)
-            if j == dim
-                result[j] = φ * (4 * ε4 * δ_d^2 - 2 * ε2)
-            else
-                result[j] = φ * 4 * ε4 * δ_d * δ[j]
-            end
-        end
-        return result
     end
     return grad_Lφ_x
 end
@@ -411,12 +222,8 @@ end
 
 Get gradient of applied partial derivative operator w.r.t. evaluation point.
 """
-grad_applied_partial_wrt_x(::PHS1, dim::Int) = grad_partial_phs1_wrt_x(dim)
-grad_applied_partial_wrt_x(::PHS3, dim::Int) = grad_partial_phs3_wrt_x(dim)
-grad_applied_partial_wrt_x(::PHS5, dim::Int) = grad_partial_phs5_wrt_x(dim)
-grad_applied_partial_wrt_x(::PHS7, dim::Int) = grad_partial_phs7_wrt_x(dim)
-grad_applied_partial_wrt_x(basis::IMQ, dim::Int) = grad_partial_imq_wrt_x(basis.ε, dim)
-grad_applied_partial_wrt_x(basis::Gaussian, dim::Int) = grad_partial_gaussian_wrt_x(basis.ε, dim)
+grad_applied_partial_wrt_x(basis::AbstractRadialBasis, dim::Int) =
+    (x, xi) -> _hessian_row(basis, x, xi, dim)
 
 """
     grad_applied_partial_wrt_xi(basis, dim)
