@@ -53,26 +53,26 @@ end
 # ∂ - first partial derivative
 function (op::∂{<:PHS1})(x, xᵢ)
     r = euclidean(x, xᵢ)
-    return (x[op.dim] - xᵢ[op.dim]) / (r + AVOID_INF)
+    return (x[op.dim] - xᵢ[op.dim]) / (r + avoid_inf(r))
 end
 
 function (op::∂{<:PHS1})(x, xᵢ, normal)
     r = euclidean(x, xᵢ)
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -normal[op.dim] / (r + AVOID_INF) +
-        dot_normal * (x[op.dim] - xᵢ[op.dim]) / (r^3 + AVOID_INF)
+    return -normal[op.dim] / (r + avoid_inf(r)) +
+        dot_normal * (x[op.dim] - xᵢ[op.dim]) / (r^3 + avoid_inf(r))
 end
 
 # ∇ - gradient
 function (op::∇{<:PHS1})(x, xᵢ)
     r = euclidean(x, xᵢ)
-    return (x .- xᵢ) / (r + AVOID_INF)
+    return (x .- xᵢ) / (r + avoid_inf(r))
 end
 
 function (op::∇{<:PHS1})(x, xᵢ, normal)
     r = euclidean(x, xᵢ)
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -normal / (r + AVOID_INF) + dot_normal * (x .- xᵢ) / (r^3 + AVOID_INF)
+    return -normal / (r + avoid_inf(r)) + dot_normal * (x .- xᵢ) / (r^3 + avoid_inf(r))
 end
 
 # H - Hessian matrix
@@ -85,7 +85,7 @@ function (op::H{<:PHS1})(x, xᵢ)
     return StaticArraysCore.SMatrix{N, N, T}(
         ntuple(N * N) do k
             i, j = divrem(k - 1, N) .+ 1
-            T(i == j) / (r + AVOID_INF) - Δ[i] * Δ[j] / (r^3 + AVOID_INF)
+            T(i == j) / (r + avoid_inf(r)) - Δ[i] * Δ[j] / (r^3 + avoid_inf(r))
         end,
     )
 end
@@ -94,7 +94,7 @@ end
 function (op::∂²{<:PHS1})(x, xᵢ)
     r = euclidean(x, xᵢ)
     r² = sqeuclidean(x, xᵢ)
-    return (-(x[op.dim] - xᵢ[op.dim])^2 + r²) / (r^3 + AVOID_INF)
+    return (-(x[op.dim] - xᵢ[op.dim])^2 + r²) / (r^3 + avoid_inf(r))
 end
 
 function (op::∂²{<:PHS1})(x, xᵢ, normal)
@@ -102,20 +102,20 @@ function (op::∂²{<:PHS1})(x, xᵢ, normal)
     n_d = normal[op.dim]
     Δ_d = x[op.dim] - xᵢ[op.dim]
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return (2 * n_d * Δ_d + dot_normal) / (r^3 + AVOID_INF) -
-        3 * Δ_d^2 * dot_normal / (r^5 + AVOID_INF)
+    return (2 * n_d * Δ_d + dot_normal) / (r^3 + avoid_inf(r)) -
+        3 * Δ_d^2 * dot_normal / (r^5 + avoid_inf(r))
 end
 
 # ∇² - Laplacian
 function (op::∇²{<:PHS1})(x, xᵢ)
     r = euclidean(x, xᵢ)
-    return 2 / (r + AVOID_INF)
+    return 2 / (r + avoid_inf(r))
 end
 
 function (op::∇²{<:PHS1})(x, xᵢ, normal)
     r = euclidean(x, xᵢ)
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return 2 * dot_normal / (r^3 + AVOID_INF)
+    return 2 * dot_normal / (r^3 + avoid_inf(r))
 end #==============================================================================# #==============================================================================#
 
 #                                    PHS3                                      #
@@ -146,7 +146,7 @@ function (op::∂{<:PHS3})(x, xᵢ, normal)
     n_d = normal[op.dim]
     Δ_d = x[op.dim] - xᵢ[op.dim]
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -3 * (n_d * r + dot_normal * Δ_d / (r + AVOID_INF))
+    return -3 * (n_d * r + dot_normal * Δ_d / (r + avoid_inf(r)))
 end
 
 # ∇ - gradient
@@ -158,7 +158,7 @@ end
 function (op::∇{<:PHS3})(x, xᵢ, normal)
     r = euclidean(x, xᵢ)
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -3 * (normal * r + dot_normal * (x .- xᵢ) / (r + AVOID_INF))
+    return -3 * (normal * r + dot_normal * (x .- xᵢ) / (r + avoid_inf(r)))
 end
 
 # H - Hessian matrix
@@ -171,7 +171,7 @@ function (op::H{<:PHS3})(x, xᵢ)
     return StaticArraysCore.SMatrix{N, N, T}(
         ntuple(N * N) do k
             i, j = divrem(k - 1, N) .+ 1
-            3 * (T(i == j) * r + Δ[i] * Δ[j] / (r + AVOID_INF))
+            3 * (T(i == j) * r + Δ[i] * Δ[j] / (r + avoid_inf(r)))
         end,
     )
 end
@@ -179,7 +179,7 @@ end
 # ∂² - second partial derivative
 function (op::∂²{<:PHS3})(x, xᵢ)
     r = euclidean(x, xᵢ)
-    return 3 * (r + (x[op.dim] - xᵢ[op.dim])^2 / (r + AVOID_INF))
+    return 3 * (r + (x[op.dim] - xᵢ[op.dim])^2 / (r + avoid_inf(r)))
 end
 
 function (op::∂²{<:PHS3})(x, xᵢ, normal)
@@ -188,8 +188,8 @@ function (op::∂²{<:PHS3})(x, xᵢ, normal)
     n_d = normal[op.dim]
     Δ_d = x[op.dim] - xᵢ[op.dim]
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -3 * (2 * Δ_d * n_d + dot_normal - dot_normal * Δ_d^2 / (r² + AVOID_INF)) /
-        (r + AVOID_INF)
+    return -3 * (2 * Δ_d * n_d + dot_normal - dot_normal * Δ_d^2 / (r² + avoid_inf(r))) /
+        (r + avoid_inf(r))
 end
 
 # ∇² - Laplacian
@@ -201,7 +201,7 @@ end
 function (op::∇²{<:PHS3})(x, xᵢ, normal)
     r = euclidean(x, xᵢ)
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -12 * dot_normal / (r + AVOID_INF)
+    return -12 * dot_normal / (r + avoid_inf(r))
 end #==============================================================================# #==============================================================================#
 
 #                                    PHS5                                      #
@@ -274,7 +274,7 @@ function (op::∂²{<:PHS5})(x, xᵢ, normal)
     n_d = normal[op.dim]
     Δ_d = x[op.dim] - xᵢ[op.dim]
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -5 * (6 * n_d * Δ_d * r + 3 * dot_normal * (r + Δ_d^2 / (r + AVOID_INF)))
+    return -5 * (6 * n_d * Δ_d * r + 3 * dot_normal * (r + Δ_d^2 / (r + avoid_inf(r))))
 end
 
 # ∇² - Laplacian
