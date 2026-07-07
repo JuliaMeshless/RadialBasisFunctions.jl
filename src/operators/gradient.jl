@@ -14,11 +14,7 @@ is mathematically the Jacobian (a 1×D row vector, returned as a length-D vector
 - `data`: Vector of points (e.g., `Vector{SVector{2,Float64}}`)
 
 # Keyword Arguments
-- `basis`: RBF basis function (default: `PHS(3; poly_deg=2)`)
-- `eval_points`: Evaluation points (default: `data`)
-- `k`: Stencil size (default: `autoselect_k(data, basis)`)
-- `adjl`: Adjacency list (default: computed via `find_neighbors`)
-- `hermite`: Optional NamedTuple for Hermite interpolation
+$(KWARG_DOCS)
 
 # Examples
 ```julia

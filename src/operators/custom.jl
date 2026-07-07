@@ -40,11 +40,7 @@ Build a `RadialBasisOperator` with a custom operator.
 - `rank::Int`: Tensor rank added to the output (0 = rank-preserving, 1 = rank+1).
   Auto-inferred when omitted: from the type parameter for `AbstractOperator`, or by
   probing the closure for `Function` (tuple return → rank 1, scalar → rank 0).
-- `basis`: RBF basis (default: `PHS(3; poly_deg=2)`)
-- `eval_points`: Evaluation points (default: `data`)
-- `k`: Stencil size (default: `autoselect_k(data, basis)`)
-- `adjl`: Adjacency list (default: computed via `find_neighbors`)
-- `hermite`: Optional NamedTuple for Hermite interpolation
+$(KWARG_DOCS)
 
 # Examples
 ```julia

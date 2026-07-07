@@ -11,11 +11,7 @@ convenience wrapper around [`directional`](@ref).
 - `normals`: Normal vectors at each point (will be normalized)
 
 # Keyword Arguments
-- `basis`: RBF basis (default: `PHS(3; poly_deg=2)`)
-- `eval_points`: Evaluation points (default: `data`)
-- `k`: Stencil size (default: `autoselect_k(data, basis)`)
-- `adjl`: Adjacency list (default: computed via `find_neighbors`)
-- `hermite`: Optional NamedTuple for Hermite interpolation
+$(KWARG_DOCS)
 
 # Examples
 ```julia

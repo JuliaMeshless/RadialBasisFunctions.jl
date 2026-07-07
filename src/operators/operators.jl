@@ -34,6 +34,14 @@ function (op::AbstractGradientOperator{Dim, N})(basis::AbstractBasis) where {Dim
     return ntuple(dim -> ∂(basis, dim), Dim)
 end
 
+# Shared keyword-arguments docstring block for operator constructors
+const KWARG_DOCS = """
+- `basis`: RBF basis (default: `PHS(3; poly_deg=2)`)
+- `eval_points`: Evaluation points (default: `data`)
+- `k`: Stencil size (default: `autoselect_k(data, basis)`)
+- `adjl`: Adjacency list (default: computed via `find_neighbors`)
+- `hermite`: Optional NamedTuple for Hermite interpolation"""
+
 """
     struct RadialBasisOperator
 
@@ -78,15 +86,11 @@ Unified constructor with keyword arguments.
 - `data`: Vector of data points
 
 # Keyword Arguments
-- `eval_points`: Evaluation points (default: `data`)
-- `basis`: RBF basis (default: `PHS(3; poly_deg=2)`)
-- `k`: Stencil size (default: `autoselect_k(data, basis)`)
-- `adjl`: Adjacency list (default: computed via `find_neighbors`)
-- `hermite`: Optional NamedTuple for Hermite interpolation with fields:
-  - `is_boundary::Vector{Bool}`
-  - `bc::Vector{<:BoundaryCondition}`
-  - `normals::Vector{<:AbstractVector}`
+$(KWARG_DOCS)
 - `device`: KernelAbstractions backend for weight computation (default: auto-detected from `data` via `get_backend`)
+
+The `hermite` NamedTuple has fields `is_boundary::Vector{Bool}`,
+`bc::Vector{<:BoundaryCondition}`, and `normals::Vector{<:AbstractVector}`.
 
 # Examples
 ```julia
