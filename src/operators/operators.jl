@@ -22,15 +22,15 @@ abstract type AbstractOperator{N} end
 (op::AbstractOperator)(data::AbstractVector; kw...) = RadialBasisOperator(op, data; kw...)
 
 """
-    AbstractGradientOperator{Dim,N} <: AbstractOperator{N}
+    AbstractJacobianOperator{Dim,N} <: AbstractOperator{N}
 
 Abstract supertype for operators whose action on a basis is the tuple of first
 partial derivatives `(∂₁, …, ∂_Dim)`: [`Jacobian`](@ref), `Divergence`, `Curl`,
 `StrainRate`, and `RotationRate`.
 """
-abstract type AbstractGradientOperator{Dim, N} <: AbstractOperator{N} end
+abstract type AbstractJacobianOperator{Dim, N} <: AbstractOperator{N} end
 
-function (op::AbstractGradientOperator{Dim, N})(basis::AbstractBasis) where {Dim, N}
+function (op::AbstractJacobianOperator{Dim, N})(basis::AbstractBasis) where {Dim, N}
     return ntuple(dim -> ∂(basis, dim), Dim)
 end
 
@@ -255,7 +255,7 @@ _eval_op(op::RadialBasisOperator, y, x) = mul!(y, op.weights, x)
 # StrainRate, RotationRate): allocate via per-operator _alloc_output, then
 # delegate to the in-place method
 function _eval_op(
-        op::RadialBasisOperator{<:AbstractGradientOperator{<:Any, 0}}, x::AbstractMatrix
+        op::RadialBasisOperator{<:AbstractJacobianOperator{<:Any, 0}}, x::AbstractMatrix
     )
     T = promote_type(eltype(x), eltype(first(op.weights)))
     return _eval_op(op, _alloc_output(op.ℒ, x, T, length(op.eval_points)), x)

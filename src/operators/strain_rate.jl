@@ -1,5 +1,5 @@
 """
-    StrainRate{Dim} <: AbstractGradientOperator{Dim,0}
+    StrainRate{Dim} <: AbstractJacobianOperator{Dim,0}
 
 Operator for the symmetric strain rate tensor εᵢⱼ = ½(∂uᵢ/∂xⱼ + ∂uⱼ/∂xᵢ).
 
@@ -7,7 +7,7 @@ Takes a vector field (Matrix N×D) as input and produces a symmetric tensor
 (Array N_eval×D×D). Weights are stored as `NTuple{Dim, SparseMatrixCSC}`,
 reusing the Jacobian weight-building infrastructure.
 """
-struct StrainRate{Dim} <: AbstractGradientOperator{Dim, 0} end
+struct StrainRate{Dim} <: AbstractJacobianOperator{Dim, 0} end
 
 # ============================================================================
 # Evaluation — vector field input only

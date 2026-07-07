@@ -1,5 +1,5 @@
 """
-    RotationRate{Dim} <: AbstractGradientOperator{Dim,0}
+    RotationRate{Dim} <: AbstractJacobianOperator{Dim,0}
 
 Operator for the anti-symmetric rotation rate tensor ωᵢⱼ = ½(∂uᵢ/∂xⱼ − ∂uⱼ/∂xᵢ).
 
@@ -7,7 +7,7 @@ Takes a vector field (Matrix N×D) as input and produces an anti-symmetric tenso
 (Array N_eval×D×D). Diagonal entries are zero. Weights are stored as
 `NTuple{Dim, SparseMatrixCSC}`, reusing the Jacobian weight-building infrastructure.
 """
-struct RotationRate{Dim} <: AbstractGradientOperator{Dim, 0} end
+struct RotationRate{Dim} <: AbstractJacobianOperator{Dim, 0} end
 
 # ============================================================================
 # Evaluation — vector field input only
