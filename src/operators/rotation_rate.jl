@@ -13,24 +13,9 @@ struct RotationRate{Dim} <: AbstractGradientOperator{Dim, 0} end
 # Evaluation — vector field input only
 # ============================================================================
 
-function _eval_op(op::RadialBasisOperator{<:RotationRate}, x::AbstractMatrix)
-    D = length(op.weights)
-    N_eval = length(op.eval_points)
-    T = promote_type(eltype(x), eltype(first(op.weights)))
-    out = fill!(similar(x, T, N_eval, D, D), zero(T))
-    half = T(0.5)
-    for i in 1:D, j in (i + 1):D
-        # ωᵢⱼ = ½(∂uᵢ/∂xⱼ − ∂uⱼ/∂xᵢ)
-        mul!(view(out, :, i, j), op.weights[j], view(x, :, i))
-        mul!(view(out, :, i, j), op.weights[i], view(x, :, j), -one(T), one(T))
-        view(out, :, i, j) .*= half
-        # Anti-symmetric: ωⱼᵢ = −ωᵢⱼ
-        view(out, :, j, i) .= .-view(out, :, i, j)
-    end
-    return out
-end
+_alloc_output(::RotationRate{Dim}, x, ::Type{T}, n) where {Dim, T} = similar(x, T, n, Dim, Dim)
 
-# In-place
+# In-place; ωᵢⱼ = ½(∂uᵢ/∂xⱼ − ∂uⱼ/∂xᵢ), ωⱼᵢ = −ωᵢⱼ
 function _eval_op(
         op::RadialBasisOperator{<:RotationRate}, y::AbstractArray{<:Any, 3}, x::AbstractMatrix
     )

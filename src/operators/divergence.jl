@@ -13,17 +13,7 @@ struct Divergence{Dim} <: AbstractGradientOperator{Dim, 0} end
 # Evaluation — vector field input only
 # ============================================================================
 
-function _eval_op(op::RadialBasisOperator{<:Divergence}, x::AbstractMatrix)
-    D = length(op.weights)
-    N_eval = length(op.eval_points)
-    T = promote_type(eltype(x), eltype(first(op.weights)))
-    out = similar(x, T, N_eval)
-    mul!(out, op.weights[1], view(x, :, 1))
-    for d in 2:D
-        mul!(out, op.weights[d], view(x, :, d), one(T), one(T))
-    end
-    return out
-end
+_alloc_output(::Divergence, x, ::Type{T}, n) where {T} = similar(x, T, n)
 
 # In-place
 function _eval_op(op::RadialBasisOperator{<:Divergence}, y::AbstractVector, x::AbstractMatrix)

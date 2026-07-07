@@ -251,6 +251,16 @@ end
 _eval_op(op::RadialBasisOperator, x) = op.weights * x
 _eval_op(op::RadialBasisOperator, y, x) = mul!(y, op.weights, x)
 
+# Allocating wrapper for rank-0 gradient-family operators (Divergence, Curl,
+# StrainRate, RotationRate): allocate via per-operator _alloc_output, then
+# delegate to the in-place method
+function _eval_op(
+        op::RadialBasisOperator{<:AbstractGradientOperator{<:Any, 0}}, x::AbstractMatrix
+    )
+    T = promote_type(eltype(x), eltype(first(op.weights)))
+    return _eval_op(op, _alloc_output(op.ℒ, x, T, length(op.eval_points)), x)
+end
+
 # Generic error for operators that require vector field (matrix) input
 function _eval_op(op::RadialBasisOperator, x::AbstractVector)
     if requires_vector_input(op.ℒ)
