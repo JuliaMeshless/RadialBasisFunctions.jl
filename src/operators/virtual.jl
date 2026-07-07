@@ -17,7 +17,7 @@ function ∂virtual(
         k::T = autoselect_k(data, basis),
     ) where {T <: Int, B <: AbstractRadialBasis}
     N = length(first(data))
-    dx = zeros(N)
+    dx = zeros(eltype(first(data)), N)
     dx[dim] = Δ
 
     self = regrid(data, eval_points, basis; k = k)

@@ -298,6 +298,6 @@ end
     I[start_pos] = eval_idx
     J[start_pos] = eval_idx
     return @inbounds for op in 1:num_ops
-        V[start_pos, op] = 1.0
+        V[start_pos, op] = one(eltype(V))
     end
 end
