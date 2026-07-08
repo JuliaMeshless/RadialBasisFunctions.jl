@@ -17,5 +17,5 @@ Order   = [:function, :type]
 ```@autodocs
 Modules = [RadialBasisFunctions]
 Public = false
-Order   = [:function, :type]
+Order   = [:function, :type, :constant]
 ```
