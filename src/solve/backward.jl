@@ -15,10 +15,10 @@ Key steps per stencil:
 using LinearAlgebra: ldiv!, mul!
 
 """
-    backward_linear_solve!(ΔA, Δb, Δw, cache)
+    backward_linear_solve!(ΔA, Δb, Δλ, Δw, cache)
 
 Compute cotangents of collocation matrix A and RHS vector b
-from cotangent of weights Δw.
+from cotangent of weights Δw. `Δλ` is a caller-owned scratch buffer (reused across stencils).
 
 Given: Aλ = b, w = λ[1:k]
 We have: Δλ = [Δw; 0]  (padded with zeros for monomial part)
@@ -31,6 +31,7 @@ Using implicit function theorem:
 function backward_linear_solve!(
         ΔA::AbstractMatrix{T},
         Δb::AbstractVecOrMat{T},
+        Δλ::AbstractMatrix{T},
         Δw::AbstractVecOrMat{T},
         cache::StencilForwardCache{T},
     ) where {T}
@@ -39,8 +40,8 @@ function backward_linear_solve!(
     n = k + nmon
     num_ops = size(cache.lambda, 2)
 
-    # Pad Δw with zeros for monomial part
-    Δλ = zeros(T, n, num_ops)
+    # Pad Δw with zeros for monomial part (reused buffer: zero, then set RBF rows)
+    fill!(Δλ, zero(T))
     Δλ[1:k, :] .= Δw
 
     # Solve adjoint system: A'η = Δλ
@@ -64,7 +65,7 @@ function backward_linear_solve!(
 end
 
 """
-    backward_collocation!(Δdata, ΔA, neighbors, data, basis, mon, k)
+    backward_collocation!(Δdata, ΔA, ∇p, neighbors, data, basis, mon, k)
 
 Chain rule through collocation matrix construction.
 
@@ -84,6 +85,7 @@ Note: A is symmetric, so we need to handle both triangles.
 function backward_collocation!(
         Δdata::Vector{Vector{T}},
         ΔA::AbstractMatrix{T},
+        ∇p::AbstractMatrix{T},
         neighbors::Vector{Int},
         data::AbstractVector,
         basis::AbstractRadialBasis,
@@ -123,8 +125,7 @@ function backward_collocation!(
     # Need gradient of monomial basis w.r.t. xi
     if Deg > -1
         nmon = binomial(Dim + Deg, Deg)
-        ∇p = zeros(T, nmon, Dim)
-        # Hoist functor construction outside loop
+        # ∇p is a reused caller buffer; ∇mon(∇p, xi) fully overwrites it each call
         ∇mon = ∇(mon)
 
         @inbounds for i in 1:k
@@ -427,7 +428,7 @@ function backward_rhs_ε!(
 end
 
 """
-    backward_stencil_with_ε!(Δdata, Δeval_point, Δε_acc, Δw, cache, neighbors, eval_point, data, basis, mon, k, grad_Lφ_x, grad_Lφ_xi; poly_backward!=nothing, ∂Lφ_∂ε_fn=nothing)
+    backward_stencil_with_ε!(Δdata, Δeval_point, Δε_acc, Δw, ΔA, Δb, Δλ, ∇p, cache, neighbors, eval_point, data, basis, mon, k, grad_Lφ_x, grad_Lφ_xi; poly_backward!=nothing, ∂Lφ_∂ε_fn=nothing)
 
 Complete backward pass for a single stencil including shape parameter gradient.
 
@@ -447,6 +448,10 @@ function backward_stencil_with_ε!(
         Δeval_point::Vector{T},
         Δε_acc::Base.RefValue{T},
         Δw::AbstractVecOrMat{T},
+        ΔA::AbstractMatrix{T},
+        Δb::AbstractMatrix{T},
+        Δλ::AbstractMatrix{T},
+        ∇p::AbstractMatrix{T},
         cache::StencilForwardCache{T},
         neighbors::Vector{Int},
         eval_point,
@@ -459,13 +464,8 @@ function backward_stencil_with_ε!(
         poly_backward!::F1 = nothing,
         ∂Lφ_∂ε_fn::F2 = nothing,
     ) where {T, Dim, Deg, F1, F2}
-    n = k + cache.nmon
-
-    ΔA = zeros(T, n, n)
-    Δb = zeros(T, n, size(Δw, 2))
-
-    backward_linear_solve!(ΔA, Δb, Δw, cache)
-    backward_collocation!(Δdata, ΔA, neighbors, data, basis, mon, k)
+    backward_linear_solve!(ΔA, Δb, Δλ, Δw, cache)
+    backward_collocation!(Δdata, ΔA, ∇p, neighbors, data, basis, mon, k)
     backward_collocation_ε!(Δε_acc, ΔA, neighbors, data, basis, k)
     backward_rhs!(
         Δdata, Δeval_point, Δb, neighbors, eval_point, data, basis, k,
@@ -483,15 +483,15 @@ end
 # =============================================================================
 
 """
-    extract_stencil_cotangent(ΔW, eval_idx, neighbors, k, num_ops)
+    extract_stencil_cotangent!(Δw, ΔW, eval_idx, neighbors, k)
 
-Extract cotangent values for a single stencil from a dense/sparse matrix cotangent.
-Used by the Enzyme extension.
+Fill the caller-owned buffer `Δw` with a single stencil's cotangent from a dense matrix
+cotangent. Used by the Enzyme extension. The caller pre-zeros `Δw`; every RBF row is written
+here, so no internal reset is needed.
 """
-function extract_stencil_cotangent(
-        ΔW::AbstractMatrix{T}, eval_idx::Int, neighbors::Vector{Int}, k::Int, num_ops::Int
+function extract_stencil_cotangent!(
+        Δw::AbstractMatrix{T}, ΔW::AbstractMatrix{T}, eval_idx::Int, neighbors::Vector{Int}, k::Int
     ) where {T}
-    Δw = zeros(T, k, num_ops)
     for (local_idx, global_idx) in enumerate(neighbors)
         Δw[local_idx, 1] = ΔW[eval_idx, global_idx]
     end
@@ -499,15 +499,15 @@ function extract_stencil_cotangent(
 end
 
 """
-    extract_stencil_cotangent_from_nzval(ΔW_nzval, W, eval_idx, neighbors, k)
+    extract_stencil_cotangent_from_nzval!(Δw, ΔW_nzval, W, eval_idx, neighbors, k)
 
-Extract cotangent values for a single stencil from sparse matrix nzval gradient.
-Used by Mooncake extension where gradients are stored in fdata.nzval.
+Fill the caller-owned buffer `Δw` with a single stencil's cotangent from a sparse-matrix
+nzval gradient. Used by the Mooncake extension where gradients are stored in fdata.nzval.
+Only entries found in the sparse structure are written, so the caller must pre-zero `Δw`.
 """
-function extract_stencil_cotangent_from_nzval(
-        ΔW_nzval::Vector{T}, W::SparseMatrixCSC, eval_idx::Int, neighbors::Vector{Int}, k::Int
+function extract_stencil_cotangent_from_nzval!(
+        Δw::AbstractMatrix{T}, ΔW_nzval::Vector{T}, W::SparseMatrixCSC, eval_idx::Int, neighbors::Vector{Int}, k::Int
     ) where {T}
-    Δw = zeros(T, k, 1)
     for (local_idx, global_idx) in enumerate(neighbors)
         col_start = W.colptr[global_idx]
         col_end = W.colptr[global_idx + 1] - 1

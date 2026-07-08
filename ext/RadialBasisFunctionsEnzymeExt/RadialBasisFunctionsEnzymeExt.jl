@@ -287,7 +287,7 @@ end
 # =============================================================================
 
 # Import shared utilities from main package
-import RadialBasisFunctions: extract_stencil_cotangent, _get_grad_funcs
+import RadialBasisFunctions: extract_stencil_cotangent!, _get_grad_funcs
 import RadialBasisFunctions: run_build_weights_pullback
 
 # =============================================================================
@@ -365,7 +365,7 @@ function _enzyme_run_pullback_loop(dret, tape, OpType)
     grad_Lφ_x, grad_Lφ_xi = _get_grad_funcs(OpType, basis_val, op_cached)
 
     return run_build_weights_pullback(
-        (eval_idx, neighbors, k) -> extract_stencil_cotangent(ΔW, eval_idx, neighbors, k, cache.num_ops),
+        (Δw, eval_idx, neighbors, k) -> extract_stencil_cotangent!(Δw, ΔW, eval_idx, neighbors, k),
         cache, adjl_val, eval_points_val, data_val, basis_val, mon, op_cached, OpType,
         grad_Lφ_x, grad_Lφ_xi
     )

@@ -31,7 +31,7 @@ import RadialBasisFunctions: _interpolator_constructor_backward, _build_collocat
 
 # Import backward pass support from main package
 import RadialBasisFunctions: _forward_with_cache
-import RadialBasisFunctions: extract_stencil_cotangent_from_nzval, _get_grad_funcs
+import RadialBasisFunctions: extract_stencil_cotangent_from_nzval!, _get_grad_funcs
 import RadialBasisFunctions: run_build_weights_pullback
 
 # Import gradient function
@@ -320,7 +320,7 @@ function _mooncake_build_weights_pullback(
         ΔW_nzval = W_fdata.data.nzval
 
         Δdata_raw, Δeval_raw, Δε_acc = run_build_weights_pullback(
-            (eval_idx, neighbors, k) -> extract_stencil_cotangent_from_nzval(ΔW_nzval, W, eval_idx, neighbors, k),
+            (Δw, eval_idx, neighbors, k) -> extract_stencil_cotangent_from_nzval!(Δw, ΔW_nzval, W, eval_idx, neighbors, k),
             cache, adj, eval_pts, pts, bas, mon, ℒ, OpType,
             grad_Lφ_x, grad_Lφ_xi
         )

@@ -51,7 +51,7 @@ function _get_rhs_closures(::Type{<:Laplacian}, ℒ, basis)
 end
 
 """
-    build_weights_pullback_loop!(Δdata, Δeval, Δε_acc, ΔW_extractor, cache, adjl,
+    build_weights_pullback_loop!(Δdata, Δeval, Δε_acc, ΔW_extractor, ws, cache, adjl,
         eval_points, data, basis, mon, ℒ, OpType, grad_Lφ_x, grad_Lφ_xi)
 
 Shared stencil iteration loop for _build_weights pullback across all AD backends.
@@ -65,6 +65,7 @@ function build_weights_pullback_loop!(
         Δeval::Vector{Vector{T}},
         Δε_acc::Base.RefValue{T},
         ΔW_extractor,
+        ws::BackwardWorkspace{T},
         cache::WeightsBuildForwardCache,
         adjl::AbstractVector,
         eval_points::AbstractVector,
@@ -78,7 +79,6 @@ function build_weights_pullback_loop!(
     ) where {T, OpType}
     N_eval = length(eval_points)
     k = cache.k
-    dim_space = length(first(data))
 
     poly_backward!, ∂Lφ_∂ε_fn = _get_rhs_closures(OpType, ℒ, basis)
 
@@ -87,25 +87,33 @@ function build_weights_pullback_loop!(
         eval_point = eval_points[eval_idx]
         stencil_cache = cache.stencil_caches[eval_idx]
 
-        Δw = ΔW_extractor(eval_idx, neighbors, k)
+        # Extract this stencil's cotangent into the reused buffer. Pre-zero: the Mooncake
+        # extractor only writes entries present in the sparse structure.
+        fill!(ws.Δw, zero(T))
+        ΔW_extractor(ws.Δw, eval_idx, neighbors, k)
 
-        if sum(abs, Δw) > 0
-            local_data = [data[i] for i in neighbors]
-            Δlocal_data = [zeros(T, dim_space) for _ in 1:k]
-            Δeval_pt = zeros(T, dim_space)
+        if sum(abs, ws.Δw) > 0
+            # Gather stencil points and reset the accumulator buffers for reuse
+            for (local_idx, global_idx) in enumerate(neighbors)
+                ws.local_data[local_idx] = data[global_idx]
+            end
+            for v in ws.Δlocal_data
+                fill!(v, zero(T))
+            end
+            fill!(ws.Δeval_pt, zero(T))
 
             backward_stencil_with_ε!(
-                Δlocal_data, Δeval_pt, Δε_acc, Δw, stencil_cache, collect(1:k),
-                eval_point, local_data, basis, mon, k,
+                ws.Δlocal_data, ws.Δeval_pt, Δε_acc, ws.Δw, ws.ΔA, ws.Δb, ws.Δλ, ws.∇p,
+                stencil_cache, ws.local_idx, eval_point, ws.local_data, basis, mon, k,
                 grad_Lφ_x, grad_Lφ_xi;
                 poly_backward! = poly_backward!,
                 ∂Lφ_∂ε_fn = ∂Lφ_∂ε_fn,
             )
 
             for (local_idx, global_idx) in enumerate(neighbors)
-                Δdata[global_idx] .+= Δlocal_data[local_idx]
+                Δdata[global_idx] .+= ws.Δlocal_data[local_idx]
             end
-            Δeval[eval_idx] .+= Δeval_pt
+            Δeval[eval_idx] .+= ws.Δeval_pt
         end
     end
 
@@ -137,8 +145,11 @@ function run_build_weights_pullback(
     Δeval = [zeros(T, dim_space) for _ in 1:length(eval_points)]
     Δε_acc = Ref(zero(T))
 
+    # One reused scratch workspace for the whole stencil sweep
+    ws = BackwardWorkspace(cache, data)
+
     build_weights_pullback_loop!(
-        Δdata, Δeval, Δε_acc, ΔW_extractor, cache, adjl,
+        Δdata, Δeval, Δε_acc, ΔW_extractor, ws, cache, adjl,
         eval_points, data, basis, mon, ℒ, OpType, grad_Lφ_x, grad_Lφ_xi,
     )
 
