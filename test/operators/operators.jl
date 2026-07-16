@@ -53,9 +53,8 @@ end
 end
 
 @testset "RadialBasisOperator Constructors" begin
-    # Test positional eval_points + basis constructor (operators.jl lines 114-125)
     x2 = SVector{2}.(HaltonPoint(2)[101:150])
-    op = RadialBasisOperator(Partial(1, 1), x, x2, PHS(3; poly_deg = 2))
+    op = RadialBasisOperator(Partial(1, 1), x; eval_points = x2, basis = PHS(3; poly_deg = 2))
     @test op isa RadialBasisOperator
     @test length(op.eval_points) == 50
 end

@@ -77,11 +77,6 @@ end
     # Data + basis (positional)
     op1 = RadialBasisOperator(Partial(1, 1), x, PHS(3; poly_deg = 2); device = cpu)
     @test op1.device isa CPU
-
-    # Data + eval_points + basis (positional)
-    x2 = SVector{2}.(HaltonPoint(2)[101:150])
-    op2 = RadialBasisOperator(Partial(1, 1), x, x2, PHS(3; poly_deg = 2); device = cpu)
-    @test op2.device isa CPU
 end
 
 # ============================================================================

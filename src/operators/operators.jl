@@ -158,40 +158,6 @@ function RadialBasisOperator(
     return RadialBasisOperator(ℒ, data; basis = basis, k = k, adjl = adjl, device = device)
 end
 
-# Data + eval_points + basis (positional)
-function RadialBasisOperator(
-        ℒ::AbstractOperator,
-        data::AbstractVector,
-        eval_points::AbstractVector,
-        basis::AbstractRadialBasis;
-        k::Int = autoselect_k(data, basis),
-        adjl = find_neighbors(data, eval_points, k),
-        device = get_backend(data),
-    )
-    return RadialBasisOperator(
-        ℒ, data; eval_points = eval_points, basis = basis, k = k, adjl = adjl, device = device
-    )
-end
-
-# Hermite-compatible constructor (positional boundary arguments)
-function RadialBasisOperator(
-        ℒ::AbstractOperator,
-        data::AbstractVector,
-        eval_points::AbstractVector,
-        basis::AbstractRadialBasis,
-        is_boundary::Vector{Bool},
-        boundary_conditions::Vector{<:BoundaryCondition},
-        normals::Vector{<:AbstractVector};
-        k::Int = autoselect_k(data, basis),
-        adjl = find_neighbors(data, eval_points, k),
-        device = get_backend(data),
-    )
-    hermite = (is_boundary = is_boundary, bc = boundary_conditions, normals = normals)
-    return RadialBasisOperator(
-        ℒ, data; eval_points = eval_points, basis = basis, k = k, adjl = adjl, hermite = hermite, device = device
-    )
-end
-
 dim(op::RadialBasisOperator) = length(first(op.data))
 
 # caching

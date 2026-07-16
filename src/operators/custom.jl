@@ -68,34 +68,5 @@ function custom(data::AbstractVector, ℒ::Function, basis::AbstractRadialBasis;
     return RadialBasisOperator(Custom{rank}(ℒ), data; basis = basis, kw...)
 end
 
-function custom(
-        data::AbstractVector,
-        eval_points::AbstractVector,
-        ℒ::Function,
-        basis::AbstractRadialBasis = PHS(3; poly_deg = 2);
-        rank::Int = _infer_rank(ℒ),
-        kw...,
-    )
-    return RadialBasisOperator(Custom{rank}(ℒ), data; eval_points = eval_points, basis = basis, kw...)
-end
-
-# Hermite backward compatibility (positional boundary arguments)
-function custom(
-        data::AbstractVector,
-        eval_points::AbstractVector,
-        ℒ::Function,
-        basis::AbstractRadialBasis,
-        is_boundary::Vector{Bool},
-        boundary_conditions::Vector{<:BoundaryCondition},
-        normals::Vector{<:AbstractVector};
-        rank::Int = _infer_rank(ℒ),
-        kw...,
-    )
-    hermite = (is_boundary = is_boundary, bc = boundary_conditions, normals = normals)
-    return RadialBasisOperator(
-        Custom{rank}(ℒ), data; eval_points = eval_points, basis = basis, hermite = hermite, kw...
-    )
-end
-
 # pretty printing
 print_op(::Custom) = "Custom Operator"

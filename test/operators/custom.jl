@@ -42,14 +42,16 @@ end
 end
 
 @testset "custom() Different Eval Points" begin
-    # Test custom.jl lines 47-55: separate evaluation points
     x2 = SVector{2}.(HaltonPoint(2)[(N + 1):(N + 100)])
-    op = custom(x, x2, basis -> (x, xᵢ) -> basis(x, xᵢ); rank = 0)
+    op = custom(x, basis -> (x, xᵢ) -> basis(x, xᵢ); eval_points = x2, rank = 0)
     @test op isa RadialBasisOperator
     @test length(op.eval_points) == 100
 
     # With explicit basis
-    op2 = custom(x, x2, basis -> (x, xᵢ) -> basis(x, xᵢ), PHS(5; poly_deg = 3); rank = 0)
+    op2 = custom(
+        x, basis -> (x, xᵢ) -> basis(x, xᵢ);
+        eval_points = x2, basis = PHS(5; poly_deg = 3), rank = 0,
+    )
     @test op2 isa RadialBasisOperator
 end
 
@@ -208,7 +210,6 @@ end
 end
 
 @testset "custom() Hermite Boundary Conditions" begin
-    # Test custom.jl lines 58-72: Hermite interpolation with boundary conditions
     # Create a simple 1D domain for testing
     spacing = 0.1
     domain = [SVector{1}(x) for x in 0.0:spacing:1.0]
@@ -228,12 +229,9 @@ end
     # Test that the constructor works
     op = custom(
         domain,
-        domain,
-        basis -> (x, xᵢ) -> basis(x, xᵢ),
-        PHS(3; poly_deg = 2),
-        is_boundary,
-        boundary_conditions,
-        normals;
+        basis -> (x, xᵢ) -> basis(x, xᵢ);
+        basis = PHS(3; poly_deg = 2),
+        hermite = (is_boundary = is_boundary, bc = boundary_conditions, normals = normals),
         rank = 0,
     )
     @test op isa RadialBasisOperator
