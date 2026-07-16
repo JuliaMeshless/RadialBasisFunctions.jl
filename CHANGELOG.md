@@ -14,9 +14,12 @@ Breaking release. The operator constructor surface was simplified and several ex
 #### Positional `eval_points` and positional Hermite constructor tiers removed
 
 Removed from `partial`, `laplacian`, `gradient`, `jacobian`, `directional`, `mixed_partial`, and `hessian`
-([#141], `8f374bd`). `divergence`, `curl`, `strain_rate`, `rotation_rate`, `custom`, and `regrid` were not
-affected. The keyword constructors and the short trailing-basis forms (`partial(data, order, dim, basis)` etc.)
-are unchanged, as are the positional and Hermite constructors on `RadialBasisOperator` itself.
+([#141], `8f374bd`), and later in the same release from `RadialBasisOperator` itself and `custom`, so the
+`eval_points` keyword is now the only way to supply evaluation points. `divergence`, `curl`, `strain_rate`,
+and `rotation_rate` were not affected. `regrid(data, eval_points)` keeps its positional form — there it is
+the primary source→target signature, not a back-compat tier. The keyword constructors and the short
+trailing-basis forms (`partial(data, order, dim, basis)`, `RadialBasisOperator(ℒ, data, basis)`,
+`custom(data, ℒ, basis)`, etc.) are unchanged.
 
 ```julia
 # before (0.5.x)                                    # after (0.6.0)
@@ -25,6 +28,8 @@ partial(data, eval_points, order, dim, basis)       partial(data, order, dim; ev
 directional(data, eval_points, v, basis)            directional(data, v; eval_points, basis)
 mixed_partial(data, eval_points, i, j, basis)       mixed_partial(data, i, j; eval_points, basis)
 gradient(data, eval_points, basis)                  gradient(data; eval_points, basis)
+RadialBasisOperator(ℒ, data, eval_points, basis)    RadialBasisOperator(ℒ, data; eval_points, basis)
+custom(data, eval_points, ℒ, basis)                 custom(data, ℒ; eval_points, basis)
 
 # Hermite (6–8 positional args) → the `hermite` keyword
 laplacian(data, eval_points, basis,                 laplacian(data; eval_points, basis,
