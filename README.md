@@ -1,12 +1,10 @@
-<table align="center">
-  <tr>
-    <td><img src="docs/src/assets/logo.svg" alt="RadialBasisFunctions.jl" width="300"></td>
-    <td>
-      <h1>RadialBasisFunctions.jl</h1>
-      <p>High-performance radial basis function interpolation<br>and differential operators for Julia.</p>
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <img src="docs/src/assets/logo.svg" alt="RadialBasisFunctions.jl logo" width="160">
+</p>
+
+<h1 align="center">RadialBasisFunctions.jl</h1>
+
+<p align="center"><em>High-performance radial basis function interpolation and differential operators for Julia.</em></p>
 
 <p align="center">
   <a href="https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable"><img src="https://img.shields.io/badge/docs-stable-blue.svg" alt="Stable Docs"></a>
