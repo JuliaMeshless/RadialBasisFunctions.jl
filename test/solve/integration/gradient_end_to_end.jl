@@ -27,14 +27,11 @@ import RadialBasisFunctions as RBF
 
     G_op = RBF.RadialBasisOperator(
         jacobian_op,
-        domain_2d,
-        domain_2d,
-        basis_phs,
-        is_boundary,
-        boundary_conditions,
-        normals;
+        domain_2d;
+        basis = basis_phs,
         k = k,
         adjl = adjl,
+        hermite = (is_boundary = is_boundary, bc = boundary_conditions, normals = normals),
     )
 
     @testset "Test 1: Weights Calculation (Forward Problem)" begin
