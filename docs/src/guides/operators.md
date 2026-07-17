@@ -116,7 +116,7 @@ Key fields:
 | `adjl` | Adjacency list (neighbor indices per stencil) |
 | `basis` | RBF basis function used |
 
-### Lazy Evaluation and Caching
+### Weight Caching and Invalidation
 
 Weights are computed eagerly during construction and cached. If you mutate the underlying data (e.g., move points), invalidate the cache to trigger recomputation on next evaluation:
 
@@ -172,8 +172,9 @@ Available functor types (accessed via `RadialBasisFunctions.∂` etc.):
 |:---|:---|:---|
 | `∂` | `∂(basis, dim)` | `(x, xᵢ) -> scalar` |
 | `∂²` | `∂²(basis, dim)` | `(x, xᵢ) -> scalar` |
+| `∂mixed` | `∂mixed(basis, dim1, dim2)` | `(x, xᵢ) -> scalar` |
+| `∇` | `∇(basis)` | `(x, xᵢ) -> vector` |
 | `∇²` | `∇²(basis)` | `(x, xᵢ) -> scalar` |
-| `D` | `D(basis, v)` | `(x, xᵢ) -> scalar` |
 | `H` | `H(basis)` | `(x, xᵢ) -> matrix` |
 
 These functors are the interface between operators and [Custom Operators](@ref "Custom Operators"). See that page for how to use them.

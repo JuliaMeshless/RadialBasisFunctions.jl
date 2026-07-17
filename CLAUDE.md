@@ -49,11 +49,12 @@ julia --project=benchmark benchmark/benchmarks.jl
    - `MonomialBasis` - Polynomial augmentation support
 
 2. **Operators** (`src/operators/`): Differential operators built on RBFs
-   - `RadialBasisOperator` - Main operator type with lazy weight computation
-   - Specific operators: `Partial`, `MixedPartial`, `Jacobian`, `Hessian`, `Laplacian`, `Directional`, `Divergence`, `Curl`, `Custom{N}`
-   - `operator_algebra.jl` - `Identity`, `ScaledOperator`, and algebraic operations (`+`, `-`, `*`) on operators
+   - `RadialBasisOperator` - Main operator type; weights are computed eagerly at construction and cached
+   - Specific operators: `Partial`, `MixedPartial`, `Jacobian`, `Hessian`, `Laplacian`, `Directional`, `Divergence`, `Curl`, `StrainRate`, `RotationRate`, `Regrid`, `VirtualPartial`, `Custom{N}`
+   - `operator_algebra.jl` - `Identity`, `ScaledOperator`, `SumOperator`, and algebraic operations (`+`, `-`, `*`) on operators
    - `operator_macro.jl` - `@operator` macro for textbook notation
-   - Virtual operators for performance optimization
+   - `operator_traits.jl` - `output_rank`, `requires_vector_input`, `is_symmetric`, `is_antisymmetric`, `is_self_adjoint`, `derivative_order`
+   - `virtual.jl` - `∂virtual` virtual-point finite-difference partials (returns a `RadialBasisOperator{<:VirtualPartial}`)
 
 3. **Solve System** (`src/solve/`): Core weight computation and AD support
    - `api.jl` - Entry points and routing (`_build_weights()` functions)
@@ -76,11 +77,12 @@ julia --project=benchmark benchmark/benchmarks.jl
 
 6. **Utilities** (`src/utils.jl`):
    - `find_neighbors()` - k-nearest neighbor search using NearestNeighbors.jl
+   - `autoselect_k()` - default stencil-size heuristic from basis and polynomial degree
    - `reorder_points!()` - Point ordering utilities
 
 ### Key Design Patterns
 
-- **Lazy Evaluation**: Operators compute weights only when needed, with caching
+- **Eager Weights with Caching**: Operators compute weights at construction and cache them; `invalidate_cache!`/`update_weights!` trigger recomputation
 - **GPU Support**: KernelAbstractions.jl enables GPU computation for weight building
 - **Modular Design**: Basis functions, operators, and solvers are decoupled
 - **Type System**: Heavy use of parametric types for performance
@@ -141,7 +143,7 @@ results = interp(new_points)
 
 ### Differential Operators
 ```julia
-# Create operators (weights computed lazily on first use)
+# Create operators (weights computed at construction)
 lap = laplacian(points)           # ∇²f
 grad = gradient(points)           # ∇f (returns Nx2 matrix)
 ∂x = partial(points, 1, 1)        # ∂f/∂x₁ (first derivative, dimension 1)
@@ -183,6 +185,16 @@ using NearestNeighbors
 adjl = find_neighbors(points, 30)
 lap = laplacian(points; adjl=adjl)
 grad = gradient(points; adjl=adjl)  # Reuse same neighbors
+```
+
+### Boundary Conditions (Hermite) and Evaluation Points
+```julia
+# Boundary data is passed via the `hermite` keyword (keyword-only since v0.6)
+bcs = [Dirichlet() for _ in 1:N]  # or Neumann(), Robin(α, β), Internal()
+lap = laplacian(points; hermite=(is_boundary=is_boundary, bc=bcs, normals=normals))
+
+# Evaluate at points other than the data via the `eval_points` keyword (also keyword-only)
+lap = laplacian(points; eval_points=other_points)
 ```
 
 ### Regridding (Interpolation Between Point Sets)
@@ -361,6 +373,7 @@ Gaussian(0.5) # Smaller ε = wider basis function
 | Strain rate ½(∇u + (∇u)ᵀ) | `strain_rate(points)` | Array (N × D × D) |
 | Rotation rate ½(∇u − (∇u)ᵀ) | `rotation_rate(points)` | Array (N × D × D) |
 | Diffusion ∇⋅(κ∇f) | `(@operator ∇ ⋅ (κ * ∇))(points)` | Vector |
+| Virtual finite-difference partial | `∂virtual(points, dim, Δ)` | Vector |
 | Interpolate to new points | `regrid(src, dst)` | Vector |
 | Global interpolation | `Interpolator(points, values)` | Callable object |
 
@@ -392,7 +405,7 @@ function (rbf::WendlandC2)(x, xᵢ)
     return (1 - r)^4 * (4r + 1)
 end
 
-# Implement derivative operators: ∂, ∇, ∂², ∇², D, D², H
+# Implement derivative operators: ∂, ∇, ∂², ∇², H, ∂mixed
 # See src/basis/polyharmonic_spline.jl for full examples
 ```
 

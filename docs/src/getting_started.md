@@ -49,7 +49,7 @@ abs.(y_true .- y_new)
 
 ## Operators
 
-Operators compute RBF-FD weights for differentiation on scattered data. They're lazy — weights are built on first evaluation and cached.
+Operators compute RBF-FD weights for differentiation on scattered data. Weights are built at construction and cached; invalidate the cache to trigger recomputation.
 
 ### Partial Derivative
 
