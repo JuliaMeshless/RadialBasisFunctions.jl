@@ -5,7 +5,7 @@ All notable changes to RadialBasisFunctions.jl are documented here.
 This project follows [Semantic Versioning](https://semver.org/). While the package is pre-1.0, minor version
 bumps may contain breaking changes, and breaking changes are made without deprecation shims.
 
-## [0.6.0] — unreleased
+## [0.6.0] — 2026-07-17
 
 Breaking release. The operator constructor surface was simplified and several exported types changed shape.
 
