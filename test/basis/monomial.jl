@@ -207,6 +207,13 @@ end
 
     # standard evaluation
     @test all(isapprox.(m(x), [1]))
+
+    # derivatives
+    for i in 1:4
+        @test all(isapprox.(RBF.∂(m, i)(x), [0]))
+        @test all(isapprox.(RBF.∂²(m, i)(x), [0]))
+    end
+    @test all(isapprox.(RBF.∇²(m)(x), [0]))
 end
 
 @testset "Gradient operator (∇)" begin
