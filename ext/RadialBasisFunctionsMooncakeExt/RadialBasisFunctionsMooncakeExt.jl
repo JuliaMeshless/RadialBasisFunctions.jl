@@ -18,7 +18,7 @@ using RadialBasisFunctions
 using Mooncake
 using Mooncake: CoDual, NoFData, NoRData, primal, zero_fcodual
 using StaticArraysCore: SVector
-using LinearAlgebra: Symmetric
+using LinearAlgebra: Symmetric, bunchkaufman!
 using SparseArrays: SparseMatrixCSC
 
 # Import types and functions we need
@@ -216,7 +216,8 @@ function Mooncake.rrule!!(
     A = Symmetric(zeros(data_type, n, n))
     _build_collocation_matrix!(A, x_val, basis_val, mon, k)
     b = vcat(y_val, zeros(data_type, npoly))
-    w = A \ b
+    F = bunchkaufman!(A, true)
+    w = F \ b
 
     interp = Interpolator(x_val, y_val, w[1:k], w[(k + 1):end], basis_val, mon)
     interp_cd = zero_fcodual(interp)
@@ -227,7 +228,7 @@ function Mooncake.rrule!!(
     function interpolator_ctor_pb!!(::Union{NoRData, Mooncake.RData})
         Δrbf = interp_fdata.data.rbf_weights
         Δmon = interp_fdata.data.monomial_weights
-        Δy = _interpolator_constructor_backward(Δrbf, Δmon, A, k)
+        Δy = _interpolator_constructor_backward(Δrbf, Δmon, F, k)
         y_cd.dx .+= Δy
         return NoRData(), NoRData(), NoRData(), basis_zero_rdata
     end
