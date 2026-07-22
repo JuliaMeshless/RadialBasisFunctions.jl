@@ -5,6 +5,7 @@ using HaltonSequences
 using LinearAlgebra
 import DifferentiationInterface as DI
 using Mooncake: Mooncake
+using Enzyme: Enzyme
 
 f(x) = 1 + sin(4 * x[1]) + cos(3 * x[1]) + sin(2 * x[2])
 N = 100_000
@@ -80,8 +81,9 @@ itp = Interpolator(xi, f.(xi), basis)
 xe = SVector{2}.(HaltonPoint(2)[501:600])
 SUITE["Interpolator"]["eval (poly)"] = @benchmarkable itp($xe)
 
-# Mooncake pullback of sum(laplacian-applied field squared) w.r.t. point positions,
-# mirroring the _build_weights differentiation API in test/extensions/autodiff_di.jl
+# Reverse-mode pullback of sum(laplacian-applied field squared) w.r.t. point positions,
+# per AD backend, mirroring the _build_weights differentiation API in
+# test/extensions/autodiff_di.jl
 ad_N = 300
 ad_points = SVector{2}.(HaltonPoint(2)[1:ad_N])
 ad_v = f.(ad_points)
@@ -95,11 +97,18 @@ function ad_loss(pts)
     return sum((W * ad_v) .^ 2)
 end
 
-ad_backend = DI.AutoMooncake(; config = nothing)
 ad_pts_flat = vcat([collect(p) for p in ad_points]...)
-ad_prep = DI.prepare_gradient(ad_loss, ad_backend, ad_pts_flat)
+
+mooncake_backend = DI.AutoMooncake(; config = nothing)
+mooncake_prep = DI.prepare_gradient(ad_loss, mooncake_backend, ad_pts_flat)
 SUITE["AD"]["mooncake pullback"] = @benchmarkable DI.gradient(
-    $ad_loss, $ad_prep, $ad_backend, $ad_pts_flat
+    $ad_loss, $mooncake_prep, $mooncake_backend, $ad_pts_flat
+)
+
+enzyme_backend = DI.AutoEnzyme(; function_annotation = Enzyme.Const)
+enzyme_prep = DI.prepare_gradient(ad_loss, enzyme_backend, ad_pts_flat)
+SUITE["AD"]["enzyme pullback"] = @benchmarkable DI.gradient(
+    $ad_loss, $enzyme_prep, $enzyme_backend, $ad_pts_flat
 )
 
 x1 = SVector{3}(rand(3))
