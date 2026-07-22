@@ -99,11 +99,7 @@ end
 
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
-                    if name == "Enzyme"
-                        @test_skip "Enzyme cannot differentiate through Interpolator constructor (factorize Union types)"
-                    else
-                        test_gradient_vs_fd(loss_interp, values, backend; rtol = 1.0e-3)
-                    end
+                    test_gradient_vs_fd(loss_interp, values, backend; rtol = 1.0e-3)
                 end
             end
         end
@@ -116,11 +112,7 @@ end
 
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
-                    if name == "Enzyme"
-                        @test_skip "Enzyme cannot differentiate through Interpolator constructor (factorize Union types)"
-                    else
-                        test_gradient_vs_fd(loss_interp_imq, values, backend; rtol = 1.0e-3)
-                    end
+                    test_gradient_vs_fd(loss_interp_imq, values, backend; rtol = 1.0e-3)
                 end
             end
         end
@@ -133,11 +125,7 @@ end
 
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
-                    if name == "Enzyme"
-                        @test_skip "Enzyme cannot differentiate through Interpolator constructor (factorize Union types)"
-                    else
-                        test_gradient_vs_fd(loss_interp_gauss, values, backend; rtol = 1.0e-3)
-                    end
+                    test_gradient_vs_fd(loss_interp_gauss, values, backend; rtol = 1.0e-3)
                 end
             end
         end
@@ -152,11 +140,7 @@ end
 
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
-                    if name == "Enzyme"
-                        @test_skip "Enzyme cannot differentiate through Interpolator constructor (factorize Union types)"
-                    else
-                        test_gradient_vs_fd(loss_interp_single, values, backend; rtol = 1.0e-3)
-                    end
+                    test_gradient_vs_fd(loss_interp_single, values, backend; rtol = 1.0e-3)
                 end
             end
         end

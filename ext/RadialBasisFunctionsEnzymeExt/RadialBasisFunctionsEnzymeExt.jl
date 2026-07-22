@@ -10,6 +10,7 @@ Native rules are provided for:
 - Basis function evaluation: all AbstractRadialBasis subtypes
 - Operator evaluation: `_eval_op(op, x)` for scalar and vector-valued operators
 - Operator call syntax: `op(x)`
+- Interpolator constructor: `Interpolator(x, y, basis)`
 - Interpolator evaluation: single point and batch
 - Weight construction: `_build_weights` for Partial and Laplacian operators
 """
@@ -35,6 +36,8 @@ import RadialBasisFunctions: _forward_with_cache
 # Import gradient function and shared helpers
 const ∇ = RadialBasisFunctions.∇
 import RadialBasisFunctions: _interpolator_point_gradient!
+import RadialBasisFunctions: _interpolator_constructor_backward, _interpolator_weight_cotangents!
+import RadialBasisFunctions: _build_collocation_matrix!
 
 # =============================================================================
 # Basis Function Rules
@@ -279,6 +282,169 @@ function EnzymeRules.reverse(
         _interpolator_point_gradient!(xs.dval[i], interp, x_val, Δys[i])
     end
 
+    return (nothing,)
+end
+
+# =============================================================================
+# Interpolator Constructor Rule (#147; mirrors the Mooncake rrule!!)
+# =============================================================================
+# Makes the constructor opaque so Enzyme never traces the linear solve. The
+# shadow Interpolator's y-field aliases y.dval; its weight fields collect
+# cotangents deposited by the Duplicated-Interpolator evaluation rules, which
+# the reverse pass pulls back to Δy via the implicit function theorem.
+
+function EnzymeRules.augmented_primal(
+        config::EnzymeRules.RevConfigWidth{1},
+        func::EnzymeCore.Const{Type{Interpolator}},
+        ::Type{RT},
+        x::EnzymeCore.Const{<:AbstractVector},
+        y::EnzymeCore.Duplicated{<:AbstractVector},
+        basis::EnzymeCore.Const{<:AbstractRadialBasis},
+    ) where {RT}
+    x_val, y_val, basis_val = x.val, y.val, basis.val
+
+    # Forward pass: reproduce the Interpolator constructor (interpolation.jl)
+    dim = length(first(x_val))
+    k = length(x_val)
+    npoly = binomial(dim + basis_val.poly_deg, basis_val.poly_deg)
+    n = k + npoly
+    mon = MonomialBasis(dim, basis_val.poly_deg)
+    data_type = promote_type(eltype(first(x_val)), eltype(y_val))
+    A = Symmetric(zeros(data_type, n, n))
+    _build_collocation_matrix!(A, x_val, basis_val, mon, k)
+    b = vcat(y_val, zeros(data_type, npoly))
+    F = bunchkaufman!(A, true)
+    w = F \ b
+
+    interp = Interpolator(x_val, y_val, w[1:k], w[(k + 1):end], basis_val, mon)
+    shadow = Interpolator(
+        zero(x_val), y.dval, zeros(data_type, k), zeros(data_type, npoly), basis_val, mon
+    )
+    tape = (F, k, shadow)
+    # RT's primal is a UnionAll (MonomialBasis hides a function-type parameter),
+    # so Enzyme requires the explicitly-typed AugmentedReturn with an Any tape
+    PT = _primal_type(RT)
+    return EnzymeRules.AugmentedReturn{PT, PT, Any}(interp, shadow, tape)
+end
+
+function EnzymeRules.reverse(
+        config::EnzymeRules.RevConfigWidth{1},
+        func::EnzymeCore.Const{Type{Interpolator}},
+        dret,
+        tape,
+        x::EnzymeCore.Const{<:AbstractVector},
+        y::EnzymeCore.Duplicated{<:AbstractVector},
+        basis::EnzymeCore.Const{<:AbstractRadialBasis},
+    )
+    F, k, shadow = tape
+    # F is the cached Bunch-Kaufman factorization: O(n²) solve, no refactorization
+    Δy = _interpolator_constructor_backward(shadow.rbf_weights, shadow.monomial_weights, F, k)
+    y.dval .+= Δy
+    fill!(shadow.rbf_weights, zero(eltype(shadow.rbf_weights)))
+    fill!(shadow.monomial_weights, zero(eltype(shadow.monomial_weights)))
+    return (nothing, nothing, nothing)
+end
+
+# =============================================================================
+# Duplicated-Interpolator Evaluation Rules
+# =============================================================================
+# For an Interpolator constructed inside the differentiated region evaluated at
+# constant points: the cotangent flows into the interpolator's weight shadows
+# instead of the evaluation point. Enzyme annotates the interpolator Duplicated
+# when the basis is float-free (PHS) but MixedDuplicated (shadow boxed in a
+# RefValue) when the basis carries an active float (IMQ/Gaussian ε).
+
+const DupInterp{T} = Union{EnzymeCore.Duplicated{T}, EnzymeCore.MixedDuplicated{T}}
+
+_interp_shadow(interp::EnzymeCore.Duplicated) = interp.dval
+_interp_shadow(interp::EnzymeCore.MixedDuplicated) = interp.dval[]
+
+# Single point evaluation
+function EnzymeRules.augmented_primal(
+        config::EnzymeRules.RevConfigWidth{1},
+        interp::DupInterp{<:Interpolator},
+        ::Type{<:EnzymeCore.Active},
+        x::EnzymeCore.Const,
+    )
+    y = interp.val(x.val)
+    tape = copy(x.val)
+    return EnzymeRules.AugmentedReturn(y, nothing, tape)
+end
+
+function EnzymeRules.reverse(
+        config::EnzymeRules.RevConfigWidth{1},
+        interp::DupInterp{<:Interpolator},
+        dret::EnzymeCore.Active,
+        tape,
+        x::EnzymeCore.Const,
+    )
+    x_val = tape
+    shadow = _interp_shadow(interp)
+    _interpolator_weight_cotangents!(
+        shadow.rbf_weights, shadow.monomial_weights, interp.val, x_val, dret.val
+    )
+    return (nothing,)
+end
+
+# Single point evaluation at an isbits point (e.g. SVector): Enzyme passes it
+# Active, so the point cotangent is returned by value alongside the weight
+# cotangents deposited into the interpolator shadow
+function EnzymeRules.augmented_primal(
+        config::EnzymeRules.RevConfigWidth{1},
+        interp::DupInterp{<:Interpolator},
+        ::Type{<:EnzymeCore.Active},
+        x::EnzymeCore.Active,
+    )
+    y = interp.val(x.val)
+    tape = x.val
+    return EnzymeRules.AugmentedReturn(y, nothing, tape)
+end
+
+function EnzymeRules.reverse(
+        config::EnzymeRules.RevConfigWidth{1},
+        interp::DupInterp{<:Interpolator},
+        dret::EnzymeCore.Active,
+        tape,
+        x::EnzymeCore.Active{XT},
+    ) where {XT}
+    x_val = tape
+    shadow = _interp_shadow(interp)
+    _interpolator_weight_cotangents!(
+        shadow.rbf_weights, shadow.monomial_weights, interp.val, x_val, dret.val
+    )
+    Δx = zeros(eltype(x_val), length(x_val))
+    _interpolator_point_gradient!(Δx, interp.val, x_val, dret.val)
+    return (XT(Tuple(Δx))::XT,)
+end
+
+# Batch evaluation
+function EnzymeRules.augmented_primal(
+        config::EnzymeRules.RevConfigWidth{1},
+        interp::DupInterp{<:Interpolator},
+        ::Type{RT},
+        xs::EnzymeCore.Const{<:Vector{<:AbstractVector}},
+    ) where {RT}
+    ys = interp.val(xs.val)
+    shadow = _make_shadow_for_return(RT, ys)
+    tape = (deepcopy(xs.val), shadow)
+    return EnzymeRules.AugmentedReturn(ys, shadow, tape)
+end
+
+function EnzymeRules.reverse(
+        config::EnzymeRules.RevConfigWidth{1},
+        interp::DupInterp{<:Interpolator},
+        dret,
+        tape,
+        xs::EnzymeCore.Const{<:Vector{<:AbstractVector}},
+    )
+    xs_val, shadow = tape
+    Δys = _extract_dret_with_shadow(dret, shadow)
+    ishadow = _interp_shadow(interp)
+    for (i, x_val) in enumerate(xs_val)
+        _interpolator_weight_cotangents!(
+            ishadow.rbf_weights, ishadow.monomial_weights, interp.val, x_val, Δys[i]
+        )
+    end
     return (nothing,)
 end
 
