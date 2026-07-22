@@ -25,7 +25,7 @@ Beyond interpolation, it provides differential operators (Laplacian, gradient, d
 
 Other things that might matter to you:
 - GPU evaluation support via [Adapt.jl](https://github.com/JuliaGPU/Adapt.jl) — build on CPU, evaluate on GPU ([full GPU tracking issue](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88))
-- Native autodiff rules for [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl) and [Mooncake.jl](https://github.com/compintell/Mooncake.jl) (no generic fallbacks)
+- Native autodiff rules for [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl) (recommended) and [Mooncake.jl](https://github.com/compintell/Mooncake.jl) (no generic fallbacks)
 - [Lux.jl](https://github.com/LuxDL/Lux.jl) integration — `RBFLayer` for neural networks with radial basis function activations
 - Operator algebra — combine operators with `+`, `-`, `*`
 

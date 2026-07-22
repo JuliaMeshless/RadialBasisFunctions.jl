@@ -5,6 +5,25 @@ All notable changes to RadialBasisFunctions.jl are documented here.
 This project follows [Semantic Versioning](https://semver.org/). While the package is pre-1.0, minor version
 bumps may contain breaking changes, and breaking changes are made without deprecation shims.
 
+## [Unreleased]
+
+### Added
+
+- Enzyme rule for the `Interpolator` constructor, plus `Duplicated`/`MixedDuplicated` evaluation rules
+  for interpolators built inside a differentiated region — Enzyme now matches Mooncake on every AD
+  path ([#147]). Enzyme is the recommended default backend; the autodiff guide leads with
+  `DI.AutoEnzyme(; function_annotation=Enzyme.Const)`.
+
+### Fixed
+
+- The Enzyme test suite is fully green on Julia 1.10/1.11 (previously `@test_broken`, [#150]) and runs
+  un-gated on Julia 1.12 (requires Enzyme ≥ 0.13.190 in the test/docs environments).
+- The `Interpolator` constructor factorizes the collocation matrix with Bunch-Kaufman instead of the
+  Union-typed generic `factorize`, which broke Enzyme's type analysis and cost dynamic dispatch. The
+  Mooncake constructor pullback reuses the cached factorization (O(n²) solve instead of O(n³)).
+- Enzyme shape-parameter tangents are constructed without the `ε > 0` validation, which threw for
+  negative gradients on the Active-basis path.
+
 ## [0.6.0] — 2026-07-17
 
 Breaking release. The operator constructor surface was simplified and several exported types changed shape.
@@ -128,4 +147,5 @@ No exports were removed or renamed.
   in [#150]. The Mooncake backend is unaffected.
 
 [#141]: https://github.com/JuliaMeshless/RadialBasisFunctions.jl/pull/141
+[#147]: https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/147
 [#150]: https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/150

@@ -2,16 +2,10 @@
 
 Both operators and interpolators can be differentiated with reverse-mode AD. Two backends are supported through package extensions:
 
-- **Mooncake.jl** - Reverse-mode AD with support for mutation
-- **Enzyme.jl** - Native EnzymeRules for high-performance reverse-mode AD
+- **Enzyme.jl** - Native EnzymeRules for high-performance reverse-mode AD; the recommended default backend
+- **Mooncake.jl** - Reverse-mode AD with support for mutation; a fully supported alternative
 
 All examples use [DifferentiationInterface.jl](https://github.com/gdalle/DifferentiationInterface.jl) which provides a unified API over different AD backends.
-
-## Compatibility
-
-Enzyme.jl currently has known issues with Julia 1.12+. If you encounter problems, use Julia < 1.12 or switch to Mooncake.jl.
-
-See: [Enzyme.jl#2699](https://github.com/EnzymeAD/Enzyme.jl/issues/2699)
 
 ## Implementation Status
 
@@ -25,7 +19,7 @@ The most common use case is differentiating a loss function with respect to fiel
 using RadialBasisFunctions
 using StaticArrays
 import DifferentiationInterface as DI
-import Mooncake
+import Enzyme
 
 # Create points and operator (outside loss function)
 N = 49
@@ -42,10 +36,12 @@ function loss(v)
 end
 
 # Compute gradient using DifferentiationInterface
-backend = DI.AutoMooncake(; config=nothing)  # also supports DI.AutoEnzyme()
+backend = DI.AutoEnzyme(; function_annotation=Enzyme.Const)
 grad = DI.gradient(loss, backend, values)
 grad[1:5]  # Show first 5 gradient values
 ```
+
+The `function_annotation=Enzyme.Const` tells Enzyme that data captured by the loss closure (here the operator `lap`) is constant — we differentiate w.r.t. the input values, never the captures. This is required for the operator-capture pattern above.
 
 This works with any operator type:
 
@@ -78,10 +74,6 @@ grad[1:5]
 ## Differentiating Through Interpolators
 
 When differentiating through interpolation, the `Interpolator` must be constructed inside the loss function since changing the input values changes the interpolation weights.
-
-!!! note
-    Differentiating through `Interpolator` construction currently requires Mooncake.
-    Enzyme does not yet support this code path via DifferentiationInterface.
 
 ```@example autodiff
 N_interp = 30
@@ -145,7 +137,6 @@ grad = DI.gradient(loss_gauss, backend, x)
 For advanced use cases like mesh optimization or shape parameter tuning, you can differentiate through the weight construction process using the internal `_build_weights` function.
 
 ```@example autodiff
-# Using Mooncake for weight construction
 N_weights = 25
 points_weights = [SVector{2}(0.1 + 0.8 * i / 5, 0.1 + 0.8 * j / 5) for i in 1:5 for j in 1:5]
 adjl = RadialBasisFunctions.find_neighbors(points_weights, 10)
@@ -185,22 +176,20 @@ grad[1:6]
 | Component | Enzyme | Mooncake |
 |-----------|:------:|:--------:|
 | Operator evaluation (`op(values)`) | ✓ | ✓ |
-| Interpolator construction | ✗* | ✓ |
+| Interpolator construction | ✓ | ✓ |
 | Interpolator evaluation | ✓ | ✓ |
 | Basis functions (PHS, IMQ, Gaussian) | ✓ | ✓ |
 | Weight construction (`_build_weights`) | ✓ | ✓ |
 | Shape parameter (ε) differentiation | ✓ | ✓ |
 
-*Enzyme does not support differentiating through `Interpolator` construction via DifferentiationInterface due to `factorize` limitations. Use Mooncake for this use case.
+## Using Mooncake Backend
 
-## Using Enzyme Backend
-
-Switch to Enzyme by changing the backend (requires Julia < 1.12):
+Switch to Mooncake by changing the backend:
 
 ```julia
 import DifferentiationInterface as DI
-import Enzyme
+import Mooncake
 
-backend = DI.AutoEnzyme()
+backend = DI.AutoMooncake(; config=nothing)
 grad = DI.gradient(loss, backend, values)
 ```
