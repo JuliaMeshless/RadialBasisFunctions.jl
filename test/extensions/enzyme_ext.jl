@@ -6,55 +6,38 @@ using Enzyme
 const ENZYME_SUPPORTED_JULIA = VERSION < v"1.12"
 
 if ENZYME_SUPPORTED_JULIA
-    # Enzyme reverse mode is currently broken for these AD/solve paths on Julia
-    # <1.12: EnzymeMutabilityException on the loss closures, a RadialBasisFunctions
-    # /Enzyme `gradient` export collision, and IllegalTypeAnalysisException through
-    # LinearAlgebra._factorize (Union return). The affected cases are marked
-    # @test_broken pending JuliaMeshless/RadialBasisFunctions.jl#150; @test_broken
-    # flips to a failure if Enzyme starts working, prompting us to un-break them.
+    # Loss closures are passed as Const(loss): we differentiate w.r.t. the data or
+    # shape parameter, never the closure's captured operator/points, and Enzyme
+    # cannot prove the closure read-only on its own (#150).
     @testset "Enzyme Extension - Operator Differentiation" begin
         points, N, values = make_operator_test_data()
 
         @testset "Laplacian Operator" begin
-            @test_broken try
-                lap = laplacian(points)
-                loss(v) = sum(lap(v) .^ 2)
+            lap = laplacian(points)
+            loss(v) = sum(lap(v) .^ 2)
 
-                dv = zeros(N)
-                Enzyme.autodiff(Reverse, loss, Active, Duplicated(values, dv))
-                validate_gradient(dv, loss, values)
-                true
-            catch
-                false
-            end
+            dv = zeros(N)
+            Enzyme.autodiff(Reverse, Const(loss), Active, Duplicated(values, dv))
+            validate_gradient(dv, loss, values)
         end
 
         @testset "Gradient Operator" begin
-            @test_broken try
-                grad = gradient(points)
-                loss(v) = sum(grad(v) .^ 2)
+            # qualified: Enzyme also exports `gradient`
+            grad = RadialBasisFunctions.gradient(points)
+            loss(v) = sum(grad(v) .^ 2)
 
-                dv = zeros(N)
-                Enzyme.autodiff(Reverse, loss, Active, Duplicated(values, dv))
-                validate_gradient(dv, loss, values)
-                true
-            catch
-                false
-            end
+            dv = zeros(N)
+            Enzyme.autodiff(Reverse, Const(loss), Active, Duplicated(values, dv))
+            validate_gradient(dv, loss, values)
         end
 
         @testset "Partial Derivative Operator" begin
-            @test_broken try
-                partial_x = partial(points, 1, 1)
-                loss(v) = sum(partial_x(v) .^ 2)
+            partial_x = partial(points, 1, 1)
+            loss(v) = sum(partial_x(v) .^ 2)
 
-                dv = zeros(N)
-                Enzyme.autodiff(Reverse, loss, Active, Duplicated(values, dv))
-                validate_gradient(dv, loss, values)
-                true
-            catch
-                false
-            end
+            dv = zeros(N)
+            Enzyme.autodiff(Reverse, Const(loss), Active, Duplicated(values, dv))
+            validate_gradient(dv, loss, values)
         end
     end
 
@@ -90,31 +73,21 @@ if ENZYME_SUPPORTED_JULIA
         end
 
         @testset "IMQ Basis Function" begin
-            @test_broken try
-                imq = IMQ(1.0)
-                loss(xv) = imq(xv, xi)^2
+            imq = IMQ(1.0)
+            loss(xv) = imq(xv, xi)^2
 
-                dx = zeros(2)
-                Enzyme.autodiff(Reverse, loss, Active, Duplicated(x, dx))
-                validate_gradient(dx, loss, x)
-                true
-            catch
-                false
-            end
+            dx = zeros(2)
+            Enzyme.autodiff(Reverse, Const(loss), Active, Duplicated(x, dx))
+            validate_gradient(dx, loss, x)
         end
 
         @testset "Gaussian Basis Function" begin
-            @test_broken try
-                gauss = Gaussian(1.0)
-                loss(xv) = gauss(xv, xi)^2
+            gauss = Gaussian(1.0)
+            loss(xv) = gauss(xv, xi)^2
 
-                dx = zeros(2)
-                Enzyme.autodiff(Reverse, loss, Active, Duplicated(x, dx))
-                validate_gradient(dx, loss, x)
-                true
-            catch
-                false
-            end
+            dx = zeros(2)
+            Enzyme.autodiff(Reverse, Const(loss), Active, Duplicated(x, dx))
+            validate_gradient(dx, loss, x)
         end
     end
 
@@ -168,27 +141,17 @@ if ENZYME_SUPPORTED_JULIA
             @testset "$BasisName $OpName - d(loss)/d(ε)" for
                 (BasisName, BT) in [("IMQ", IMQ), ("Gaussian", Gaussian)],
                     (OpName, op) in [("Partial", Partial(1, 1)), ("Laplacian", Laplacian())]
-                @test_broken try
-                    loss = make_eps_loss(op, points, adjl, BT)
-                    dε = Enzyme.autodiff(Reverse, loss, Active, Active(1.0))[1][1]
-                    validate_scalar_gradient(dε, loss, 1.0)
-                    true
-                catch
-                    false
-                end
+                loss = make_eps_loss(op, points, adjl, BT)
+                dε = Enzyme.autodiff(Reverse, Const(loss), Active, Active(1.0))[1][1]
+                validate_scalar_gradient(dε, loss, 1.0)
             end
 
             @testset "Different ε values" begin
                 for ε_val in [0.5, 2.0, 5.0]
                     @testset "$BasisName ε=$ε_val" for (BasisName, BT) in [("IMQ", IMQ), ("Gaussian", Gaussian)]
-                        @test_broken try
-                            loss = make_eps_loss(Partial(1, 1), points, adjl, BT)
-                            dε = Enzyme.autodiff(Reverse, loss, Active, Active(ε_val))[1][1]
-                            validate_scalar_gradient(dε, loss, ε_val; rtol = 1.0e-2)
-                            true
-                        catch
-                            false
-                        end
+                        loss = make_eps_loss(Partial(1, 1), points, adjl, BT)
+                        dε = Enzyme.autodiff(Reverse, Const(loss), Active, Active(ε_val))[1][1]
+                        validate_scalar_gradient(dε, loss, ε_val; rtol = 1.0e-2)
                     end
                 end
             end
