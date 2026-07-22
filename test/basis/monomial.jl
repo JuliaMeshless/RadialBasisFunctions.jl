@@ -198,6 +198,24 @@ end
     @test all(isapprox.(RBF.∇²(m)(x), [0, 0, 0, 0, 0, 0, 0, 2, 2, 2]))
 end
 
+@testset "dim=4, deg=0 - constant basis for higher dimensions" begin
+    x = SVector(2.0, 3.0, 4.0, 5.0)
+
+    m = MonomialBasis(4, 0)
+    @test m isa MonomialBasis
+    @test typeof(m) <: MonomialBasis{4, 0}
+
+    # standard evaluation
+    @test all(isapprox.(m(x), [1]))
+
+    # derivatives
+    for i in 1:4
+        @test all(isapprox.(RBF.∂(m, i)(x), [0]))
+        @test all(isapprox.(RBF.∂²(m, i)(x), [0]))
+    end
+    @test all(isapprox.(RBF.∇²(m)(x), [0]))
+end
+
 @testset "Gradient operator (∇)" begin
     @testset "dim=2, deg=1" begin
         x = SVector(2.0, 3.0)

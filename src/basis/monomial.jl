@@ -24,16 +24,15 @@ end
 degree(::MonomialBasis{Dim, Deg}) where {Dim, Deg} = Deg
 dim(::MonomialBasis{Dim, Deg}) where {Dim, Deg} = Dim
 
-for Dim in (:1, :2, :3)
-    @eval begin
-        function _get_monomial_basis(::Val{$Dim}, ::Val{0})
-            return function basis!(b, x)
-                b[1] = one(_get_underlying_type(x))
-                return nothing
-            end
-        end
-    end
+function _constant_monomial_basis(b, x)
+    b[1] = one(_get_underlying_type(x))
+    return nothing
 end
+
+# Degree-0 basis is the constant `1` in every dimension. Explicit `Val{1}` and generic
+# `Val{Dim}` methods keep this unambiguous against the `Val{1}, Val{N}` method below.
+_get_monomial_basis(::Val{1}, ::Val{0}) = _constant_monomial_basis
+_get_monomial_basis(::Val{Dim}, ::Val{0}) where {Dim} = _constant_monomial_basis
 
 function _get_monomial_basis(::Val{1}, ::Val{N}) where {N}
     function basis!(b, x)
