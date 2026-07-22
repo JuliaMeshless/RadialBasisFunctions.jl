@@ -10,18 +10,14 @@ using Random: MersenneTwister
 
 const FD = FiniteDifferences
 
-# Version compatibility - Enzyme.jl has known issues with Julia 1.12+
-# See: https://github.com/EnzymeAD/Enzyme.jl/issues/2699
-const ENZYME_SUPPORTED = VERSION < v"1.12"
-
 # Backend configuration
 const ENZYME_BACKEND = DI.AutoEnzyme(; function_annotation = Enzyme.Const)
 const MOONCAKE_BACKEND = DI.AutoMooncake(; config = nothing)
 
-# Build backend registry (only include supported backends)
-const AD_BACKENDS = Pair{String, Any}[]
-ENZYME_SUPPORTED && push!(AD_BACKENDS, "Enzyme" => ENZYME_BACKEND)
-push!(AD_BACKENDS, "Mooncake" => MOONCAKE_BACKEND)
+const AD_BACKENDS = Pair{String, Any}[
+    "Enzyme" => ENZYME_BACKEND,
+    "Mooncake" => MOONCAKE_BACKEND,
+]
 
 """
     test_gradient_vs_fd(f, x, backend; rtol=1e-4, name="")
@@ -62,12 +58,7 @@ end
 
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
-                    # Vector-valued operators have known issues on Julia 1.12+ with Enzyme
-                    if name == "Enzyme" && VERSION >= v"1.12"
-                        @test_skip "Vector-valued operators have known issues on Julia 1.12+"
-                    else
-                        test_gradient_vs_fd(loss_grad, values, backend; rtol = 1.0e-4)
-                    end
+                    test_gradient_vs_fd(loss_grad, values, backend; rtol = 1.0e-4)
                 end
             end
         end

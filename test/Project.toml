@@ -22,7 +22,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 [compat]
 Adapt = "4"
 DifferentiationInterface = "0.7"
-Enzyme = "0.13"
+Enzyme = "0.13.190"
 EnzymeCore = "0.8"
 FiniteDifferences = "0.12"
 ForwardDiff = "1"
