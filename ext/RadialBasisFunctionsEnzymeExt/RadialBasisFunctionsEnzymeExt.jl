@@ -25,7 +25,7 @@ using SparseArrays
 
 # Import internal functions
 import RadialBasisFunctions: _eval_op, RadialBasisOperator, Interpolator
-import RadialBasisFunctions: IMQ, Gaussian
+import RadialBasisFunctions: IMQ, Gaussian, _tangent_basis
 import RadialBasisFunctions: AbstractRadialBasis, Jacobian
 import RadialBasisFunctions: _build_weights, Partial, Laplacian, _optype
 import RadialBasisFunctions: MonomialBasis
@@ -486,15 +486,16 @@ _extract_dret_with_shadow(dret::EnzymeCore.Active, _shadow) = dret.val
 _extract_dret_with_shadow(::Type, shadow::AbstractArray) = shadow
 _extract_dret_with_shadow(::Type, ::Nothing) = nothing
 
-# Helper to construct Enzyme tangent for basis types
+# Helper to construct Enzyme tangent for basis types. Uses the non-validating
+# _tangent_basis constructor: Δε is a derivative and may be negative.
 _make_enzyme_tangent(::Type{<:AbstractRadialBasis}, _basis, _Δε) = nothing  # PHS has no ε
 
 function _make_enzyme_tangent(::Type{Gaussian{T, D}}, _basis::Gaussian{T, D}, Δε) where {T, D}
-    return Gaussian(convert(T, Δε); poly_deg = D(0))
+    return _tangent_basis(Gaussian{T, D}, Δε)
 end
 
 function _make_enzyme_tangent(::Type{IMQ{T, D}}, _basis::IMQ{T, D}, Δε) where {T, D}
-    return IMQ(convert(T, Δε); poly_deg = D(0))
+    return _tangent_basis(IMQ{T, D}, Δε)
 end
 
 # Shared augmented_primal body for all _build_weights rules
