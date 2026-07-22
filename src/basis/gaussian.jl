@@ -22,6 +22,9 @@ struct Gaussian{T, D <: Int} <: AbstractRadialBasis
         end
         return new{T, D}(ε, poly_deg)
     end
+    # AD tangent construction: ε holds a derivative (any sign), so no validation
+    global _tangent_basis
+    _tangent_basis(::Type{Gaussian{T, D}}, Δε) where {T, D <: Int} = new{T, D}(convert(T, Δε), zero(D))
 end
 
 (rbf::Gaussian)(r2) = exp(-rbf.ε^2 * r2)
