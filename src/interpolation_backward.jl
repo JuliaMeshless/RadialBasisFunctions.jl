@@ -55,7 +55,10 @@ using the implicit function theorem. Since `w = A⁻¹ [y; 0]` and `A` is consta
 
     Δy = (A⁻¹ [Δrbf_weights; Δmon_weights])[1:k]
 
-Used by both Mooncake and potentially Enzyme extensions.
+`A` may be the collocation matrix or a factorization of it (both extension rules pass
+the cached `BunchKaufman`; symmetric ⟹ self-adjoint, so `A⁻ᵀ = A⁻¹` holds either way).
+
+Used by both the Mooncake and Enzyme extensions.
 """
 function _interpolator_constructor_backward(Δrbf_weights, Δmon_weights, A, k)
     Δw = vcat(Δrbf_weights, Δmon_weights)
