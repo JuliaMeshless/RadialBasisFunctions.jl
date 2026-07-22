@@ -59,25 +59,20 @@ if ENZYME_SUPPORTED_JULIA
     end
 
     @testset "Enzyme Extension - Interpolator Differentiation" begin
-        @test_broken try
-            N = 30
-            points = [SVector{2}(rand(), rand()) for _ in 1:N]
-            values = sin.(getindex.(points, 1))
-            eval_points = [SVector{2}(rand(), rand()) for _ in 1:10]
+        N = 30
+        points = [SVector{2}(rand(), rand()) for _ in 1:N]
+        values = sin.(getindex.(points, 1))
+        eval_points = [SVector{2}(rand(), rand()) for _ in 1:10]
 
-            function loss_interp(v)
-                interp_local = Interpolator(points, v)
-                result = interp_local(eval_points)
-                return sum(result .^ 2)
-            end
-
-            dv = zeros(N)
-            Enzyme.autodiff(Reverse, loss_interp, Active, Duplicated(values, dv))
-            validate_gradient(dv, loss_interp, values; rtol = 1.0e-3)
-            true
-        catch
-            false
+        function loss_interp(v)
+            interp_local = Interpolator(points, v)
+            result = interp_local(eval_points)
+            return sum(result .^ 2)
         end
+
+        dv = zeros(N)
+        Enzyme.autodiff(Reverse, Const(loss_interp), Active, Duplicated(values, dv))
+        validate_gradient(dv, loss_interp, values; rtol = 1.0e-3)
     end
 
     @testset "Enzyme Extension - Basis Function Differentiation" begin

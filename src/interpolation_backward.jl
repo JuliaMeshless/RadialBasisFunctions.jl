@@ -65,3 +65,27 @@ function _interpolator_constructor_backward(Δrbf_weights, Δmon_weights, A, k)
     Δb = A \ Δw  # A is symmetric ⟹ A⁻ᵀ = A⁻¹
     return Δb[1:k]
 end
+
+"""
+    _interpolator_weight_cotangents!(Δrbf_w, Δmon_w, interp::Interpolator, x, Δy)
+
+Accumulate the cotangent of `interp(x) * Δy` w.r.t. the interpolator weights:
+
+    Δrbf_w[i] += Δy * φ(x, xᵢ)
+    Δmon_w[j] += Δy * pⱼ(x)
+
+Used by the Enzyme extension's Duplicated-Interpolator evaluation rules to deposit
+weight cotangents into the shadow Interpolator consumed by the constructor rule.
+"""
+function _interpolator_weight_cotangents!(Δrbf_w, Δmon_w, interp::Interpolator, x, Δy)
+    for i in eachindex(Δrbf_w)
+        Δrbf_w[i] += Δy * interp.rbf_basis(x, interp.x[i])
+    end
+    if !isempty(Δmon_w)
+        vals = interp.monomial_basis(x)
+        for j in eachindex(Δmon_w)
+            Δmon_w[j] += Δy * vals[j]
+        end
+    end
+    return nothing
+end
