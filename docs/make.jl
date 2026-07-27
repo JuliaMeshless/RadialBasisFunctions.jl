@@ -35,6 +35,7 @@ makedocs(;
                 "Work-Precision" => "guides/convergence/work-precision.md",
             ],
             "Quick Reference" => "guides/quickref.md",
+            "Troubleshooting" => "guides/troubleshooting.md",
         ],
         "Reference" => [
             "Theory" => "reference/theory.md",
