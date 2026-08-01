@@ -8,19 +8,19 @@ using LinearAlgebra: Symmetric
 # ============================================================================
 
 """
-    allocate_sparse_arrays(TD, k, N_eval, num_ops, adjl, boundary_data, global_to_boundary)
+    allocate_sparse_arrays(TD, k, N_eval, num_ops, adjl, boundary_data, global_to_boundary, eval_bnd)
 
 Allocate sparse matrix arrays for COO format sparse matrix construction.
 Exactly counts non-zeros: interior points get k entries, Dirichlet points get 1 entry.
 """
 function allocate_sparse_arrays(
         TD, k::Int, N_eval::Int, num_ops::Int, adjl, boundary_data::BoundaryData,
-        global_to_boundary::Vector{Int},
+        global_to_boundary::Vector{Int}, eval_bnd::Vector{Int},
     )
     # Count exact non-zeros needed
     total_nnz, row_offsets = count_nonzeros(
         adjl, boundary_data.is_boundary, boundary_data.boundary_conditions,
-        global_to_boundary,
+        global_to_boundary, eval_bnd,
     )
 
     I = Vector{Int}(undef, total_nnz)
@@ -31,14 +31,17 @@ function allocate_sparse_arrays(
 end
 
 """
-    count_nonzeros(adjl, is_boundary, boundary_conditions)
+    count_nonzeros(adjl, is_boundary, boundary_conditions, global_to_boundary, eval_bnd)
 
 Count exact number of non-zero entries for optimized allocation.
 Returns (total_nnz, row_offsets) where row_offsets[i] is the starting position for row i.
+The evaluation point's boundary status comes from `eval_bnd` (value-based, see
+`build_eval_boundary_map`), so this is correct for any evaluation set, not just
+`eval_points === data`.
 """
 function count_nonzeros(
         adjl, is_boundary::Vector{Bool}, boundary_conditions::Vector{<:BoundaryCondition},
-        global_to_boundary::Vector{Int} = construct_global_to_boundary(is_boundary),
+        global_to_boundary::Vector{Int}, eval_bnd::Vector{Int},
     )
     N_eval = length(adjl)
     row_offsets = Vector{Int}(undef, N_eval + 1)
@@ -47,18 +50,12 @@ function count_nonzeros(
     row_offsets[1] = 1  # 1-based indexing
 
     for eval_idx in 1:N_eval
-        if is_boundary[eval_idx]
-            boundary_idx = global_to_boundary[eval_idx]
-            bc = boundary_conditions[boundary_idx]
-            if is_dirichlet(bc)
-                # Dirichlet: only diagonal element
-                total_nnz += 1
-            else
-                # Neumann/Robin: full stencil
-                total_nnz += length(adjl[eval_idx])
-            end
+        b = eval_bnd[eval_idx]
+        if b > 0 && is_dirichlet(boundary_conditions[b])
+            # Dirichlet: only diagonal element
+            total_nnz += 1
         else
-            # Interior: full stencil
+            # Interior / Neumann / Robin: full stencil
             total_nnz += length(adjl[eval_idx])
         end
 
@@ -66,6 +63,21 @@ function count_nonzeros(
     end
 
     return total_nnz, row_offsets
+end
+
+# Backward-compatible collocation form: evaluation point i is assumed to be data
+# point i (the pre-`eval_bnd` behaviour, correct when eval_points === data).
+function count_nonzeros(
+        adjl, is_boundary::Vector{Bool}, boundary_conditions::Vector{<:BoundaryCondition},
+        global_to_boundary::Vector{Int} = construct_global_to_boundary(is_boundary),
+    )
+    eval_bnd = [
+        i <= length(global_to_boundary) ? global_to_boundary[i] : 0 for
+        i in eachindex(adjl)
+    ]
+    return count_nonzeros(
+        adjl, is_boundary, boundary_conditions, global_to_boundary, eval_bnd
+    )
 end
 
 """
@@ -136,6 +148,7 @@ function build_weights_kernel(
         boundary_data::BoundaryData;
         batch_size::Int = 10,
         device = CPU(),
+        eval_bc::Bool = true,
     )
     if !(device isa CPU)
         throw(
@@ -154,10 +167,11 @@ function build_weights_kernel(
     N_eval = length(eval_points)
 
     global_to_boundary = construct_global_to_boundary(boundary_data.is_boundary)
+    eval_bnd, eval_data = build_eval_maps(data, boundary_data.is_boundary, eval_points)
 
     # Allocate sparse arrays
     I, J, V, row_offsets = allocate_sparse_arrays(
-        TD, k, N_eval, num_ops, adjl, boundary_data, global_to_boundary
+        TD, k, N_eval, num_ops, adjl, boundary_data, global_to_boundary, eval_bnd
     )
 
     # Calculate batches
@@ -166,8 +180,8 @@ function build_weights_kernel(
     # Launch kernel
     launch_kernel!(
         I, J, V, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
-        boundary_data, global_to_boundary, row_offsets, batch_size, N_eval, n_batches,
-        k, nmon, num_ops, device,
+        boundary_data, global_to_boundary, eval_bnd, eval_data, row_offsets,
+        batch_size, N_eval, n_batches, k, nmon, num_ops, eval_bc, device,
     )
 
     return _construct_sparse(I, J, V, N_eval, length(data), num_ops)
@@ -185,8 +199,9 @@ Handles Dirichlet/Interior/Hermite stencil classification via dispatch.
 """
 function launch_kernel!(
         I, J, V, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
-        boundary_data::BoundaryData, global_to_boundary, row_offsets,
-        batch_size, N_eval, n_batches, k, nmon, num_ops, device,
+        boundary_data::BoundaryData, global_to_boundary, eval_bnd, eval_data,
+        row_offsets, batch_size, N_eval, n_batches, k, nmon, num_ops, eval_bc,
+        device,
     )
     TD = eltype(first(data))
     dim = length(first(data))
@@ -197,8 +212,8 @@ function launch_kernel!(
     @kernel function weight_kernel(
             I, J, V, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
             is_boundary, boundary_conditions, normals,
-            batch_hermite_datas, global_to_boundary,
-            row_offsets, batch_size, N_eval, nmon, k, num_ops, TD,
+            batch_hermite_datas, global_to_boundary, eval_bnd, eval_data,
+            row_offsets, batch_size, N_eval, nmon, k, num_ops, eval_bc, TD,
         )
         batch_idx = @index(Global)
         hermite_data = batch_hermite_datas[batch_idx]
@@ -216,14 +231,18 @@ function launch_kernel!(
             neighbors = adjl[eval_idx]
             eval_point = eval_points[eval_idx]
 
-            # Classify stencil type
+            # Classify stencil type (value-based: correct for any eval set)
             stype = classify_stencil(
-                is_boundary, boundary_conditions, eval_idx, neighbors, global_to_boundary
+                is_boundary, boundary_conditions, eval_bnd, eval_idx, neighbors,
+                global_to_boundary,
             )
 
             if stype isa DirichletStencil
-                # Identity row: only diagonal is 1.0
-                fill_dirichlet_entry!(I, J, V, eval_idx, start_pos, num_ops)
+                # Identity row on the coincident DATA point (eval_data, not
+                # eval_idx: the two coincide only when eval_points === data).
+                fill_dirichlet_entry!(
+                    I, J, V, eval_idx, eval_data[eval_idx], start_pos, num_ops
+                )
                 continue
             end
 
@@ -238,10 +257,13 @@ function launch_kernel!(
                     λ, A, b, ℒrbf, ℒmon, local_data, eval_point, basis, mon, k
                 )
             else  # HermiteStencil
-                # Mixed interior/boundary stencil
+                # Mixed interior/boundary stencil. eval_bc = false means the
+                # evaluation point's own BC is NOT applied (postprocessing at
+                # boundary nodes): the eval point is treated as interior.
                 update_hermite_stencil_data!(
                     hermite_data, data, neighbors, is_boundary,
-                    boundary_conditions, normals, global_to_boundary, eval_point,
+                    boundary_conditions, normals, global_to_boundary,
+                    eval_bc ? eval_point : nothing,
                 )
                 weights = _build_stencil!(
                     λ, A, b, ℒrbf, ℒmon, hermite_data, eval_point, basis, mon, k
@@ -257,8 +279,8 @@ function launch_kernel!(
     kernel!(
         I, J, V, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
         boundary_data.is_boundary, boundary_data.boundary_conditions,
-        boundary_data.normals, batch_hermite_datas, global_to_boundary,
-        row_offsets, batch_size, N_eval, nmon, k, num_ops, TD;
+        boundary_data.normals, batch_hermite_datas, global_to_boundary, eval_bnd,
+        eval_data, row_offsets, batch_size, N_eval, nmon, k, num_ops, eval_bc, TD;
         ndrange = n_batches, workgroupsize = 1,
     )
     return KernelAbstractions.synchronize(device)
@@ -293,10 +315,11 @@ end
     end
 end
 
-"""Fill Dirichlet identity row for optimized allocation"""
-@inline function fill_dirichlet_entry!(I, J, V, eval_idx::Int, start_pos::Int, num_ops::Int)
+"""Fill Dirichlet identity row for optimized allocation. `data_idx` is the column
+of the coincident data point (== `eval_idx` only when `eval_points === data`)."""
+@inline function fill_dirichlet_entry!(I, J, V, eval_idx::Int, data_idx::Int, start_pos::Int, num_ops::Int)
     I[start_pos] = eval_idx
-    J[start_pos] = eval_idx
+    J[start_pos] = data_idx
     return @inbounds for op in 1:num_ops
         V[start_pos, op] = one(eltype(V))
     end

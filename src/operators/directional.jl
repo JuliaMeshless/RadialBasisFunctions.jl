@@ -100,6 +100,7 @@ function _build_weights(
         boundary_conditions::Vector{<:BoundaryCondition},
         normals::Vector{<:AbstractVector};
         device = CPU(),
+        eval_bc::Bool = true,
     ) where {Dim}
     v = ℒ.v
     _validate_directional_vector(v, Dim, length(data))
@@ -123,6 +124,7 @@ function _build_weights(
         boundary_conditions,
         normals;
         device = device,
+        eval_bc = eval_bc,
     )
 
     return _combine_directional_weights(weights, v, Dim)

@@ -7,6 +7,11 @@ Supertype of all Polyharmonic Splines.
 """
 abstract type AbstractPHS <: AbstractRadialBasis end
 
+# Normal form of the identity (Regrid) operator: ∂/∂n_{xᵢ} φ(x, xᵢ), needed by
+# the Hermite RHS for Neumann/Robin stencil members when ℒ is the identity.
+# ∂/∂xᵢ φ(x, xᵢ) = -∂/∂x φ(x, xᵢ) for radial bases, hence the minus sign.
+(phs::AbstractPHS)(x, xᵢ, normal) = -LinearAlgebra.dot(normal, ∇(phs)(x, xᵢ))
+
 """
     function PHS(n::T=3; poly_deg::T=2) where {T<:Int}
 

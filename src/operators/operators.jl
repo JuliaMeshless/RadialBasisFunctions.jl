@@ -91,6 +91,11 @@ $(KWARG_DOCS)
 
 The `hermite` NamedTuple has fields `is_boundary::Vector{Bool}`,
 `bc::Vector{<:BoundaryCondition}`, and `normals::Vector{<:AbstractVector}`.
+An optional fourth field `eval_bc::Bool` (default `true`) controls whether the
+evaluation point's own boundary condition is applied to the monomial RHS: set
+it to `false` when *evaluating* (rather than solving at) points that may
+coincide with boundary nodes — e.g. postprocessing boundary values of a
+Hermite solve.
 
 # Examples
 ```julia
@@ -136,6 +141,7 @@ function RadialBasisOperator(
             hermite.is_boundary,
             hermite.bc,
             hermite.normals;
+            eval_bc = get(hermite, :eval_bc, true),
             device = device,
         )
     end

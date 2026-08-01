@@ -118,10 +118,15 @@ end
 """
     _build_weights(data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
                   is_boundary, boundary_conditions, normals;
-                  batch_size=10, device=CPU())
+                  batch_size=10, device=CPU(), eval_bc=true)
 
 Build weights for problems with boundary conditions using Hermite interpolation.
 Exact allocation: Dirichlet points get single entry, others get full stencil.
+
+`eval_bc` (default `true`): whether an evaluation point that coincides with a
+boundary data point has its own boundary condition applied to the monomial RHS.
+Pass `false` when *evaluating* at boundary points (postprocessing a Hermite
+solve) rather than *solving* at them.
 """
 function _build_weights(
         data,
@@ -136,6 +141,7 @@ function _build_weights(
         normals::Vector{<:AbstractVector};
         batch_size::Int = 10,
         device = CPU(),
+        eval_bc::Bool = true,
     )
     _validate_boundary_inputs(data, is_boundary, boundary_conditions, normals)
     _check_normal_form_support(ℒrbf, basis, data, boundary_conditions, normals)
@@ -151,6 +157,7 @@ function _build_weights(
         boundary_data;
         batch_size = batch_size,
         device = device,
+        eval_bc = eval_bc,
     )
 end
 
@@ -174,6 +181,7 @@ function _build_weights(
         boundary_conditions::Vector{<:BoundaryCondition},
         normals::Vector{<:AbstractVector};
         device = CPU(),
+        eval_bc::Bool = true,
     )
     dim = length(first(data))
     mon = MonomialBasis(dim, basis.poly_deg)
@@ -192,5 +200,6 @@ function _build_weights(
         boundary_conditions,
         normals;
         device = device,
+        eval_bc = eval_bc,
     )
 end

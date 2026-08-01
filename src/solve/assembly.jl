@@ -33,6 +33,9 @@ end
 _mono_rhs!(bmono, ℒmon, mon, eval_point, data::AbstractVector, k) = ℒmon(bmono, eval_point)
 function _mono_rhs!(bmono, ℒmon, mon, eval_point, data::HermiteStencilData, k)
     eval_idx = data.eval_local_idx[]
+    # -1: eval_bc = false. Must return before the scan below, which would
+    # otherwise re-find the eval point and reapply the BC we were told to skip.
+    eval_idx == -1 && return ℒmon(bmono, eval_point)
     if eval_idx == 0
         # Fallback scan for callers that bypass update_hermite_stencil_data!
         for i in 1:k
@@ -41,8 +44,12 @@ function _mono_rhs!(bmono, ℒmon, mon, eval_point, data::HermiteStencilData, k)
                 break
             end
         end
-        eval_idx == 0 &&
-            throw(ArgumentError("evaluation point not found in stencil data"))
+    end
+    if eval_idx == 0
+        # The evaluation point is not one of the stencil's data points (e.g. an
+        # oversampled collocation point). Only data points can be boundary
+        # points, so it is interior by definition: standard monomial RHS.
+        return ℒmon(bmono, eval_point)
     end
     @assert !is_dirichlet(data.boundary_conditions[eval_idx]) "Dirichlet eval nodes handled at higher level"
     return hermite_mono_rhs!(
