@@ -128,6 +128,7 @@ results = interp(new_points)
 | Internal | `Internal()` | Interior point, no condition |
 
 ```julia
+using RadialBasisFunctions: Dirichlet, Neumann, Robin  # not exported
 lap = laplacian(points; hermite=(is_boundary=…, bc=…, normals=…))
 ```
 

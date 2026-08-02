@@ -12,6 +12,7 @@ using LinearAlgebra
 using StaticArraysCore
 using SparseArrays
 using RadialBasisFunctions
+using RadialBasisFunctions: Dirichlet, Neumann, Robin
 import RadialBasisFunctions as RBF
 
 @testset "Solve Utils Integration Tests" begin

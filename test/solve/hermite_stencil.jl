@@ -8,6 +8,7 @@ using LinearAlgebra
 using Test
 
 import RadialBasisFunctions as RBF
+using RadialBasisFunctions: Dirichlet, Neumann, Robin
 
 @testset "Clean Hermite Implementation - Single Stencil" begin
     # Create a simple 1D problem with 3 points: 2 interior + 1 Neumann boundary

@@ -1,4 +1,5 @@
 using RadialBasisFunctions
+using RadialBasisFunctions: Dirichlet, Neumann, Robin
 import RadialBasisFunctions as RBF
 using StaticArraysCore
 using LinearAlgebra

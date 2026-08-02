@@ -1,5 +1,6 @@
 using Test
 using RadialBasisFunctions
+using RadialBasisFunctions: Dirichlet, Neumann, Robin
 import RadialBasisFunctions as RBF
 
 @testset "BoundaryCondition" begin

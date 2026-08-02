@@ -17,6 +17,14 @@ Hermite formulation restores symmetry — see
 | Robin | `Robin(α, β)` | Mixed: ``\alpha u + \beta \, \partial u/\partial n = g`` |
 | Internal | `Internal()` | Interior point (no boundary condition) |
 
+`Dirichlet`, `Neumann`, and `Robin` are public but **not exported** — downstream physics
+packages (e.g. Macchiato.jl) export their own boundary-condition types with these names.
+Import them explicitly:
+
+```julia
+using RadialBasisFunctions: Dirichlet, Neumann, Robin
+```
+
 ## Setting Up a Domain
 
 Hermite stencils need a *real* boundary with meaningful outward normals. Below is a unit
@@ -24,6 +32,7 @@ disk: interior nodes scattered inside, boundary nodes placed on the circle itsel
 
 ```@example bcs
 using RadialBasisFunctions
+using RadialBasisFunctions: Dirichlet, Neumann, Robin
 using StaticArrays
 using LinearAlgebra: norm, normalize
 using Random

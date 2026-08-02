@@ -1,6 +1,7 @@
 using Test
 using StaticArraysCore
 using RadialBasisFunctions
+using RadialBasisFunctions: Dirichlet, Neumann, Robin
 import RadialBasisFunctions as RBF
 
 # 12-point 2D domain with 2 boundary points at (0,0) and (1,0), mirrors test/hermite.jl

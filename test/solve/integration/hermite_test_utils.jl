@@ -2,6 +2,7 @@ using Test
 using StaticArraysCore
 using LinearAlgebra
 using Random: MersenneTwister
+using RadialBasisFunctions: Dirichlet, Neumann, Robin
 
 function create_2d_unit_square_domain(
         spacing::Float64 = 0.05; randomize = false, rng = MersenneTwister(101)
