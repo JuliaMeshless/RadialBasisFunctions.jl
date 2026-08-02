@@ -89,13 +89,13 @@ $(KWARG_DOCS)
 # Examples
 ```julia
 # 2D curl (scalar output)
-points = [SVector{2}(rand(2)) for _ in 1:1000]
+points = rand(SVector{2,Float64}, 1000)
 curl_op = curl(points)
 u = hcat(-getindex.(points, 2), getindex.(points, 1))  # u = (-y, x)
 ω = curl_op(u)  # ≈ 2.0 everywhere
 
 # 3D curl (vector output)
-points3d = [SVector{3}(rand(3)) for _ in 1:1000]
+points3d = rand(SVector{3,Float64}, 1000)
 curl_op3d = curl(points3d)
 u3d = hcat(-getindex.(points3d, 2), getindex.(points3d, 1), zeros(1000))
 ω3d = curl_op3d(u3d)  # ≈ [0, 0, 2] everywhere

@@ -12,7 +12,7 @@ escape hatch.
 using RadialBasisFunctions
 using StaticArrays
 
-x = [SVector{2}(rand(2)) for _ in 1:100]
+x = rand(SVector{2,Float64}, 100)
 f(p) = sin(p[1]) * cos(p[2])
 u = f.(x)
 nothing # hide

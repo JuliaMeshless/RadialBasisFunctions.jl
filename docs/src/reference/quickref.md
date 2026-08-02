@@ -8,14 +8,14 @@ Data **must** be an `AbstractVector` of point vectors, not a `Matrix`:
 using StaticArrays
 
 # CORRECT: Vector of static vectors
-points = [SVector{2}(rand(2)) for _ in 1:100]
+points = rand(SVector{2,Float64}, 100)
 
 # Converting from matrix
 matrix = rand(100, 2)
-points = [SVector{2}(row) for row in eachrow(matrix)]
+points = map(SVector{2}, eachrow(matrix))
 
 # 3D points
-points_3d = [SVector{3}(rand(3)) for _ in 1:100]
+points_3d = rand(SVector{3,Float64}, 100)
 ```
 
 ## Basis Functions
@@ -55,7 +55,7 @@ basis = PHS(3; poly_deg=-1)  # No polynomial (not recommended)
 ```julia
 using RadialBasisFunctions, StaticArrays
 
-points = [SVector{2}(rand(2)) for _ in 1:100]
+points = rand(SVector{2,Float64}, 100)
 
 # Scalar field operators
 lap = laplacian(points)           # ∇²f (scalar output)

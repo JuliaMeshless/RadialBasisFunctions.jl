@@ -22,7 +22,6 @@ import DifferentiationInterface as DI
 import Enzyme
 
 # Create points and operator (outside loss function)
-N = 49
 points = [SVector{2}(0.1 + 0.8 * i / 7, 0.1 + 0.8 * j / 7) for i in 1:7 for j in 1:7]
 values = sin.(getindex.(points, 1)) .+ cos.(getindex.(points, 2))
 nothing # hide
@@ -137,8 +136,8 @@ grad = DI.gradient(loss_gauss, backend, x)
 For advanced use cases like mesh optimization or shape parameter tuning, you can differentiate through the weight construction process using the internal `_build_weights` function.
 
 ```@example autodiff
-N_weights = 25
 points_weights = [SVector{2}(0.1 + 0.8 * i / 5, 0.1 + 0.8 * j / 5) for i in 1:5 for j in 1:5]
+N_weights = length(points_weights)
 adjl = RadialBasisFunctions.find_neighbors(points_weights, 10)
 basis = PHS(3; poly_deg=2)
 ℒ = Partial(1, 1)  # First derivative in x
@@ -150,7 +149,7 @@ function loss_weights(pts)
     return sum(W.nzval .^ 2)
 end
 
-pts_flat = vcat([collect(p) for p in points_weights]...)
+pts_flat = reduce(vcat, points_weights)
 grad = DI.gradient(loss_weights, backend, pts_flat)
 grad[1:6]  # Gradients for first 3 points (x,y pairs)
 ```

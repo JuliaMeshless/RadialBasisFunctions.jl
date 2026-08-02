@@ -60,7 +60,7 @@ The parameter `N` captures whether differentiation adds a tensor index to the ou
 **`N=0` (rank-preserving):** The output has the same shape as the input. The operator stores a single weight matrix `W`, and evaluation is `W * u`.
 
 ```@example operators
-x = [SVector{2}(rand(2)) for _ in 1:100]
+x = rand(SVector{2,Float64}, 100)
 u = sin.(getindex.(x, 1))
 nothing # hide
 

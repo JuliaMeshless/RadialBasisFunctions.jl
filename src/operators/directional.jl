@@ -29,7 +29,7 @@ $(KWARG_DOCS)
 ∂_x = directional(data, [1.0, 0.0])
 
 # Spatially-varying direction (e.g., radial)
-normals = [normalize(p) for p in data]
+normals = normalize.(data)
 ∂_n = directional(data, normals)
 ```
 

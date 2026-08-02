@@ -41,7 +41,7 @@ Other things that might matter to you:
 using RadialBasisFunctions, StaticArrays
 
 # Scattered 2D points — no mesh needed
-points = [SVector{2}(rand(2)) for _ in 1:500]
+points = rand(SVector{2,Float64}, 500)
 f(x) = sin(4x[1]) * cos(3x[2])
 values = f.(points)
 
@@ -62,7 +62,7 @@ interp(SVector(0.5, 0.5))
 mixed = ∂x + ∂²y                   # operator algebra
 
 # Transfer data between point sets
-target = [SVector{2}(rand(2)) for _ in 1:1000]
+target = rand(SVector{2,Float64}, 1000)
 rg = regrid(points, target)
 rg(values)                         # interpolated onto target
 ```

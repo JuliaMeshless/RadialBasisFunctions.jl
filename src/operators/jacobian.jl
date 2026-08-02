@@ -36,7 +36,7 @@ $(KWARG_DOCS)
 
 # Examples
 ```julia
-points = [SVector{2}(rand(2)) for _ in 1:1000]
+points = rand(SVector{2,Float64}, 1000)
 op = jacobian(points)
 
 # Scalar field → gradient
@@ -81,7 +81,7 @@ For repeated evaluations on the same points, prefer creating the operator once w
 
 # Examples
 ```julia
-points = [SVector{2}(rand(2)) for _ in 1:1000]
+points = rand(SVector{2,Float64}, 1000)
 u = sin.(getindex.(points, 1))
 ∇u = jacobian(points, u)  # One-shot gradient computation
 ```

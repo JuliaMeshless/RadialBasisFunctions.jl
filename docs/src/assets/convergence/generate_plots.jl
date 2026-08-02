@@ -69,17 +69,12 @@ is_unusable(op, fam, ord, pd) = (String(op), String(fam), Int(ord), Int(pd)) in 
 
 function load_csv(path)
     data, hdr = readdlm(path, ','; header = true)
-    cols = vec(hdr)
-    rows = Vector{NamedTuple}(undef, size(data, 1))
-    for i in 1:size(data, 1)
-        vals = Tuple(data[i, j] for j in 1:length(cols))
-        rows[i] = NamedTuple{Tuple(Symbol.(cols))}(vals)
-    end
-    return rows
+    names = Tuple(Symbol.(vec(hdr)))
+    return map(i -> NamedTuple{names}(Tuple(view(data, i, :))), axes(data, 1))
 end
 
 function filter_rows(rows, pred)
-    return [r for r in rows if pred(r)]
+    return filter(pred, rows)
 end
 
 function sorted_by_N(rows)
@@ -147,8 +142,8 @@ function plot_h_phs_matched!(ax, rows_for_op, rate, rate_label, op_name)
             )
         )
         isempty(rs) && continue
-        Ns = [r.N for r in rs]
-        errs = [r.nrmse for r in rs]
+        Ns = map(r -> r.N, rs)
+        errs = map(r -> r.nrmse, rs)
         scatterlines!(
             ax, Ns, errs; color = cmap[i + 1],
             label = "PHS$ord, p=$POLY_DEG", markersize = 8, linewidth = 1.8
@@ -159,7 +154,7 @@ function plot_h_phs_matched!(ax, rows_for_op, rate, rate_label, op_name)
     # Reference slope anchored at the geometric mean of curves at leftmost N
     # so the dashed line sits among the data rather than below it.
     return if !isempty(leftmost_errs)
-        Ns_line = range(minimum(plotted_Ns), maximum(plotted_Ns); length = 50) |> collect
+        Ns_line = collect(range(minimum(plotted_Ns), maximum(plotted_Ns); length = 50))
         anchor_err = exp(mean(log.(leftmost_errs)))
         ref_slope!(
             ax, Ns_line, rate;
@@ -180,8 +175,8 @@ function plot_h_phs_polydeg_panel!(ax, rows_for_op, phs_order, poly_degs, title,
             )
         )
         isempty(rs) && continue
-        Ns = [r.N for r in rs]
-        errs = [r.nrmse for r in rs]
+        Ns = map(r -> r.N, rs)
+        errs = map(r -> r.nrmse, rs)
         scatterlines!(
             ax, Ns, errs; color = cmap[i],
             label = "p=$p", markersize = 7, linewidth = 1.5
@@ -201,8 +196,8 @@ function plot_h_shape_panel!(ax, rows_for_op, family, poly_degs, title, op_name)
             )
         )
         isempty(rs) && continue
-        Ns = [r.N for r in rs]
-        errs = [r.nrmse for r in rs]
+        Ns = map(r -> r.N, rs)
+        errs = map(r -> r.nrmse, rs)
         scatterlines!(
             ax, Ns, errs; color = cmap[i],
             label = "p=$p", markersize = 7, linewidth = 1.5
@@ -235,7 +230,7 @@ function make_h_plots(h_rows)
                 xlabel = "N", ylabel = j == 1 ? op.ylabel : ""
             )
             plot_h_phs_polydeg_panel!(
-                ax, rows_op, ord, collect(ps),
+                ax, rows_op, ord, ps,
                 "PHS$ord, poly_deg sweep", op.name
             )
             axislegend(ax; position = :lb, framevisible = false, labelsize = 9)
@@ -302,8 +297,8 @@ function _plot_eps_compare_panel_fixed!(
                 ),
             )
             isempty(rs) && continue
-            Ns = [r.N for r in rs]
-            errs = [r.nrmse for r in rs]
+            Ns = map(r -> r.N, rs)
+            errs = map(r -> r.nrmse, rs)
             scatterlines!(
                 ax, Ns, errs;
                 color = cmap[i + 2], linestyle = style_by_family[family],
@@ -331,8 +326,8 @@ function _plot_eps_compare_panel_scaled!(
                 ),
             )
             isempty(rs) && continue
-            Ns = [r.N for r in rs]
-            errs = [r.nrmse for r in rs]
+            Ns = map(r -> r.N, rs)
+            errs = map(r -> r.nrmse, rs)
             scatterlines!(
                 ax, Ns, errs;
                 color = cmap[i + 2], linestyle = style_by_family[family],
@@ -355,8 +350,8 @@ function _plot_phs_reference!(ax, h_rows, op_name)
         ),
     )
     isempty(rs) && return
-    Ns = [r.N for r in rs]
-    errs = [r.nrmse for r in rs]
+    Ns = map(r -> r.N, rs)
+    errs = map(r -> r.nrmse, rs)
     scatterlines!(
         ax, Ns, errs;
         color = (:black, 0.7), marker = :utriangle, markersize = 7,
@@ -448,8 +443,8 @@ function plot_p_refinement(p_rows)
                 by = r -> r.poly_deg
             )
             isempty(rs) && continue
-            pd = [r.poly_deg for r in rs]
-            er = [r.nrmse for r in rs]
+            pd = map(r -> r.poly_deg, rs)
+            er = map(r -> r.nrmse, rs)
             scatterlines!(
                 ax, pd, er; color = cmap[i], label = lab,
                 markersize = 8, linewidth = 1.8
@@ -473,8 +468,8 @@ function plot_p_refinement(p_rows)
             by = r -> r.poly_deg
         )
         isempty(rs) && continue
-        pd = [r.poly_deg for r in rs]
-        bt = [r.build_time_s for r in rs]
+        pd = map(r -> r.poly_deg, rs)
+        bt = map(r -> r.build_time_s, rs)
         scatterlines!(
             ax, pd, bt; color = Makie.wong_colors()[i], label = lab,
             markersize = 8, linewidth = 1.8
@@ -512,8 +507,8 @@ function plot_k_refinement(k_rows)
                 by = r -> r.k
             )
             isempty(rs) && continue
-            ks = [r.k for r in rs]
-            er = [r.nrmse for r in rs]
+            ks = map(r -> r.k, rs)
+            er = map(r -> r.nrmse, rs)
             scatterlines!(
                 ax, ks, er; color = cmap[i], label = lab,
                 markersize = 8, linewidth = 1.8
@@ -546,8 +541,8 @@ function plot_eps_refinement(eps_rows)
                 by = r -> r.eps
             )
             isempty(rs) && continue
-            eps = [r.eps for r in rs]
-            er = [r.nrmse for r in rs]
+            eps = map(r -> r.eps, rs)
+            er = map(r -> r.nrmse, rs)
             scatterlines!(
                 ax, eps, er; color = cmap[i], label = op,
                 markersize = 8, linewidth = 1.8
@@ -571,8 +566,8 @@ function plot_eps_refinement(eps_rows)
                 by = r -> r.eps
             )
             isempty(rs) && continue
-            eps = [r.eps for r in rs]
-            er = [r.nrmse for r in rs]
+            eps = map(r -> r.eps, rs)
+            er = map(r -> r.nrmse, rs)
             scatterlines!(
                 ax, eps, er; color = cmap[i], label = "p=$p",
                 markersize = 8, linewidth = 1.8
@@ -617,7 +612,7 @@ function _plot_wp_curves!(ax, rows_op, op_name, xfield)
         )
         isempty(rs) && continue
         x = getproperty.(rs, xfield)
-        e = [r.nrmse for r in rs]
+        e = map(r -> r.nrmse, rs)
         scatterlines!(
             ax, x, e;
             color = color, linestyle = ls, marker = mk,

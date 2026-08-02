@@ -13,11 +13,11 @@ points = rand(100, 2)
 
 # CORRECT
 using StaticArrays
-points = [SVector{2}(rand(2)) for _ in 1:100]
+points = rand(SVector{2,Float64}, 100)
 
 # Converting from a Matrix
 matrix_data = rand(100, 2)
-points = [SVector{2}(row) for row in eachrow(matrix_data)]
+points = map(SVector{2}, eachrow(matrix_data))
 ```
 
 ## `ArgumentError: n must be 1, 3, 5, or 7`

@@ -18,7 +18,7 @@ $(KWARG_DOCS)
 
 # Examples
 ```julia
-points = [SVector{2}(rand(2)) for _ in 1:1000]
+points = rand(SVector{2,Float64}, 1000)
 op = gradient(points)
 
 u = sin.(getindex.(points, 1))
@@ -46,7 +46,7 @@ For repeated evaluations, prefer creating the operator once with [`gradient(data
 
 # Examples
 ```julia
-points = [SVector{2}(rand(2)) for _ in 1:1000]
+points = rand(SVector{2,Float64}, 1000)
 u = sin.(getindex.(points, 1))
 ∇u = gradient(points, u)  # One-shot gradient computation
 ```

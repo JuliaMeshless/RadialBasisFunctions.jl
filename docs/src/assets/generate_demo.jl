@@ -18,7 +18,8 @@ xs = range(0, 1, nx)
 ys = range(0, 1, ny)
 
 # Create all grid points and subsample randomly
-all_points = [SVector(x, y) for x in xs, y in ys] |> vec
+grid_points = SVector.(xs, ys')
+all_points = vec(grid_points)
 all_values = vec(volcano)
 
 Random.seed!(42)
@@ -31,8 +32,7 @@ values = all_values[sample_idx]
 interp = Interpolator(points, values)
 
 # Interpolate to grid for plotting
-eval_points = [SVector(x, y) for x in xs, y in ys]
-z_interp = [interp(p) for p in eval_points]
+z_interp = interp.(grid_points)
 
 # Compute gradient
 grad_op = gradient(points; k = 30)
@@ -44,7 +44,7 @@ interp_gy = Interpolator(points, grad_vals[:, 2])
 
 grad_mag = sqrt.(grad_vals[:, 1] .^ 2 .+ grad_vals[:, 2] .^ 2)
 interp_mag = Interpolator(points, grad_mag)
-mag_interp = [interp_mag(p) for p in eval_points]
+mag_interp = interp_mag.(grid_points)
 
 azimuth = 0.8π
 elev = 0.2π
@@ -62,7 +62,7 @@ ax1 = Axis3(
     azimuth = azimuth,
     elevation = elev,
 )
-scatter!(ax1, [p[1] for p in points], [p[2] for p in points], values; color = values, colormap = :terrain, markersize = 8)
+scatter!(ax1, getindex.(points, 1), getindex.(points, 2), values; color = values, colormap = :terrain, markersize = 8)
 
 # Panel 2: RBF Reconstruction surface
 ax2 = Axis3(
@@ -133,7 +133,7 @@ end
 
 function plot_descent_path!(ax, start_point; color = :black)
     path = gradient_descent(start_point)
-    lines!(ax, [p[1] for p in path], [p[2] for p in path]; color = color, linewidth = 2)
+    lines!(ax, getindex.(path, 1), getindex.(path, 2); color = color, linewidth = 2)
     scatter!(ax, [start_point[1]], [start_point[2]]; color = color, markersize = 10, marker = :circle)
     return scatter!(ax, [path[end][1]], [path[end][2]]; color = color, markersize = 12, marker = :star5)
 end

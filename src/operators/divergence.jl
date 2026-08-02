@@ -56,7 +56,7 @@ $(KWARG_DOCS)
 
 # Examples
 ```julia
-points = [SVector{2}(rand(2)) for _ in 1:1000]
+points = rand(SVector{2,Float64}, 1000)
 div_op = divergence(points)
 
 # Vector field as matrix (N × D)

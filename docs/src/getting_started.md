@@ -13,7 +13,7 @@ Suppose we have a set of data ``\mathbf{x}`` where ``\mathbf{x}_i \in \mathbb{R}
 
 ```@example overview
 f(x) = 2*x[1]^2 + 3*x[2]
-x = [SVector{2}(rand(2)) for _ in 1:1000]
+x = rand(SVector{2,Float64}, 1000)
 y = f.(x)
 nothing # hide
 ```
@@ -27,7 +27,7 @@ interp = Interpolator(x, y)
 and evaluate it at a new point
 
 ```@example overview
-x_new = [SVector{2}(rand(2)) for _ in 1:5]
+x_new = rand(SVector{2,Float64}, 5)
 y_new = interp(x_new)
 y_true = f.(x_new)
 nothing # hide
@@ -114,7 +114,7 @@ The direction can also vary per-point, useful for computing normal derivatives:
 
 ```@example overview
 # Spatially-varying direction (e.g., radial directions)
-normals = [normalize(collect(p)) for p in x]
+normals = map(normalize, x)
 normal_deriv = directional(x, normals)
 typeof(normal_deriv(y))
 ```
@@ -135,7 +135,7 @@ Interpolate field values from one set of points to another using `regrid`:
 
 ```@example overview
 # Target points (fine grid, different from original x)
-x_fine = [SVector{2}(rand(2)) for _ in 1:500]
+x_fine = rand(SVector{2,Float64}, 500)
 
 # Build regridding operator from x to x_fine
 rg = regrid(x, x_fine)

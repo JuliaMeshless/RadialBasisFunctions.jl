@@ -35,8 +35,11 @@ points = [
 ]
 
 # Taylor-Green velocity field
-u1 = [sin(π * p[1]) * cos(π * p[2]) for p in points]
-u2 = [-cos(π * p[1]) * sin(π * p[2]) for p in points]
+u1_exact(p) = sin(π * p[1]) * cos(π * p[2])
+u2_exact(p) = -cos(π * p[1]) * sin(π * p[2])
+
+u1 = u1_exact.(points)
+u2 = u2_exact.(points)
 vel = hcat(u1, u2)
 
 # Shared stencils for all operators
@@ -46,7 +49,7 @@ adjl = find_neighbors(points, 30)
 nx, ny = 80, 80
 xs = range(0.05, 1.95; length=nx)
 ys = range(0.05, 1.95; length=ny)
-grid_points = vec([SVector(x, y) for x in xs, y in ys])
+grid_points = vec(SVector.(xs, ys'))
 rg = regrid(points, grid_points)
 to_grid(v) = reshape(rg(v), nx, ny)
 nothing # hide
@@ -115,13 +118,14 @@ In 2D, the curl reduces to a scalar — the vorticity:
 curl_op = curl(points; adjl=adjl)
 ω = curl_op(vel)
 
-ω_exact = [2π * sin(π * p[1]) * sin(π * p[2]) for p in points]
+ω_exact_fn(p) = 2π * sin(π * p[1]) * sin(π * p[2])
+ω_exact = ω_exact_fn.(points)
 println("Vorticity max error: ", round(maximum(abs, ω .- ω_exact); sigdigits=3))
 ```
 
 ```@example continuum
 ω_grid = to_grid(ω)
-ω_exact_grid = [2π * sin(π * x) * sin(π * y) for x in xs, y in ys]
+ω_exact_grid = ω_exact_fn.(SVector.(xs, ys'))
 lims = extrema(ω_exact_grid)
 shared_levels = range(lims[1], lims[2]; length=20)
 
@@ -150,12 +154,12 @@ The Jacobian is the building block for both the strain rate and rotation rate te
 jac_op = jacobian(points; adjl=adjl)
 J = jac_op(vel)
 
-J_exact = [
-    [π * cos(π * p[1]) * cos(π * p[2]) for p in points],
-    [-π * sin(π * p[1]) * sin(π * p[2]) for p in points],
-    [π * sin(π * p[1]) * sin(π * p[2]) for p in points],
-    [-π * cos(π * p[1]) * cos(π * p[2]) for p in points],
-]
+J11_exact(p) = π * cos(π * p[1]) * cos(π * p[2])
+J12_exact(p) = -π * sin(π * p[1]) * sin(π * p[2])
+J21_exact(p) = π * sin(π * p[1]) * sin(π * p[2])
+J22_exact(p) = -π * cos(π * p[1]) * cos(π * p[2])
+
+J_exact = [J11_exact.(points), J12_exact.(points), J21_exact.(points), J22_exact.(points)]
 
 for (name, computed, exact) in zip(
     ["J₁₁", "J₁₂", "J₂₁", "J₂₂"],
@@ -180,7 +184,7 @@ For the Taylor-Green vortex: ``\varepsilon_{11} = \pi\cos\pi x\cos\pi y``, ``\va
 ε_op = strain_rate(points; adjl=adjl)
 ε = ε_op(vel)
 
-ε11_exact = [π * cos(π * p[1]) * cos(π * p[2]) for p in points]
+ε11_exact = J11_exact.(points)   # ε₁₁ = ∂u₁/∂x = J₁₁
 println("Symmetry check |ε₁₂ - ε₂₁|: ",
     round(maximum(abs, ε[:, 1, 2] .- ε[:, 2, 1]); sigdigits=3))
 println("ε₁₁ max error: ", round(maximum(abs, ε[:, 1, 1] .- ε11_exact); sigdigits=3))

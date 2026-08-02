@@ -33,12 +33,12 @@ Random.seed!(42)
 # Boundary nodes on the unit circle
 n_boundary = 120
 θ = range(0, 2π; length=n_boundary + 1)[1:(end - 1)]
-boundary_pts = [SVector(cos(t), sin(t)) for t in θ]
+boundary_pts = map(t -> SVector(cos(t), sin(t)), θ)
 
 # Interior nodes scattered inside the disk
 interior_pts = SVector{2,Float64}[]
 while length(interior_pts) < 700
-    p = SVector{2}(2 .* rand(2) .- 1)
+    p = 2 * rand(SVector{2,Float64}) .- 1
     norm(p) < 0.95 && push!(interior_pts, p)
 end
 
@@ -47,7 +47,7 @@ is_boundary = [i > length(interior_pts) for i in eachindex(points)]
 boundary_indices = findall(is_boundary)
 
 # Outward unit normals — radial on a disk
-normals = [normalize(collect(points[i])) for i in boundary_indices]
+normals = normalize.(points[boundary_indices])
 length(points), count(is_boundary)
 ```
 
@@ -61,7 +61,7 @@ Pass a named tuple with three fields to any operator constructor. `hermite` is
 - `normals` — an outward unit normal per boundary point, same order
 
 ```@example bcs
-bcs = [Dirichlet() for _ in boundary_indices]
+bcs = fill(Dirichlet(), length(boundary_indices))
 
 lap = laplacian(points; hermite=(
     is_boundary=is_boundary,
@@ -106,11 +106,11 @@ the unit circle, ``\partial u/\partial n = \nabla u \cdot \hat{n} = 2x^2 - 2y^2`
 
 lap_neumann = laplacian(points; hermite=(
     is_boundary=is_boundary,
-    bc=[Neumann() for _ in boundary_indices],
+    bc=fill(Neumann(), length(boundary_indices)),
     normals=normals
 ))
 
-v = [is_boundary[i] ? ∂u∂n(points[i]) : u(points[i]) for i in eachindex(points)]
+v = map((b, p) -> b ? ∂u∂n(p) : u(p), is_boundary, points)
 maximum(abs, lap_neumann(v)[.!is_boundary])
 ```
 

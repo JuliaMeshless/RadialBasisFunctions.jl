@@ -99,7 +99,7 @@ function compute_error(op_kind::Symbol, pts, basis; k = nothing)
 
     if op_kind === :interpolation
         Random.seed!(99)
-        eval_pts = [SVector{2}(rand(2) .* 0.98 .+ 0.01) for _ in 1:500]
+        eval_pts = map(p -> 0.98p .+ 0.01, rand(SVector{2,Float64}, 500))
         vals = franke.(pts)
         interp = Interpolator(pts, vals, basis)
         got = interp.(eval_pts)
@@ -136,12 +136,10 @@ function compute_error(op_kind::Symbol, pts, basis; k = nothing)
         op = hessian(pts; kw...)
         got = op(g.(pts))  # N × 2 × 2
         exact = similar(got)
-        for (i, x) in enumerate(pts)
-            exact[i, 1, 1] = ∂²g_∂x1²(x)
-            exact[i, 1, 2] = ∂²g_∂x1∂x2(x)
-            exact[i, 2, 1] = ∂²g_∂x1∂x2(x)
-            exact[i, 2, 2] = ∂²g_∂x2²(x)
-        end
+        exact[:, 1, 1] .= ∂²g_∂x1².(pts)
+        exact[:, 1, 2] .= ∂²g_∂x1∂x2.(pts)
+        exact[:, 2, 1] .= ∂²g_∂x1∂x2.(pts)
+        exact[:, 2, 2] .= ∂²g_∂x2².(pts)
         return frobenius_nrmse(got, exact)
 
     elseif op_kind === :jacobian
@@ -149,12 +147,10 @@ function compute_error(op_kind::Symbol, pts, basis; k = nothing)
         u_mat = hcat(u1.(pts), u2.(pts))
         got = op(u_mat)  # N × 2 × 2
         exact = similar(got)
-        for (i, x) in enumerate(pts)
-            exact[i, 1, 1] = ∂u1_∂x1(x)
-            exact[i, 1, 2] = ∂u1_∂x2(x)
-            exact[i, 2, 1] = ∂u2_∂x1(x)
-            exact[i, 2, 2] = ∂u2_∂x2(x)
-        end
+        exact[:, 1, 1] .= ∂u1_∂x1.(pts)
+        exact[:, 1, 2] .= ∂u1_∂x2.(pts)
+        exact[:, 2, 1] .= ∂u2_∂x1.(pts)
+        exact[:, 2, 2] .= ∂u2_∂x2.(pts)
         return frobenius_nrmse(got, exact)
 
     elseif op_kind === :divergence
@@ -186,18 +182,16 @@ struct CSVStore
 end
 
 function CSVStore(path, header, key_cols_names)
-    key_cols = [findfirst(==(c), header) for c in key_cols_names]
-    seen = Set{Tuple}()
-    if isfile(path)
+    key_cols = map(c -> findfirst(==(c), header), key_cols_names)
+    seen = if isfile(path)
         data, hdr = readdlm(path, ','; header = true)
         @assert vec(hdr) == header "header mismatch in $path"
-        for row in eachrow(data)
-            push!(seen, Tuple(row[i] for i in key_cols))
-        end
+        Set{Tuple}(Tuple(row[i] for i in key_cols) for row in eachrow(data))
     else
         open(path, "w") do io
             println(io, join(header, ","))
         end
+        Set{Tuple}()
     end
     return CSVStore(path, header, seen, key_cols)
 end
@@ -567,7 +561,7 @@ function sweep_work_precision()
                 bbytes = res.memory
                 interp = Interpolator(pts, vals, basis)
                 Random.seed!(99)
-                eval_pts = [SVector{2}(rand(2) .* 0.98 .+ 0.01) for _ in 1:500]
+                eval_pts = map(p -> 0.98p .+ 0.01, rand(SVector{2,Float64}, 500))
                 _ = interp.(eval_pts)
                 a = @benchmarkable $interp.($eval_pts) samples = 5 evals = 1 seconds = 30
                 tune!(a)

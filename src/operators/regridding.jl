@@ -24,8 +24,8 @@ Build a `RadialBasisOperator` for interpolating from `data` points to `eval_poin
 # Examples
 ```julia
 # Interpolate from coarse grid to fine grid
-coarse = [SVector{2}(rand(2)) for _ in 1:100]
-fine = [SVector{2}(rand(2)) for _ in 1:1000]
+coarse = rand(SVector{2,Float64}, 100)
+fine = rand(SVector{2,Float64}, 1000)
 op = regrid(coarse, fine)
 
 # Apply to field values
