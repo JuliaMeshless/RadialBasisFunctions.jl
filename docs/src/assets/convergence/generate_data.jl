@@ -99,7 +99,7 @@ function compute_error(op_kind::Symbol, pts, basis; k = nothing)
 
     if op_kind === :interpolation
         Random.seed!(99)
-        eval_pts = map(p -> 0.98p .+ 0.01, rand(SVector{2,Float64}, 500))
+        eval_pts = map(p -> 0.98p .+ 0.01, rand(SVector{2, Float64}, 500))
         vals = franke.(pts)
         interp = Interpolator(pts, vals, basis)
         got = interp.(eval_pts)
@@ -561,7 +561,7 @@ function sweep_work_precision()
                 bbytes = res.memory
                 interp = Interpolator(pts, vals, basis)
                 Random.seed!(99)
-                eval_pts = map(p -> 0.98p .+ 0.01, rand(SVector{2,Float64}, 500))
+                eval_pts = map(p -> 0.98p .+ 0.01, rand(SVector{2, Float64}, 500))
                 _ = interp.(eval_pts)
                 a = @benchmarkable $interp.($eval_pts) samples = 5 evals = 1 seconds = 30
                 tune!(a)

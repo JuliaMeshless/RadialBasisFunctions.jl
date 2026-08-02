@@ -116,7 +116,7 @@ const Δ = ∇² # some people like this notation for the Laplacian
 using PrecompileTools
 @setup_workload begin
     f(x) = 1 + sin(4 * x[1]) + cos(3 * x[1]) + sin(2 * x[2])
-    x = rand(SVector{2,Float64}, 100)
+    x = rand(SVector{2, Float64}, 100)
     z = f.(x)
     @compile_workload begin
         # basis functions
@@ -144,7 +144,7 @@ using PrecompileTools
 
             # interpolation
             interp = Interpolator(x, z, b)
-            zz = interp(rand(SVector{2,Float64}, 2))
+            zz = interp(rand(SVector{2, Float64}, 2))
         end
     end
 end
