@@ -9,6 +9,15 @@ bumps may contain breaking changes, and breaking changes are made without deprec
 
 ### Added
 
+- Public `weights(op)` accessor for `RadialBasisOperator` — returns the stencil weight
+  matrix (or tuple of matrices for gradient-family operators), rebuilding first when the
+  cache is stale. Downstream assemblers should use it instead of reaching into the
+  `weights` field.
+- Scalar algebra on built operators: `α * op`, `op * α`, `op / α`, and `-op` now work on
+  `RadialBasisOperator`, scaling the existing weights without re-collocation. Previously
+  scalars combined only with symbolic operators (`α * Laplacian()`), which pushed users to
+  manipulate `op.weights` by hand.
+
 - Enzyme rule for the `Interpolator` constructor, plus `Duplicated`/`MixedDuplicated` evaluation rules
   for interpolators built inside a differentiated region — Enzyme now matches Mooncake on every AD
   path ([#147]). Enzyme is the recommended default backend; the autodiff guide leads with

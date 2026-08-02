@@ -556,6 +556,21 @@ Return the element type of the operator's weight matrix.
 """
 Base.eltype(op::RadialBasisOperator) = eltype(op.weights)
 
+"""
+    weights(op::RadialBasisOperator)
+
+Return the stencil weights of `op` — a sparse matrix for scalar-valued (rank-0) operators,
+or a tuple of sparse matrices for gradient-family operators. Rebuilds the weights first if
+the cache is stale.
+
+This is the supported accessor for downstream assembly (e.g. building a global PDE system
+matrix); prefer it over reaching into the `weights` field directly.
+"""
+function weights(op::RadialBasisOperator)
+    !is_cache_valid(op) && update_weights!(op)
+    return op.weights
+end
+
 # LinearAlgebra methods - divergence (dot with gradient operator)
 function LinearAlgebra.:⋅(
         op::RadialBasisOperator{<:AbstractOperator{1}}, x::AbstractVector
