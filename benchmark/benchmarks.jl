@@ -1,5 +1,6 @@
 using BenchmarkTools
 using RadialBasisFunctions
+using RadialBasisFunctions: Dirichlet, Neumann, Robin
 using StaticArraysCore
 using HaltonSequences
 using LinearAlgebra

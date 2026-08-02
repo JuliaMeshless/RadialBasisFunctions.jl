@@ -7,6 +7,14 @@ bumps may contain breaking changes, and breaking changes are made without deprec
 
 ## [Unreleased]
 
+### Breaking
+
+- `Dirichlet`, `Neumann`, and `Robin` are no longer exported (they remain public API).
+  Downstream physics packages (e.g. Macchiato.jl) export their own boundary-condition
+  vocabularies using these names, so co-loading both packages made the bare names
+  ambiguous. Import them explicitly: `using RadialBasisFunctions: Dirichlet, Neumann, Robin`.
+  `BoundaryCondition` and `Internal` remain exported.
+
 ### Added
 
 - Public `weights(op)` accessor for `RadialBasisOperator` — returns the stencil weight

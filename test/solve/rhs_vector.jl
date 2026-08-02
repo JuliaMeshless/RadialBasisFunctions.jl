@@ -9,6 +9,7 @@ Operator correctness is tested in test/operators/.
 using Test
 using LinearAlgebra
 using RadialBasisFunctions
+using RadialBasisFunctions: Dirichlet, Neumann, Robin
 import RadialBasisFunctions as RBF
 
 @testset "RHS Vector Building" begin

@@ -6,6 +6,7 @@ Tests both standard and Hermite variants of _build_collocation_matrix!
 using Test
 using LinearAlgebra
 using RadialBasisFunctions
+using RadialBasisFunctions: Dirichlet, Neumann, Robin
 import RadialBasisFunctions as RBF
 
 @testset "Collocation Matrix Building" begin

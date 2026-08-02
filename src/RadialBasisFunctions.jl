@@ -22,7 +22,7 @@ include("utils.jl")
 export find_neighbors, autoselect_k, reorder_points!
 
 include("solve/types.jl")
-export BoundaryCondition, Dirichlet, Neumann, Robin, Internal
+export BoundaryCondition, Internal
 export α, β, is_dirichlet, is_neumann, is_robin, is_internal
 export HermiteStencilData, update_hermite_stencil_data!
 export InteriorStencil, DirichletStencil, HermiteStencil
