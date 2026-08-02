@@ -33,6 +33,18 @@ bumps may contain breaking changes, and breaking changes are made without deprec
 
 ### Fixed
 
+- **Mixed partials were silently wrong at the default `poly_deg = 2` in 2D and 3D.** The
+  hand-coded monomial evaluators (`MonomialBasis{2,2}`, `MonomialBasis{3,2}`) order terms
+  differently from the generic multiexponents pipeline that `_∂mixed` relied on, so the
+  ∂²/(∂xᵢ∂xⱼ) monomial action landed in the wrong slot — `mixed_partial(x, 1, 2)` mapped
+  f = xy to ≈ 0 instead of 1. Affected `mixed_partial`, `hessian` off-diagonal terms, and
+  `@operator ∂(i,j)` for any basis with degree-2 polynomial augmentation in 2 or 3
+  dimensions; degree ≥ 3 was unaffected (evaluator and derivative pipeline share the
+  generic ordering there), which is why the existing tests — all at `poly_deg = 4` — never
+  caught it. Hand-coded `_∂mixed` specializations now mirror the evaluator orderings, and
+  regression tests cover the default degree. Found by comparing against Macchiato.jl's
+  workaround (`_ℒ_mixed_partial`), which existed precisely because of this ordering
+  mismatch.
 - The Enzyme test suite is fully green on Julia 1.10/1.11 (previously `@test_broken`, [#150]) and runs
   un-gated on Julia 1.12 (requires Enzyme ≥ 0.13.190 in the test/docs environments).
 - The `Interpolator` constructor factorizes the collocation matrix with Bunch-Kaufman instead of the

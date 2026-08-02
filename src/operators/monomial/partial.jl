@@ -339,6 +339,35 @@ function ∂²(::MonomialBasis{3, 2}, ::Val{3})
     return ℒMonomialBasis(3, 2, basis!)
 end
 
+# Mixed partials must be hand-coded for every hand-coded evaluator in
+# `_get_monomial_basis`: the generic `_∂mixed` pipeline emits multiexponents
+# ordering, which does not match the hand-coded evaluator orderings. Degree < 2
+# needs no specialization (the mixed derivative is identically zero).
+
+function _∂mixed(::MonomialBasis{2, 2}, dim1::Int, dim2::Int)
+    # evaluator ordering: [1, x, y, xy, x², y²]
+    function basis!(b, x)
+        T = eltype(x)
+        b .= zero(T)
+        b[4] = one(T)
+        return nothing
+    end
+    return ℒMonomialBasis(2, 2, basis!)
+end
+
+function _∂mixed(::MonomialBasis{3, 2}, dim1::Int, dim2::Int)
+    # evaluator ordering: [1, x, y, z, xy, xz, yz, x², y², z²]
+    # ∂²/(∂xᵢ∂xⱼ) slot for i ≠ j: (1,2) → 5, (1,3) → 6, (2,3) → 7
+    slot = dim1 + dim2 + 2
+    function basis!(b, x)
+        T = eltype(x)
+        b .= zero(T)
+        b[slot] = one(T)
+        return nothing
+    end
+    return ℒMonomialBasis(3, 2, basis!)
+end
+
 """
     ∂_normal!(b, scratch, mb, normal, x)
 
