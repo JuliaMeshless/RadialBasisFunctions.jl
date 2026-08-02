@@ -37,6 +37,26 @@ y = f.(x)
     end
 end
 
+@testset "Default poly_deg=2 differentiates its own polynomial space exactly" begin
+    # Regression: the hand-coded monomial evaluators (2D/3D, degree 2) order terms
+    # differently from the generic multiexponents pipeline `_∂mixed` used to rely on,
+    # which made mixed partials silently wrong at the default degree (f = xy → 0).
+    x2 = SVector{2}.(HaltonPoint(2)[1:500])
+    fxy(p) = p[1] * p[2]
+    @test maximum(abs, mixed_partial(x2, 1, 2)(fxy.(x2)) .- 1) < 1.0e-8
+    @test maximum(abs, mixed_partial(x2, 2, 1)(fxy.(x2)) .- 1) < 1.0e-8
+    # @operator path shares MixedPartial
+    op = custom(x2, @operator(∂(1, 2)))
+    @test maximum(abs, op(fxy.(x2)) .- 1) < 1.0e-8
+    # 3D: every mixed pair at the default degree
+    x3 = SVector{3}.(HaltonPoint(3)[1:800])
+    for (i, j) in ((1, 2), (1, 3), (2, 3))
+        g(p) = p[i] * p[j]
+        @test maximum(abs, mixed_partial(x3, i, j)(g.(x3)) .- 1) < 1.0e-6
+        @test maximum(abs, mixed_partial(x3, j, i)(g.(x3)) .- 1) < 1.0e-6
+    end
+end
+
 @testset "Symmetry: ∂²f/∂x∂y == ∂²f/∂y∂x" begin
     ∂²xy = mixed_partial(x, 1, 2, PHS(3; poly_deg = 4))
     ∂²yx = mixed_partial(x, 2, 1, PHS(3; poly_deg = 4))
