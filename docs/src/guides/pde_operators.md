@@ -1,7 +1,12 @@
-# PDE Operators Cookbook
+# Building PDE Operators
 
-Recipes for assembling PDE-specific differential operators via [`@operator`](@ref), producing a
-**single weight matrix** that applies the full PDE operator in one matrix-vector multiply.
+The [`@operator`](@ref) macro lets you write PDE operators in mathematical notation. It
+translates symbolic expressions into composable operator objects, producing a **single
+weight matrix** that applies the full PDE operator in one matrix-vector multiply.
+
+This is the recommended way to build operators the built-ins don't cover. If your operator
+can't be expressed here, see [Custom Operators](@ref "Custom Operators") for the closure
+escape hatch.
 
 ```@example pde
 using RadialBasisFunctions
@@ -12,6 +17,24 @@ f(p) = sin(p[1]) * cos(p[2])
 u = f.(x)
 nothing # hide
 ```
+
+## Recognized symbols
+
+| Symbol | Meaning |
+|:-------|:--------|
+| `∇²`, `Δ` | [`Laplacian`](@ref RadialBasisFunctions.Laplacian) |
+| `∂(dim)` | First partial derivative in dimension `dim` |
+| `∂²(dim)` | Second partial derivative in dimension `dim` |
+| `∇ ⋅ (κ * ∇)` | Diffusion operator (scalar or vector `κ`) |
+| `c ⋅ ∇` | Advection operator (vector `c`) |
+| `f`, `I` | [`Identity`](@ref) operator |
+| Everything else | Scalar coefficient |
+
+Standard arithmetic (`+`, `-`, `*`) and unary negation work as expected. Scalars can be
+literals, variables, or expressions like `k^2` or `c[1]`.
+
+The macro produces rank-0 operators — see [Understanding Rank (`N`)](@ref) for what that
+means, and [Custom Operators](@ref "Custom Operators") if you need rank 1.
 
 ## Helmholtz Operator
 
@@ -101,3 +124,8 @@ adjl = find_neighbors(x, 30)
 helm_op  = (@operator ∇² + k² * f)(x; adjl=adjl)
 aniso_op = (@operator κ_x * ∂²(1) + κ_y * ∂²(2))(x; adjl=adjl)
 ```
+
+## Boundary Conditions on PDE Operators
+
+Operators built with `@operator` accept the `hermite` keyword just like the built-ins —
+see [Boundary Conditions](@ref) for how to enforce Dirichlet, Neumann, or Robin conditions.

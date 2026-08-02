@@ -88,7 +88,7 @@ See (Flyer, et al. - On the role of polynomials in RBF-FD approximations: I. Int
 
 The traditional Kansa approach used in most RBF methods is based on constructing a unique interpolant for all the nodes in the domain. This involves coupling all nodes in the domain simultaneously and therefore makes it a _global_ method. Such a global approach, while theoretically exact, scales poorly: the resulting dense system becomes prohibitively expensive and increasingly ill-conditioned as the number of nodes grows, particularly in 3D, due to the curse of dimensionality. Instead, RadialBasisFunctions.jl employs a _local_ approach, where each node is influenced only by its $k$ nearest neighbors.
 
-## Boundary Conditions
+## Boundary Condition Formulations
 
 Radial Basis Functions can also be used to solve PDEs with various types of boundary conditions (Dirichlet, Neumann, Robin, etc.), when this is done in a meshless context, special considerations must be made to ensure that all local systems, including those near boundaries, remain well-posed.
 This package enables different approaches for handling boundary conditions, among them, the Hermite approach is suggested when the PDE is to be solved only at interior nodes. Furthermore, it can also be used to interpolate data near the boundary while including boundary conditions where these are known.

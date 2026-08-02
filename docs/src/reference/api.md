@@ -1,3 +1,8 @@
+# API Reference
+
+Full docstrings for every exported name, plus internals for developers extending the
+package.
+
 ## Macros
 
 ```@docs

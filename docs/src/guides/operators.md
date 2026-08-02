@@ -44,6 +44,7 @@ AbstractOperator{N}
 │   ├── StrainRate       ½(∇u + (∇u)ᵀ)
 │   ├── RotationRate     ½(∇u − (∇u)ᵀ)
 │   ├── Regrid           interpolation to new points
+│   ├── VirtualPartial   ∂f/∂xᵢ via offset-point finite differences
 │   └── Custom{0}        user-defined
 ├── N=1 (rank-adding)
 │   ├── Jacobian          [∂fᵢ/∂xⱼ]
@@ -190,6 +191,9 @@ The names `∂`, `∂²`, `∇`, `∇²`, `H`, and `∂mixed` deliberately serve
 
 This dual identity is load-bearing: an operator action like `(op::Partial)(basis) = ∂(basis, op.order, op.dim)` is written once, and weight building applies it to the RBF basis for the collocation rows and to the `MonomialBasis` for the polynomial-augmentation rows — each returning the form the assembly kernels expect. When adding a basis or operator, implement both halves; do not try to unify them.
 
+This is also why hand-written operators that *compose* functors with arithmetic need two
+methods — see [Dual dispatch for composed functors](@ref) for the user-facing consequence.
+
 ## Operator Algebra
 
 Built `RadialBasisOperator`s can be combined with `+` and `-`. This operates on precomputed weights and returns a new operator:
@@ -205,4 +209,27 @@ typeof(result)
 
 Both operands must share the same data, stencils, and rank `N`.
 
-See [Custom Operators](@ref "Custom Operators") for more on building your own operators.
+## Virtual Operators
+
+Virtual operators ([`∂virtual`](@ref)) take a different route to a derivative: instead of
+solving for weights that approximate ``\partial/\partial x_i`` directly, they interpolate
+the field at points offset by ``\pm\Delta`` along the axis and apply a standard finite
+difference formula to those interpolated values. This is useful for schemes that need the
+derivative to be consistent with a particular FD stencil.
+
+```@example operators
+# Virtual partial derivative in x-direction with spacing Δ=0.01
+virtual_dx = ∂virtual(x, 1, 0.01)
+result = virtual_dx(u)
+size(result)
+```
+
+The offset ``\Delta`` is a genuine tuning parameter: too large and the finite difference
+truncation error dominates; too small and interpolation error is amplified by the ``1/\Delta``
+factor.
+
+## Next Steps
+
+- [Building PDE Operators](@ref) — compose operators with [`@operator`](@ref)
+- [Custom Operators](@ref "Custom Operators") — the closure escape hatch for anything the macro can't express
+- [Boundary Conditions](@ref) — Hermite interpolation at boundary nodes

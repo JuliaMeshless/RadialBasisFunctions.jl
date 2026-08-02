@@ -119,18 +119,15 @@ normal_deriv = directional(x, normals)
 typeof(normal_deriv(y))
 ```
 
-### Custom Operator Basics
+For the common case of differentiating along outward normals, [`normal_derivative`](@ref)
+wraps `directional` and normalizes the vectors you pass it.
 
-The [`@operator`](@ref) macro lets you write PDE operators in mathematical notation and call them directly with data points:
+### Custom & PDE Operators
 
-```@example overview
-k² = 4.0
-op = @operator ∇² + k² * f
-helm = op(x)
-typeof(helm)
-```
-
-See [Operators & Type Hierarchy](@ref) for an in-depth guide to the operator system and [Custom Operators](@ref "Custom Operators") for advanced examples.
+Beyond the built-ins, the [`@operator`](@ref) macro lets you write PDE operators in
+mathematical notation — Helmholtz, diffusion, advection-diffusion — and call them directly
+with data points. See [Building PDE Operators](@ref) for the recipes, and
+[Operators & Type Hierarchy](@ref) for an in-depth guide to the operator system.
 
 ### Regridding
 
@@ -161,56 +158,21 @@ result = combined(y)
 typeof(result)
 ```
 
-## Advanced: Virtual Operators
+## Enforcing Boundary Conditions
 
-Virtual operators (`∂virtual`) use finite difference formulas on interpolated values at offset points. This can be useful for certain numerical schemes:
+For PDE applications, operators support Hermite interpolation to enforce Dirichlet,
+Neumann, or Robin conditions at boundary nodes. See [Boundary Conditions](@ref) for the
+condition types and the `hermite` keyword.
 
-```@example overview
-# Virtual partial derivative in x-direction with spacing Δ=0.01
-virtual_dx = ∂virtual(x, 1, 0.01)
-result = virtual_dx(y)
-typeof(result)
-```
+## Where to Next
 
-## Boundary Conditions (Hermite Interpolation)
-
-For PDE applications, operators support Hermite interpolation with boundary conditions. This is useful when you need to enforce Dirichlet, Neumann, or Robin conditions at boundary nodes.
-
-### Boundary Condition Types
-
-- `Dirichlet()` - Value specified: ``u = g``
-- `Neumann()` - Normal derivative specified: ``\partial u/\partial n = g``
-- `Robin(α, β)` - Mixed condition: ``\alpha u + \beta \partial u/\partial n = g``
-- `Internal()` - Interior point (no boundary condition)
-
-### Example with Hermite Interpolation
-
-```@example overview
-using LinearAlgebra: norm
-
-# Define boundary information
-is_boundary = [norm(p) > 0.9 for p in x]  # Points near unit circle boundary
-boundary_indices = findall(is_boundary)
-
-# Create boundary conditions (Dirichlet on boundary)
-bcs = [Dirichlet() for _ in boundary_indices]
-
-# Normal vectors at boundary points
-normals = [normalize(collect(x[i])) for i in boundary_indices]
-
-# Build operator with Hermite interpolation
-lap_hermite = laplacian(x; hermite=(
-    is_boundary=is_boundary,
-    bc=bcs,
-    normals=normals
-))
-typeof(lap_hermite)
-```
+- [Operators & Type Hierarchy](@ref) — the operator system, rank semantics, and virtual operators
+- [Building PDE Operators](@ref) — assemble Helmholtz, diffusion, and advection-diffusion operators
+- [Quick Reference](@ref) — data formats, basis options, and operator constructors at a glance
+- [Convergence & Parameter Selection](@ref) — how to pick a basis, `poly_deg`, and stencil size
 
 ## Current Limitations
 
-1. **Data format**: The package requires `AbstractVector{<:AbstractVector}` input (not matrices). Each point must have inferrable dimension, e.g., `SVector{2,Float64}` from StaticArrays.jl. Matrix input support is planned.
+1. **Global interpolation**: `Interpolator` currently uses all points globally. Local collocation support (like the operators use) is planned for future releases.
 
-2. **Global interpolation**: `Interpolator` currently uses all points globally. Local collocation support (like the operators use) is planned for future releases.
-
-3. **GPU weight computation**: Operators and interpolators can be moved to GPU via `Adapt.jl` (e.g., `cu(operator)`) for evaluation, but weight computation (stencil assembly and solve) currently runs on CPU only. A GPU-compatible dense solver is needed for full GPU support ([#88](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88)).
+2. **GPU weight computation**: weight computation (stencil assembly and solve) currently runs on CPU only; a GPU-compatible dense solver is needed for full GPU support ([#88](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88)). Built operators *can* be moved to GPU for evaluation — see [GPU Evaluation](@ref) in the Quick Reference.

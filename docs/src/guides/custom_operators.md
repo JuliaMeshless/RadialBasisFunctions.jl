@@ -1,81 +1,34 @@
 # Custom Operators
 
-Define your own differential operators when the built-ins (`partial`, `laplacian`, `jacobian`, `directional`) don't cover your use case.
+The escape hatch for operators that [`@operator`](@ref) can't express. Reach for
+[Building PDE Operators](@ref) first — it covers the common cases with less ceremony.
+If you find yourself needing the function form below, consider
+[opening an issue](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues) so
+macro support can be added.
 
-Prerequisite: [Operators & Type Hierarchy](@ref) explains `AbstractOperator{N}`, rank semantics, and basis derivative functors.
+Prerequisite: [Operators & Type Hierarchy](@ref) explains `AbstractOperator{N}`, rank
+semantics, and basis derivative functors.
 
 ```@example custom
 using RadialBasisFunctions
-using RadialBasisFunctions: ∂, ∂², ∇²
+using RadialBasisFunctions: ∂, ∇²
 using StaticArrays
 
 x = [SVector{2}(rand(2)) for _ in 1:100]
 f(p) = sin(p[1]) * cos(p[2])
 u = f.(x)
+k² = 4.0
 nothing # hide
 ```
 
-## `@operator` Macro (Recommended)
-
-The [`@operator`](@ref) macro lets you write PDE operators in mathematical notation. It translates symbolic expressions into composable operator objects:
-
-```@example custom
-k² = 4.0
-op = @operator ∇² + k² * f
-helm = op(x)
-
-# Verify against separate built-in operators
-expected = laplacian(x)(u) .+ k² .* u
-maximum(abs, helm(u) .- expected)
-```
-
-### Recognized symbols
-
-| Symbol | Meaning |
-|:-------|:--------|
-| `∇²`, `Δ` | [`Laplacian`](@ref RadialBasisFunctions.Laplacian) |
-| `∂(dim)` | First partial derivative in dimension `dim` |
-| `∂²(dim)` | Second partial derivative in dimension `dim` |
-| `∇ ⋅ (κ * ∇)` | Diffusion operator (scalar or vector `κ`) |
-| `c ⋅ ∇` | Advection operator (vector `c`) |
-| `f`, `I` | [`Identity`](@ref) operator |
-| Everything else | Scalar coefficient |
-
-Standard arithmetic (`+`, `-`, `*`) and unary negation work as expected. Scalars can be literals, variables, or expressions like `k^2` or `c[1]`.
-
-For more `@operator` recipes — diffusion, anisotropic diffusion, advection-diffusion — see the [PDE Operators Cookbook](@ref).
-
-## Understanding Rank
-
-The rank is auto-inferred — you don't need to specify it. This table explains what each rank means:
-
-| Rank 0 (scalar output) | Rank 1 (vector output) |
-|:---|:---|
-| Output has same shape as input | Output gains a spatial dimension |
-| Single weight matrix `W` | Tuple of `D` weight matrices |
-| Laplacian, partial derivative, directional derivative | Gradient, Jacobian, Hessian-like operators |
-
-For `AbstractOperator` inputs (from `@operator` or algebra), the rank is encoded in the type parameter. For `Function` closures, it's inferred by probing: a tuple return means rank 1, a single callable means rank 0. You can still pass `rank` explicitly as an override if needed.
-
-## Hermite Boundary Conditions
-
-Custom operators support Hermite interpolation via the `hermite` keyword, just like built-in operators:
-
-```julia
-op = my_ℒ(data; hermite=(
-    is_boundary=is_boundary,
-    bc=bcs,
-    normals=normals
-))
-```
-
-See the [Boundary Conditions](@ref "Getting Started") section of Getting Started for details on Hermite interpolation.
-
 ## The Contract
 
-Any `AbstractOperator` — including results from `@operator` — can be called directly with data points to build a `RadialBasisOperator`. Under the hood this calls `RadialBasisOperator(op, data; kw...)`.
+Any `AbstractOperator` — including results from `@operator` — can be called directly with
+data points to build a `RadialBasisOperator`. Under the hood this calls
+`RadialBasisOperator(op, data; kw...)`.
 
-For raw closure-based operators, the [`custom`](@ref) function wraps a function in a `Custom{N}` operator:
+For raw closure-based operators, the [`custom`](@ref) function wraps a function in a
+`Custom{N}` operator:
 
 ```julia
 custom(data, ℒ)
@@ -89,9 +42,15 @@ The function `ℒ` must follow a three-layer structure:
 
 This callable fills the right-hand side of the stencil system that determines the weights. For a rank-0 operator it returns a scalar; for rank-1 it returns a tuple of callables (one per spatial dimension).
 
-## Escape Hatch: Function Form
+### Rank is inferred, not declared
 
-If `@operator` can't express your operator, you can pass a closure directly to `custom()`. This is a last resort — if you find yourself needing this, consider [opening an issue](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues) so macro support can be added.
+See [Understanding Rank (`N`)](@ref) for what rank means. You rarely need to state it: for
+`AbstractOperator` inputs (from `@operator` or algebra) the rank is encoded in the type
+parameter, and for `Function` closures it's inferred by probing — a tuple return means
+rank 1, a single callable means rank 0. Pass `rank` explicitly only to override that
+inference.
+
+## Function Form
 
 ### Rank-1 example
 
@@ -112,7 +71,11 @@ Each element of the tuple produces one column of the output matrix.
 
 When you **compose multiple functors with arithmetic** inside a lambda, you need two methods — one for the RBF basis and one for `MonomialBasis`. The `@operator` macro handles this automatically, which is why it's preferred.
 
-**Why dual dispatch is needed:** The system calls `ℒ` with both the RBF basis (e.g., `PHS(3)`) and a [`MonomialBasis`](@ref) (for polynomial augmentation). RBF functors like `∇²(basis)` return `(x, xᵢ) -> scalar`, but monomial functors return `(b, x) -> nothing` (in-place buffer fill). Arithmetic on `nothing` fails.
+**Why dual dispatch is needed:** this is the user-facing consequence of the
+[two differentiation protocols](@ref "Two differentiation protocols"). The system calls
+`ℒ` with both the RBF basis (e.g., `PHS(3)`) and a [`MonomialBasis`](@ref) (for polynomial
+augmentation). RBF functors like `∇²(basis)` return `(x, xᵢ) -> scalar`, but monomial
+functors return `(b, x) -> nothing` (in-place buffer fill). Arithmetic on `nothing` fails.
 
 ```@example custom
 using RadialBasisFunctions: MonomialBasis  # hide
@@ -131,9 +94,22 @@ function helmholtz_op(basis::MonomialBasis)
 end
 
 helm3 = Custom{0}(helmholtz_op)(x)
-maximum(abs, helm3(u) .- helm(u))
+
+# Verify against the same operator assembled from built-ins
+expected = laplacian(x)(u) .+ k² .* u
+maximum(abs, helm3(u) .- expected)
 ```
 
 !!! note
     Simple cases that return a single functor directly — like `basis -> ∂(basis, 1)` — don't need dual dispatch. The built-in functors already handle both basis types internally. Two methods are only needed when you compose multiple functors with arithmetic.
 
+## Boundary Conditions on Custom Operators
+
+Custom operators support Hermite interpolation via the `hermite` keyword, just like
+built-in operators:
+
+```julia
+op = my_ℒ(data; hermite=(is_boundary=is_boundary, bc=bcs, normals=normals))
+```
+
+See [Boundary Conditions](@ref) for details.

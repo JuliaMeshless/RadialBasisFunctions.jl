@@ -120,28 +120,18 @@ results = interp(new_points)
 
 ## Hermite Boundary Conditions
 
-For PDE problems with boundary conditions:
-
-```julia
-# Prepare boundary data
-is_boundary = [is_on_boundary(p) for p in points]
-bc = [Dirichlet() for _ in points]  # or Neumann(), Robin(α, β)
-normals = [compute_normal(p) for p in points]
-
-# Create operator with Hermite interpolation
-lap = laplacian(
-    points;
-    hermite=(is_boundary=is_boundary, bc=bc, normals=normals)
-)
-```
-
-### Boundary Condition Types
-
 | Type | Constructor | Meaning |
 |------|-------------|---------|
 | Dirichlet | `Dirichlet()` | Fixed value |
 | Neumann | `Neumann()` | Fixed normal derivative |
 | Robin | `Robin(α, β)` | $\alpha u + \beta \frac{\partial u}{\partial n}$ |
+| Internal | `Internal()` | Interior point, no condition |
+
+```julia
+lap = laplacian(points; hermite=(is_boundary=…, bc=…, normals=…))
+```
+
+See [Boundary Conditions](@ref) for the full walkthrough.
 
 ## GPU Evaluation
 
@@ -161,14 +151,9 @@ result_gpu = lap_gpu(values_gpu)
 
 Full GPU weight computation is planned — see [#88](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88).
 
-## Common Errors and Fixes
+## Common Errors
 
-| Error | Cause | Fix |
-|-------|-------|-----|
-| `MethodError: no method matching` | Matrix data | Use `Vector{SVector}` |
-| `n must be 1, 3, 5, or 7` | Invalid PHS order | Use odd integer ≤ 7 |
-| `Shape parameter should be > 0` | Negative ε | Use positive ε (0.1-10.0) |
-| `SingularException` | Duplicate points or bad stencil | Remove duplicates, adjust k |
+Error messages, causes, and fixes are covered in [Troubleshooting](@ref).
 
 ## Performance Tips
 
