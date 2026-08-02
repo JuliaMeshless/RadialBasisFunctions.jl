@@ -172,6 +172,54 @@ end
     @test_throws ArgumentError (2.0 * Divergence{2}())(pts)(q)
 end
 
+@testset "Scalar algebra on built operators" begin
+    q = quadratic.(pts)
+    lap = laplacian(pts)
+    scaled = 2.5 * lap
+    @test scaled isa RadialBasisOperator
+    @test scaled.ℒ isa RadialBasisFunctions.ScaledOperator
+    # weights are scaled directly — no re-collocation
+    @test isapprox(Matrix(scaled.weights), 2.5 .* Matrix(lap.weights); rtol = 1.0e-12)
+    # matches the symbolic (fused) path
+    fused = (2.5 * Laplacian())(pts)
+    @test isapprox(Matrix(scaled.weights), Matrix(fused.weights); rtol = 1.0e-10)
+    # ∇²(x² + y²) = 4 → scaled by 2.5 = 10
+    @test isapprox(scaled(q), fill(10.0, length(pts)); rtol = 1.0e-6)
+    # mirror form, division, unary negation
+    @test isapprox(Matrix((lap * 2.5).weights), Matrix(scaled.weights); rtol = 1.0e-12)
+    @test isapprox(Matrix((lap / 4).weights), 0.25 .* Matrix(lap.weights); rtol = 1.0e-12)
+    @test isapprox(Matrix((-lap).weights), -Matrix(lap.weights); rtol = 1.0e-12)
+    # composes with built-operator addition: α*A + β*B (anisotropic diffusion)
+    ∂²x = partial(pts, 2, 1)
+    ∂²y = partial(pts, 2, 2)
+    aniso = 2.0 * ∂²x + 0.5 * ∂²y
+    hand = 2.0 .* Matrix(∂²x.weights) .+ 0.5 .* Matrix(∂²y.weights)
+    @test isapprox(Matrix(aniso.weights), hand; rtol = 1.0e-12)
+    # gradient-family operators carry tuple weights — scale elementwise
+    g = gradient(pts)
+    gs = 3.0 * g
+    @test gs.weights isa Tuple
+    @test all(
+        map((a, b) -> isapprox(Matrix(a), 3.0 .* Matrix(b); rtol = 1.0e-12), gs.weights, g.weights)
+    )
+end
+
+@testset "weights accessor" begin
+    lap = laplacian(pts)
+    W = weights(lap)
+    @test W === lap.weights
+    # a stale cache is rebuilt before returning
+    stale = RadialBasisOperator(
+        lap.ℒ, copy(lap.weights), lap.data, lap.eval_points, lap.adjl, lap.basis, false;
+        device = lap.device,
+    )
+    Ws = weights(stale)
+    @test is_cache_valid(stale)
+    @test isapprox(Matrix(Ws), Matrix(W); rtol = 1.0e-12)
+    # gradient-family operators return their tuple of weight matrices
+    @test weights(gradient(pts)) isa Tuple
+end
+
 @testset "In-place evaluation of composed rank-0 operators" begin
     v = hcat(vfx.(pts), vfy.(pts))
     op = (Divergence{2}() + Divergence{2}())(pts)

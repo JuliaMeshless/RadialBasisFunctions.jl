@@ -269,6 +269,31 @@ for op in (:+, :-)
     end
 end
 
+"""
+    α * op::RadialBasisOperator
+    op::RadialBasisOperator * α
+    op::RadialBasisOperator / α
+    -op::RadialBasisOperator
+
+Scale a built operator by a scalar. The weights are scaled directly (no re-collocation)
+and the symbolic operator is wrapped in a [`ScaledOperator`](@ref), so
+`α * laplacian(x)` is equivalent to `(@operator α * ∇²)(x)` up to floating-point
+associativity.
+"""
+function Base.:*(α::Number, op::RadialBasisOperator)
+    !is_cache_valid(op) && update_weights!(op)
+    return RadialBasisOperator(
+        α * op.ℒ, _scale_weights(α, op.weights), op.data, op.eval_points, op.adjl,
+        op.basis, true; device = op.device,
+    )
+end
+Base.:*(op::RadialBasisOperator, α::Number) = α * op
+Base.:/(op::RadialBasisOperator, α::Number) = inv(α) * op
+Base.:-(op::RadialBasisOperator) = -1 * op
+
+_scale_weights(α, w) = α * w
+_scale_weights(α, w::Tuple) = map(wᵢ -> α * wᵢ, w)
+
 function _check_compatible(op1::RadialBasisOperator, op2::RadialBasisOperator)
     if (length(op1.data) != length(op2.data)) || !all(op1.data .≈ op2.data)
         throw(
