@@ -5,7 +5,7 @@ All notable changes to RadialBasisFunctions.jl are documented here.
 This project follows [Semantic Versioning](https://semver.org/). While the package is pre-1.0, minor version
 bumps may contain breaking changes, and breaking changes are made without deprecation shims.
 
-## [Unreleased]
+## [0.7.0] — 2026-08-03
 
 ### Breaking
 
