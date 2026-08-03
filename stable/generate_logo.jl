@@ -48,10 +48,9 @@ const CENTERS = [
 
 # Ring radii and opacities
 const RING_RADII = range(RING_MIN_R, RING_MAX_R; length = NUM_RINGS)
-const RING_OPACITIES = [
-    RING_OPACITY_START * exp(-2.0 * (i - 1) / (NUM_RINGS - 1))
-        for i in 1:NUM_RINGS
-]
+const RING_OPACITIES = map(
+    i -> RING_OPACITY_START * exp(-2.0 * (i - 1) / (NUM_RINGS - 1)), 1:NUM_RINGS
+)
 
 # ── helpers ─────────────────────────────────────────────────────────
 
@@ -74,7 +73,7 @@ let
     # Concentric rings for each center (drawn first so dots sit on top)
     for (idx, (cx, cy)) in enumerate(CENTERS)
         r, g, b = hex_to_rgb(COLORS[idx])
-        for j in NUM_RINGS:-1:1  # largest ring first (painter's order)
+        for j in reverse(eachindex(RING_RADII))  # largest ring first (painter's order)
             set_source_rgba(ctx, r, g, b, RING_OPACITIES[j])
             set_line_width(ctx, RING_STROKE)
             arc(ctx, cx, cy, RING_RADII[j], 0, 2π)
