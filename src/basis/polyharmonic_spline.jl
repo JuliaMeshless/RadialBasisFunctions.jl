@@ -106,16 +106,18 @@ function (op::∂²{<:PHS1})(x, xᵢ, normal)
         3 * Δ_d^2 * dot_normal / (r^5 + avoid_inf(r))
 end
 
-# ∇² - Laplacian
+# ∇² - Laplacian: Δrᵏ = k(k+d−2)·r^(k−2) in d dimensions
 function (op::∇²{<:PHS1})(x, xᵢ)
+    d = length(x)
     r = euclidean(x, xᵢ)
-    return 2 / (r + avoid_inf(r))
+    return (d - 1) / (r + avoid_inf(r))
 end
 
 function (op::∇²{<:PHS1})(x, xᵢ, normal)
+    d = length(x)
     r = euclidean(x, xᵢ)
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return 2 * dot_normal / (r^3 + avoid_inf(r))
+    return (d - 1) * dot_normal / (r^3 + avoid_inf(r))
 end #==============================================================================# #==============================================================================#
 
 #                                    PHS3                                      #
@@ -192,16 +194,18 @@ function (op::∂²{<:PHS3})(x, xᵢ, normal)
         (r + avoid_inf(r))
 end
 
-# ∇² - Laplacian
+# ∇² - Laplacian: Δrᵏ = k(k+d−2)·r^(k−2) in d dimensions
 function (op::∇²{<:PHS3})(x, xᵢ)
+    d = length(x)
     r = euclidean(x, xᵢ)
-    return 12 * r
+    return 3 * (d + 1) * r
 end
 
 function (op::∇²{<:PHS3})(x, xᵢ, normal)
+    d = length(x)
     r = euclidean(x, xᵢ)
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -12 * dot_normal / (r + avoid_inf(r))
+    return -3 * (d + 1) * dot_normal / (r + avoid_inf(r))
 end #==============================================================================# #==============================================================================#
 
 #                                    PHS5                                      #
@@ -277,16 +281,18 @@ function (op::∂²{<:PHS5})(x, xᵢ, normal)
     return -5 * (6 * n_d * Δ_d * r + 3 * dot_normal * (r + Δ_d^2 / (r + avoid_inf(r))))
 end
 
-# ∇² - Laplacian
+# ∇² - Laplacian: Δrᵏ = k(k+d−2)·r^(k−2) in d dimensions
 function (op::∇²{<:PHS5})(x, xᵢ)
+    d = length(x)
     r = euclidean(x, xᵢ)
-    return 30 * r^3
+    return 5 * (d + 3) * r^3
 end
 
 function (op::∇²{<:PHS5})(x, xᵢ, normal)
+    d = length(x)
     r = euclidean(x, xᵢ)
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -90 * dot_normal * r
+    return -15 * (d + 3) * dot_normal * r
 end #==============================================================================# #==============================================================================#
 
 #                                    PHS7                                      #
@@ -363,16 +369,18 @@ function (op::∂²{<:PHS7})(x, xᵢ, normal)
     return -7 * (10 * n_d * Δ_d * r^3 + 5 * dot_normal * (3 * r * Δ_d^2 + r^3))
 end
 
-# ∇² - Laplacian
+# ∇² - Laplacian: Δrᵏ = k(k+d−2)·r^(k−2) in d dimensions
 function (op::∇²{<:PHS7})(x, xᵢ)
+    d = length(x)
     r = euclidean(x, xᵢ)
-    return 56 * r^5
+    return 7 * (d + 5) * r^5
 end
 
 function (op::∇²{<:PHS7})(x, xᵢ, normal)
+    d = length(x)
     r = euclidean(x, xᵢ)
     dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -280 * dot_normal * r^3
+    return -35 * (d + 5) * dot_normal * r^3
 end #==============================================================================# #==============================================================================#
 
 #                           Keyword Constructors                               #

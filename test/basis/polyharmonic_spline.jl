@@ -221,6 +221,22 @@ end
     end
 end
 
+@testset "Laplacian dimension dependence" begin
+    # ∇² must equal the trace of the Hessian in every dimension — the closed-form constants
+    # are dimension-dependent (Δrᵏ = k(k+d−2)·r^(k−2)), so 2D and 3D must both be exercised.
+    for n in (1, 3, 5, 7)
+        phs = PHS(n; poly_deg = -1)
+        ∇²rbf = RBF.∇²(phs)
+        for (x₁, x₂) in (
+                (SVector(1.0, 2), SVector(2.0, 4)),          # 2D
+                (SVector(1.0, 2, 3), SVector(2.0, 4, 1)),    # 3D
+            )
+            @test ∇²rbf(x₁, x₂) ≈ tr(FD.hessian(x -> phs(x, x₂), x₁)) rtol = 1.0e-8
+            @test ∇²rbf(x₁, x₂) ≈ sum(RBF.∂²(phs, d)(x₁, x₂) for d in eachindex(x₁))
+        end
+    end
+end
+
 @testset "PHS, n=7" begin
     x₁ = SVector(1.0, 2)
     x₂ = SVector(2.0, 4)
