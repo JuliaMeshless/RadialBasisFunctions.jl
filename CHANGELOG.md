@@ -18,6 +18,14 @@ bumps may contain breaking changes, and breaking changes are made without deprec
   out exactly 4/3 × theirs for PHS3). Regression tests now pin ∇² to
   tr(ForwardDiff.hessian) and Σ∂² in both 2D and 3D.
 
+- **AD gradients through 2D `laplacian()` weights used the same 3D-hardcoded constants.**
+  The hand-written backward-pass gradients of ∇²φ for PHS1/3/5/7 in
+  `grad_applied_laplacian_wrt_x` — shared by the Enzyme and Mooncake rules — were not
+  updated alongside the primal fix above, so differentiating `_build_weights` with a 2D
+  Laplacian gave gradients off by the constant ratio (e.g. 4/3 for PHS3). They are now
+  dimension-aware, and a regression test pins them (and the Partial-operator gradients)
+  against ForwardDiff of the basis functors in both 2D and 3D.
+
 ## [0.7.0] — 2026-08-03
 
 ### Breaking

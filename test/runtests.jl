@@ -112,6 +112,10 @@ end
     include("solve.jl")
 end
 
+@safetestset "Applied Operator Second Derivatives" begin
+    include("solve/operator_second_derivatives.jl")
+end
+
 @safetestset "Boundary Types" begin
     include("boundary_types.jl")
 end

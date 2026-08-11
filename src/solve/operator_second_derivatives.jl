@@ -57,7 +57,7 @@ function _hessian_row(
 end
 
 # ============================================================================
-# PHS3: Laplacian ∇²φ = 12r
+# PHS3: Laplacian ∇²φ = 3(d+1)r in d dimensions
 # ============================================================================
 
 """
@@ -66,15 +66,16 @@ end
 Returns a function computing ∂/∂x[j] of [∇²φ] for PHS3.
 
 Mathematical derivation:
-  ∇²φ = 12r
-  ∂/∂x[j] [12r] = 12 * δ_j / r
+  ∇²φ = 3(d+1)r
+  ∂/∂x[j] [3(d+1)r] = 3(d+1) * δ_j / r
 """
 function grad_laplacian_phs3_wrt_x()
     function grad_Lφ_x(x, xi)
+        d = length(x)
         r = euclidean(x, xi)
         r_safe = r + avoid_inf(r)
         δ = x .- xi
-        return 12 .* δ ./ r_safe
+        return (3 * (d + 1)) .* δ ./ r_safe
     end
     return grad_Lφ_x
 end
@@ -89,13 +90,14 @@ end
 Returns a function computing ∂/∂x[j] of [∇²φ] for PHS1.
 
 Mathematical derivation:
-  ∇²φ = 2/r
-  ∂/∂x[j] [2/r] = -2 * δ_j / r³
+  ∇²φ = (d−1)/r
+  ∂/∂x[j] [(d−1)/r] = -(d−1) * δ_j / r³
 
 Note: At r=0, we return 0 to avoid singularity.
 """
 function grad_laplacian_phs1_wrt_x()
     function grad_Lφ_x(x, xi)
+        d = length(x)
         r = euclidean(x, xi)
         # At r=0, PHS1 Laplacian is singular, return 0 for gradient
         if r < oftype(r, 1.0e-12)
@@ -103,7 +105,7 @@ function grad_laplacian_phs1_wrt_x()
         end
         r3 = r^3
         δ = x .- xi
-        return -2 .* δ ./ r3
+        return -(d - 1) .* δ ./ r3
     end
     return grad_Lφ_x
 end
@@ -118,14 +120,15 @@ end
 Returns a function computing ∂/∂x[j] of [∇²φ] for PHS5.
 
 Mathematical derivation:
-  ∇²φ = 30r³
-  ∂/∂x[j] [30r³] = 30 * 3r² * δ_j / r = 90 * r * δ_j
+  ∇²φ = 5(d+3)r³
+  ∂/∂x[j] [5(d+3)r³] = 5(d+3) * 3r² * δ_j / r = 15(d+3) * r * δ_j
 """
 function grad_laplacian_phs5_wrt_x()
     function grad_Lφ_x(x, xi)
+        d = length(x)
         r = euclidean(x, xi)
         δ = x .- xi
-        return 90 .* r .* δ
+        return (15 * (d + 3)) .* r .* δ
     end
     return grad_Lφ_x
 end
@@ -140,15 +143,16 @@ end
 Returns a function computing ∂/∂x[j] of [∇²φ] for PHS7.
 
 Mathematical derivation:
-  ∇²φ = 56r⁵
-  ∂/∂x[j] [56r⁵] = 56 * 5r⁴ * δ_j / r = 280 * r³ * δ_j
+  ∇²φ = 7(d+5)r⁵
+  ∂/∂x[j] [7(d+5)r⁵] = 7(d+5) * 5r⁴ * δ_j / r = 35(d+5) * r³ * δ_j
 """
 function grad_laplacian_phs7_wrt_x()
     function grad_Lφ_x(x, xi)
+        d = length(x)
         r = euclidean(x, xi)
         r3 = r^3
         δ = x .- xi
-        return 280 .* r3 .* δ
+        return (35 * (d + 5)) .* r3 .* δ
     end
     return grad_Lφ_x
 end
