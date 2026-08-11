@@ -11,7 +11,7 @@
   <a href="https://JuliaMeshless.github.io/RadialBasisFunctions.jl/dev"><img src="https://img.shields.io/badge/docs-dev-blue.svg" alt="Dev Docs"></a>
   <a href="https://github.com/JuliaMeshless/RadialBasisFunctions.jl/actions/workflows/CI.yml?query=branch%3Amain"><img src="https://github.com/JuliaMeshless/RadialBasisFunctions.jl/actions/workflows/CI.yml/badge.svg?branch=main" alt="Build Status"></a>
   <a href="https://codecov.io/gh/JuliaMeshless/RadialBasisFunctions.jl"><img src="https://codecov.io/gh/JuliaMeshless/RadialBasisFunctions.jl/graph/badge.svg?token=S3BQ5FIULZ" alt="codecov"></a>
-  <a href="https://github.com/JuliaMeshless/RadialBasisFunctions.jl/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License"></a>
+  <a href="https://github.com/JuliaMeshless/RadialBasisFunctions.jl/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License"></a>
   <a href="https://zenodo.org/badge/latestdoi/634682663"><img src="https://zenodo.org/badge/634682663.svg" alt="DOI"></a>
 </p>
 
@@ -90,10 +90,10 @@ Requires Julia 1.10 or later.
 ## Documentation
 
 - **[Getting Started](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/getting_started)** — tutorials covering interpolation, operators, and boundary conditions
-- **[Autodiff](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/autodiff)** — differentiating through operators with Enzyme and Mooncake
+- **[Autodiff](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/guides/autodiff)** — differentiating through operators with Enzyme and Mooncake
 - **[RBF Neural Networks](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/guides/lux)** — training RBF layers with Lux.jl
-- **[Theory](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/theory)** — mathematical background on RBF methods
-- **[API Reference](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/api)** — full function documentation
+- **[Theory](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/reference/theory)** — mathematical background on RBF methods
+- **[API Reference](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/reference/api)** — full function documentation
 
 ## Citation
 

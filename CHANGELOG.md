@@ -5,6 +5,19 @@ All notable changes to RadialBasisFunctions.jl are documented here.
 This project follows [Semantic Versioning](https://semver.org/). While the package is pre-1.0, minor version
 bumps may contain breaking changes, and breaking changes are made without deprecation shims.
 
+## [Unreleased]
+
+### Fixed
+
+- **2D `laplacian()` operators were wrong for every PHS basis.** The fused ∇² functors for
+  PHS1/3/5/7 (both the 2-arg and the 3-arg Hermite variants) hardcoded the 3D constants of
+  Δrᵏ = k(k+d−2)·r^(k−2) — e.g. 12r instead of 9r for PHS3 in 2D. The per-dimension ∂²
+  functors were already correct, so summing `partial(…, 2, dim)` operators or taking the
+  trace of `hessian` was unaffected; only the fused `laplacian()` path was wrong in 2D.
+  Found by cross-verifying RBF-FD Poisson weights against KernelInterpolation.jl (ours came
+  out exactly 4/3 × theirs for PHS3). Regression tests now pin ∇² to
+  tr(ForwardDiff.hessian) and Σ∂² in both 2D and 3D.
+
 ## [0.7.0] — 2026-08-03
 
 ### Breaking

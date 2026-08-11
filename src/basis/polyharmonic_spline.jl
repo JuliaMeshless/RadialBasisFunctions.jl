@@ -10,7 +10,7 @@ abstract type AbstractPHS <: AbstractRadialBasis end
 """
     function PHS(n::T=3; poly_deg::T=2) where {T<:Int}
 
-Convienience contructor for polyharmonic splines.
+Convenience constructor for polyharmonic splines.
 
 # Arguments
 - `n`: Order of the spline (1, 3, 5, or 7). Higher = smoother.

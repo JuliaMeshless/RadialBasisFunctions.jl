@@ -15,6 +15,6 @@
 
 ## Docs
 User-facing material lives in `docs/src/` — add examples there, not here:
-`docs/src/guides/quickref.md` (data formats, basis and operator options),
+`docs/src/reference/quickref.md` (data formats, basis and operator options),
 `docs/src/guides/custom_operators.md` (extending with new operators),
-`docs/src/guides/troubleshooting.md`, `docs/src/reference/theory.md`.
+`docs/src/reference/troubleshooting.md`, `docs/src/reference/theory.md`.
