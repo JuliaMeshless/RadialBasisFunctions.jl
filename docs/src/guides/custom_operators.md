@@ -69,7 +69,7 @@ Each element of the tuple produces one column of the output matrix.
 
 ### Dual dispatch for composed functors
 
-When you **compose multiple functors with arithmetic** inside a lambda, you need two methods — one for the RBF basis and one for `MonomialBasis`. The `@operator` macro handles this automatically, which is why it's preferred.
+When you **compose multiple functors with arithmetic**, you need two methods — one for the RBF basis and one for `MonomialBasis`. The `@operator` macro handles this automatically, which is why it's preferred.
 
 **Why dual dispatch is needed:** this is the user-facing consequence of the
 [two differentiation protocols](@ref "Two differentiation protocols"). The system calls
@@ -77,21 +77,38 @@ When you **compose multiple functors with arithmetic** inside a lambda, you need
 augmentation). RBF functors like `∇²(basis)` return `(x, xᵢ) -> scalar`, but monomial
 functors return `(b, x) -> nothing` (in-place buffer fill). Arithmetic on `nothing` fails.
 
+**Return a callable struct, not a closure.** The package implements every operator action
+as a functor — `∇²(basis)`, `SumKernel`, and `ScaledKernel` are all callable structs,
+deliberately *"replacing closures with proper multiple dispatch."* Follow that convention:
+it keeps the action's return type inferable and the object inspectable, and it stores the
+coefficient in a typed field instead of capturing it in a boxed closure. Make the action a
+`struct` whose fields are the pieces you compose, with a call method for the arithmetic:
+
 ```@example custom
 using RadialBasisFunctions: MonomialBasis  # hide
 
-# Two-method operator function (advanced — prefer @operator for this)
-function helmholtz_op(basis)
-    lap = ∇²(basis)
-    (x, xc) -> lap(x, xc) + k² * basis(x, xc)
+# ℒφ = ∇²φ + k²·φ acting on the RBF basis — a functor, not a closure
+struct HelmholtzRBF{L, B, T}
+    ∇²φ::L      # the ∇²(basis) functor
+    φ::B        # the basis itself
+    k²::T
 end
-function helmholtz_op(basis::MonomialBasis)
-    lap = ∇²(basis)
-    function (b, x)
-        b .= lap(x) .+ k² .* basis(x)
-        return nothing
-    end
+(h::HelmholtzRBF)(x, xᵢ) = h.∇²φ(x, xᵢ) + h.k² * h.φ(x, xᵢ)
+
+# the action on the polynomial tail — monomial functors fill a buffer in place
+struct HelmholtzPoly{L, B, T} <: Function
+    ∇²p::L
+    p::B
+    k²::T
 end
+function (h::HelmholtzPoly)(b, x)
+    b .= h.∇²p(x) .+ h.k² .* h.p(x)
+    return nothing
+end
+
+# ℒ: overload one method per basis protocol, each returning its functor
+helmholtz_op(basis)                = HelmholtzRBF(∇²(basis), basis, k²)
+helmholtz_op(basis::MonomialBasis) = HelmholtzPoly(∇²(basis), basis, k²)
 
 helm3 = Custom{0}(helmholtz_op)(x)
 
@@ -99,6 +116,13 @@ helm3 = Custom{0}(helmholtz_op)(x)
 expected = laplacian(x)(u) .+ k² .* u
 maximum(abs, helm3(u) .- expected)
 ```
+
+!!! tip
+    For an operator you reach for often, promote it to a first-class
+    [`AbstractOperator`](@ref) subtype: hold `k²` in the operator struct and give it
+    `(op::Helmholtz)(basis)` methods, exactly like the built-in `Laplacian` and `Partial`.
+    Then `Helmholtz(4.0)(points)` builds it with no captured globals at all — and, for this
+    particular operator, it is identical to `(@operator ∇² + k² * f)(points)`.
 
 !!! note
     Simple cases that return a single functor directly — like `basis -> ∂(basis, 1)` — don't need dual dispatch. The built-in functors already handle both basis types internally. Two methods are only needed when you compose multiple functors with arithmetic.
