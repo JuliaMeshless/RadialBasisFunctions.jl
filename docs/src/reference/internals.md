@@ -4,54 +4,71 @@ This document explains the architecture of the solve system, which builds sparse
 
 ## Call Graph
 
-```text
-                      ┌─────────────────────────┐
-                      │ User: construct operator│
-                      └───────────┬─────────────┘
-                                  │
-                                  ▼
-                      ┌───────────────────────────┐
-                      │   _build_weights(L, op)   │
-                      └───────────┬───────────────┘
-                                  │
-                                  ▼
-                      ┌───────────────────────────┐
-                      │ Apply L to basis/monomial │
-                      └───────────┬───────────────┘
-                                  │
-                                  ▼
-                ┌─────────────────────────────────────┐
-                │        build_weights_kernel         │
-                └──────┬─────────────────────┬────────┘
-                       │                     │
-                       ▼                     ▼
-         ┌─────────────────────┐   ┌─────────────────┐
-         │allocate_sparse_arrays│   │  launch_kernel! │
-         └─────────────────────┘   └────────┬────────┘
-                                            │
-                                            ▼
-                                 ┌──────────────────────┐
-                                 │weight_kernel per batch│
-                                 └──────────┬───────────┘
-                                            │
-                                            ▼
-                                 ┌──────────────────────┐
-                                 │   _build_stencil!    │
-                                 └──┬───────┬───────┬───┘
-                                    │       │       │
-                     ┌──────────────┘       │       └──────────────┐
-                     ▼                      ▼                      ▼
-      ┌───────────────────────┐ ┌────────────────┐ ┌───────────────────┐
-      │_build_collocation_    │ │  _build_rhs!   │ │    Solve A\b      │
-      │      matrix!          │ │                │ │                   │
-      └───────────────────────┘ └────────────────┘ └───────────────────┘
+```@raw html
+<div style="overflow-x:auto;">
+<svg viewBox="0 0 720 590" width="100%" role="img" aria-labelledby="cg-title cg-desc"
+     style="max-width:720px;height:auto;display:block;margin:1.5rem auto;font-family:var(--vp-font-family-base);">
+  <title id="cg-title">RBF weight-building call graph</title>
+  <desc id="cg-desc">From constructing an operator down to returning the sparse weight matrix, colored by architecture layer: api.jl, execution.jl, and assembly.jl.</desc>
+  <defs>
+    <marker id="cg-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--vp-c-text-3)"/>
+    </marker>
+  </defs>
 
-                                            │
-                                            ▼
-                                 ┌──────────────────────┐
-                                 │sparse I,J,V -> return│
-                                 └──────────────────────┘
+  <!-- edges -->
+  <g fill="none" stroke="var(--vp-c-text-3)" stroke-width="1.6" marker-end="url(#cg-arrow)">
+    <line x1="360" y1="60"  x2="360" y2="86"/>
+    <line x1="360" y1="142" x2="360" y2="168"/>
+    <line x1="360" y1="224" x2="360" y2="250"/>
+    <path d="M360,296 V318 H170 V336"/>
+    <path d="M360,296 V318 H550 V336"/>
+    <path d="M170,392 L332,432"/>
+    <path d="M550,392 L388,432"/>
+    <line x1="360" y1="488" x2="360" y2="528"/>
+  </g>
+
+  <!-- nodes -->
+  <g stroke-width="1.6" font-size="14">
+    <!-- User -->
+    <rect x="210" y="14" width="300" height="46" rx="23" fill="var(--vp-c-default-soft)" stroke="var(--vp-c-text-3)"/>
+    <text x="360" y="42" text-anchor="middle" fill="var(--vp-c-text-1)">User constructs operator</text>
+
+    <!-- api.jl -->
+    <rect x="210" y="86" width="300" height="56" rx="8" fill="var(--vp-c-indigo-soft)" stroke="var(--vp-c-indigo-1)"/>
+    <text x="360" y="110" text-anchor="middle" fill="var(--vp-c-text-1)" font-family="var(--vp-font-family-mono)" font-size="13.5">_build_weights(ℒ, op)</text>
+    <text x="360" y="128" text-anchor="middle" fill="var(--vp-c-text-2)" font-size="10.5">apply ℒ to basis + monomial</text>
+
+    <!-- execution.jl -->
+    <rect x="210" y="168" width="300" height="56" rx="8" fill="var(--vp-c-yellow-soft)" stroke="var(--vp-c-yellow-1)"/>
+    <text x="360" y="192" text-anchor="middle" fill="var(--vp-c-text-1)" font-family="var(--vp-font-family-mono)" font-size="13.5">build_weights_kernel</text>
+    <text x="360" y="210" text-anchor="middle" fill="var(--vp-c-text-2)" font-size="10.5">allocate sparse arrays · parallel kernel per point</text>
+
+    <!-- assembly.jl -->
+    <rect x="210" y="250" width="300" height="46" rx="8" fill="var(--vp-c-green-soft)" stroke="var(--vp-c-green-1)"/>
+    <text x="360" y="278" text-anchor="middle" fill="var(--vp-c-text-1)" font-family="var(--vp-font-family-mono)" font-size="13.5">_build_stencil!</text>
+
+    <rect x="45" y="336" width="250" height="56" rx="8" fill="var(--vp-c-green-soft)" stroke="var(--vp-c-green-1)"/>
+    <text x="170" y="360" text-anchor="middle" fill="var(--vp-c-text-1)" font-family="var(--vp-font-family-mono)" font-size="12">_build_collocation_matrix!</text>
+    <text x="170" y="378" text-anchor="middle" fill="var(--vp-c-text-2)" font-size="10.5">assemble A</text>
+
+    <rect x="425" y="336" width="250" height="56" rx="8" fill="var(--vp-c-green-soft)" stroke="var(--vp-c-green-1)"/>
+    <text x="550" y="360" text-anchor="middle" fill="var(--vp-c-text-1)" font-family="var(--vp-font-family-mono)" font-size="12">_build_rhs!</text>
+    <text x="550" y="378" text-anchor="middle" fill="var(--vp-c-text-2)" font-size="10.5">assemble b</text>
+
+    <rect x="235" y="432" width="250" height="56" rx="8" fill="var(--vp-c-green-soft)" stroke="var(--vp-c-green-1)"/>
+    <text x="360" y="456" text-anchor="middle" fill="var(--vp-c-text-1)" font-family="var(--vp-font-family-mono)" font-size="12.5">w = A \ b</text>
+    <text x="360" y="474" text-anchor="middle" fill="var(--vp-c-text-2)" font-size="10.5">local solve → weights</text>
+
+    <!-- return -->
+    <rect x="210" y="528" width="300" height="46" rx="23" fill="var(--vp-c-default-soft)" stroke="var(--vp-c-text-3)"/>
+    <text x="360" y="556" text-anchor="middle" fill="var(--vp-c-text-1)">pack sparse I, J, V  →  return W</text>
+  </g>
+</svg>
+</div>
 ```
+
+Nodes are colored by architecture layer — indigo `api.jl` (routing and entry points), amber `execution.jl` (allocation and parallel kernel execution), and green `assembly.jl` (the per-stencil mathematics: build **A**, build **b**, and the local solve). The execution layer runs one `_build_stencil!` per evaluation point; once every batch completes, the collected `(I, J, V)` triples are packed into the sparse weight matrix `W`. See the layer breakdown below.
 
 ## Architecture Overview
 
