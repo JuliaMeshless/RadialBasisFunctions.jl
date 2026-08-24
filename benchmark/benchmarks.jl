@@ -4,6 +4,7 @@ using RadialBasisFunctions: Dirichlet, Neumann, Robin
 using StaticArraysCore
 using HaltonSequences
 using LinearAlgebra
+using SparseArrays: sparse
 import DifferentiationInterface as DI
 using Mooncake: Mooncake
 using Enzyme: Enzyme
@@ -21,6 +22,18 @@ basis = PHS(3; poly_deg = 2)
 SUITE["Partial"] = let s = BenchmarkGroup()
     s["build weights"] = @benchmarkable update_weights!($∂x)
     s["eval"] = @benchmarkable ∂x($y)
+    s
+end
+
+# The issue #156 headline comparison: stencil-wise (ELL) apply kernel vs the former
+# SparseMatrixCSC matvec. Note AirspeedVelocity CI runs effectively single-threaded, so
+# only the serial ELL win shows there; the threaded speedup needs a local -t run.
+∇² = laplacian(x, basis)
+W_csc = sparse(∇²)
+SUITE["Laplacian"] = let s = BenchmarkGroup()
+    s["build weights"] = @benchmarkable update_weights!($∇²)
+    s["eval (ELL)"] = @benchmarkable $∇²($y)
+    s["eval (CSC)"] = @benchmarkable $W_csc * $y
     s
 end
 
@@ -95,7 +108,9 @@ ad_ℒ = RadialBasisFunctions.Laplacian()
 function ad_loss(pts)
     pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:ad_N]
     W = RadialBasisFunctions._build_weights(ad_ℒ, pts_vec, pts_vec, ad_adjl, ad_basis)
-    return sum((W * ad_v) .^ 2)
+    # Loss over the built weight values (parent = the dense ELL value matrix); a bare
+    # W * v here would trace the threaded apply kernel, which has no build-rule coverage.
+    return sum(parent(W) .^ 2)
 end
 
 ad_pts_flat = vcat([collect(p) for p in ad_points]...)
