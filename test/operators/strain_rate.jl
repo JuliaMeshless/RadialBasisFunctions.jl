@@ -3,7 +3,6 @@ using StaticArraysCore
 using Statistics
 using HaltonSequences
 using LinearAlgebra
-using SparseArrays: SparseVector
 
 include("../test_utils.jl")
 
@@ -117,12 +116,12 @@ end
     u = hcat(getindex.(x, 2), getindex.(x, 1))
 
     ε_op = strain_rate(x; eval_points = eval_pt)
-    @test ε_op.weights[1] isa SparseVector
+    @test ε_op.weights[1] isa StencilWeights
     result = ε_op(u)
-    @test result isa Matrix
-    @test size(result) == (2, 2)
-    @test abs(result[1, 2] - 1.0) < 0.1
-    @test result[1, 2] ≈ result[2, 1]
+    @test result isa Array{Float64, 3}
+    @test size(result) == (1, 2, 2)
+    @test abs(result[1, 1, 2] - 1.0) < 0.1
+    @test result[1, 1, 2] ≈ result[1, 2, 1]
 end
 
 @testset "Printing" begin

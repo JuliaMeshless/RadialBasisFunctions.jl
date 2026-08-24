@@ -1,5 +1,4 @@
 using RadialBasisFunctions
-using SparseArrays: SparseVector
 using StaticArraysCore
 using Statistics
 using HaltonSequences
@@ -146,30 +145,29 @@ end
     @test mean_percent_error(J[:, 3], expected_dz) < 10
 end
 
-@testset "Single eval point - Scalar field returns Vector" begin
+@testset "Single eval point - Scalar field" begin
     # Single evaluation point
     eval_pt = [SVector{2}(0.5, 0.5)]
     u = sin.(getindex.(points, 1)) .+ cos.(getindex.(points, 2))
 
     op = jacobian(points; eval_points = eval_pt, basis = PHS(3; poly_deg = 2))
 
-    # Weights should be SparseVectors, not matrices
-    @test op.weights[1] isa SparseVector
-    @test op.weights[2] isa SparseVector
+    # Weights are k×1 StencilWeights with logical size (1, N)
+    @test op.weights[1] isa StencilWeights
+    @test size(op.weights[1]) == (1, N)
 
     J = op(u)
 
-    # Result should be a Vector (size D), not a 1×D Matrix
-    @test J isa Vector
-    @test size(J) == (2,)
-    @test length(J) == 2
+    # Result keeps the leading eval dim: 1×D Matrix
+    @test J isa Matrix
+    @test size(J) == (1, 2)
 
     # Check accuracy
-    @test abs(J[1] - cos(0.5)) < 0.1
-    @test abs(J[2] - (-sin(0.5))) < 0.1
+    @test abs(J[1, 1] - cos(0.5)) < 0.1
+    @test abs(J[1, 2] - (-sin(0.5))) < 0.1
 end
 
-@testset "Single eval point - Vector field returns Matrix" begin
+@testset "Single eval point - Vector field" begin
     # Single evaluation point
     eval_pt = [SVector{2}(0.5, 0.5)]
     # u = [x*y, x² + y²]
@@ -180,16 +178,16 @@ end
     op = jacobian(points; eval_points = eval_pt, basis = PHS(3; poly_deg = 2))
     J = op(u)
 
-    # Result should be a D_in × D Matrix, not 1×D_in×D tensor
-    @test J isa Matrix
-    @test size(J) == (2, 2)
+    # Result keeps the leading eval dim: 1 × D_in × D tensor
+    @test J isa Array{<:Any, 3}
+    @test size(J) == (1, 2, 2)
 
     # Expected Jacobian at (0.5, 0.5):
     # J = [[y, x], [2x, 2y]] = [[0.5, 0.5], [1.0, 1.0]]
-    @test abs(J[1, 1] - 0.5) < 0.1  # ∂u₁/∂x = y
-    @test abs(J[1, 2] - 0.5) < 0.1  # ∂u₁/∂y = x
-    @test abs(J[2, 1] - 1.0) < 0.1  # ∂u₂/∂x = 2x
-    @test abs(J[2, 2] - 1.0) < 0.1  # ∂u₂/∂y = 2y
+    @test abs(J[1, 1, 1] - 0.5) < 0.1  # ∂u₁/∂x = y
+    @test abs(J[1, 1, 2] - 0.5) < 0.1  # ∂u₁/∂y = x
+    @test abs(J[1, 2, 1] - 1.0) < 0.1  # ∂u₂/∂x = 2x
+    @test abs(J[1, 2, 2] - 1.0) < 0.1  # ∂u₂/∂y = 2y
 end
 
 @testset "General tensor input (3D array)" begin
@@ -230,17 +228,17 @@ end
 
     op = jacobian(points; eval_points = eval_pt, basis = PHS(3; poly_deg = 2))
 
-    @test op.weights[1] isa SparseVector
-    @test op.weights[2] isa SparseVector
+    @test op.weights[1] isa StencilWeights
+    @test size(op.weights[1]) == (1, N)
 
     result = op(tensor_input)
 
-    # Single eval point: no N_eval dimension → (2, 3, 2)
-    @test result isa Array{<:Any, 3}
-    @test size(result) == (2, 3, 2)
+    # Single eval point keeps the leading eval dim → (1, 2, 3, 2)
+    @test result isa Array{<:Any, 4}
+    @test size(result) == (1, 2, 3, 2)
 
     for i in 1:2, j in 1:3
-        @test abs(result[i, j, 1] - Float64(i + j)) < 0.1  # ∂f/∂x
-        @test abs(result[i, j, 2] - Float64(i - j)) < 0.1  # ∂f/∂y
+        @test abs(result[1, i, j, 1] - Float64(i + j)) < 0.1  # ∂f/∂x
+        @test abs(result[1, i, j, 2] - Float64(i - j)) < 0.1  # ∂f/∂y
     end
 end

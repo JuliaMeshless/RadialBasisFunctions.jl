@@ -3,7 +3,6 @@ using StaticArraysCore
 using Statistics
 using HaltonSequences
 using LinearAlgebra
-using SparseArrays: SparseVector
 
 include("../test_utils.jl")
 
@@ -101,10 +100,11 @@ end
     u = hcat(-getindex.(x, 2), getindex.(x, 1))
 
     curl_op = curl(x; eval_points = eval_pt)
-    @test curl_op.weights[1] isa SparseVector
+    @test curl_op.weights[1] isa StencilWeights
     result = curl_op(u)
-    @test result isa Number
-    @test abs(result - 2.0) < 0.1
+    @test result isa AbstractVector
+    @test length(result) == 1
+    @test abs(result[1] - 2.0) < 0.1
 end
 
 @testset "Single Eval Point 3D" begin
@@ -116,12 +116,13 @@ end
     u = hcat(-getindex.(x, 2), getindex.(x, 1), zeros(N))
 
     curl_op = curl(x; eval_points = eval_pt)
-    @test curl_op.weights[1] isa SparseVector
+    @test curl_op.weights[1] isa StencilWeights
     result = curl_op(u)
-    @test result isa SVector{3}
-    @test abs(result[1]) < 0.1
-    @test abs(result[2]) < 0.1
-    @test abs(result[3] - 2.0) < 0.1
+    @test result isa Matrix
+    @test size(result) == (1, 3)
+    @test abs(result[1, 1]) < 0.1
+    @test abs(result[1, 2]) < 0.1
+    @test abs(result[1, 3] - 2.0) < 0.1
 end
 
 @testset "Printing" begin

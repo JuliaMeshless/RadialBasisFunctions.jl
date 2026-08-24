@@ -2,6 +2,7 @@ using RadialBasisFunctions
 using StaticArraysCore
 using FiniteDifferences
 using LinearAlgebra
+using SparseArrays: sparse
 using Test
 import DifferentiationInterface as DI
 using Enzyme: Enzyme
@@ -70,6 +71,63 @@ end
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
                     test_gradient_vs_fd(loss_partial, values, backend; rtol = 1.0e-4)
+                end
+            end
+        end
+
+        @testset "Eval pullback vs sparse reference" begin
+            lap = laplacian(points)
+            rng = MersenneTwister(42)
+            Δy = randn(rng, N)
+            Δx = RadialBasisFunctions.accumulate_eval_pullback!(zeros(N), lap.weights, Δy)
+            @test Δx ≈ sparse(lap)' * Δy
+        end
+
+        @testset "Operator eval differentiation with Hermite boundary conditions" begin
+            # 12-point domain with 2 Dirichlet boundary points (test/hermite.jl fixture)
+            data = [
+                SVector(0.0, 0.0),   # boundary
+                SVector(0.15, 0.1),  # interior
+                SVector(0.2, 0.25),  # interior
+                SVector(0.3, 0.15),  # interior
+                SVector(0.4, 0.3),   # interior
+                SVector(0.5, 0.2),   # interior
+                SVector(0.6, 0.35),  # interior
+                SVector(0.7, 0.25),  # interior
+                SVector(0.75, 0.15), # interior
+                SVector(0.85, 0.3),  # interior
+                SVector(0.9, 0.2),   # interior
+                SVector(1.0, 0.0),   # boundary
+            ]
+            is_boundary = [
+                true, false, false, false, false, false, false, false, false, false, false, true,
+            ]
+            bcs = [RadialBasisFunctions.Dirichlet(), RadialBasisFunctions.Dirichlet()]
+            normals = [SVector(1.0, 0.0), SVector(-1.0, 0.0)]
+
+            lap_h = laplacian(
+                data;
+                basis = PHS(3; poly_deg = 2),
+                hermite = (is_boundary = is_boundary, bc = bcs, normals = normals),
+            )
+            values_h = sin.(getindex.(data, 1)) .+ cos.(getindex.(data, 2))
+            loss_hermite(v) = sum(abs2, lap_h(v))
+
+            for (name, backend) in AD_BACKENDS
+                @testset "$name" begin
+                    test_gradient_vs_fd(loss_hermite, values_h, backend; rtol = 1.0e-4)
+                end
+            end
+        end
+
+        @testset "Operator eval differentiation with distinct eval points" begin
+            m = 20
+            lap_r = laplacian(points; eval_points = points[1:m])
+            loss_eval(v) = sum(abs2, lap_r(v))
+
+            for (name, backend) in AD_BACKENDS
+                @testset "$name" begin
+                    test_gradient_vs_fd(loss_eval, values, backend; rtol = 1.0e-4)
                 end
             end
         end
@@ -188,7 +246,7 @@ end
             function loss_partial_weights(pts)
                 pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
                 W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
-                return sum(W.nzval .^ 2)
+                return sum(parent(W) .^ 2)
             end
 
             pts_flat = vcat([collect(p) for p in points]...)
@@ -207,7 +265,7 @@ end
             function loss_laplacian_weights(pts)
                 pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
                 W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
-                return sum(W.nzval .^ 2)
+                return sum(parent(W) .^ 2)
             end
 
             pts_flat = vcat([collect(p) for p in points]...)
@@ -229,7 +287,7 @@ end
                 function loss_laplacian_phs_order(pts)
                     pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
                     W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
-                    return sum(W.nzval .^ 2)
+                    return sum(parent(W) .^ 2)
                 end
 
                 pts_flat = vcat([collect(p) for p in points]...)
@@ -258,7 +316,7 @@ end
                 W = RadialBasisFunctions._build_weights(
                     ℒ_1d, pts_vec, pts_vec, adjl_1d, basis_1d
                 )
-                return sum(W.nzval .^ 2)
+                return sum(parent(W) .^ 2)
             end
 
             pts_flat_1d = vcat([collect(p) for p in points_1d]...)
@@ -293,7 +351,7 @@ end
                 W = RadialBasisFunctions._build_weights(
                     ℒ_3d, pts_vec, pts_vec, adjl_3d, basis_3d
                 )
-                return sum(W.nzval .^ 2)
+                return sum(parent(W) .^ 2)
             end
 
             pts_flat_3d = vcat([collect(p) for p in points_3d]...)
@@ -328,7 +386,7 @@ end
                 W = RadialBasisFunctions._build_weights(
                     ℒ_3d_y, pts_vec, pts_vec, adjl_3d_y, basis_3d_y
                 )
-                return sum(W.nzval .^ 2)
+                return sum(parent(W) .^ 2)
             end
 
             pts_flat_3d_y = vcat([collect(p) for p in points_3d_y]...)
@@ -363,7 +421,7 @@ end
                 W = RadialBasisFunctions._build_weights(
                     ℒ_3d_z, pts_vec, pts_vec, adjl_3d_z, basis_3d_z
                 )
-                return sum(W.nzval .^ 2)
+                return sum(parent(W) .^ 2)
             end
 
             pts_flat_3d_z = vcat([collect(p) for p in points_3d_z]...)
@@ -384,7 +442,7 @@ end
             function loss_partial_y_weights(pts)
                 pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
                 W = RadialBasisFunctions._build_weights(ℒ_y, pts_vec, pts_vec, adjl, basis)
-                return sum(W.nzval .^ 2)
+                return sum(parent(W) .^ 2)
             end
 
             pts_flat = vcat([collect(p) for p in points]...)
@@ -406,7 +464,7 @@ end
                 function loss_phs_order(pts)
                     pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
                     W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
-                    return sum(W.nzval .^ 2)
+                    return sum(parent(W) .^ 2)
                 end
 
                 pts_flat = vcat([collect(p) for p in points]...)
@@ -430,7 +488,7 @@ end
             function loss_imq_partial(pts)
                 pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
                 W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
-                return sum(W.nzval .^ 2)
+                return sum(parent(W) .^ 2)
             end
 
             pts_flat = vcat([collect(p) for p in points]...)
@@ -449,7 +507,7 @@ end
             function loss_imq_laplacian(pts)
                 pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
                 W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
-                return sum(W.nzval .^ 2)
+                return sum(parent(W) .^ 2)
             end
 
             pts_flat = vcat([collect(p) for p in points]...)
@@ -468,7 +526,7 @@ end
             function loss_gaussian_partial(pts)
                 pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
                 W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
-                return sum(W.nzval .^ 2)
+                return sum(parent(W) .^ 2)
             end
 
             pts_flat = vcat([collect(p) for p in points]...)
@@ -489,7 +547,7 @@ end
             function loss_gaussian_laplacian(pts)
                 pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
                 W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
-                return sum(W.nzval .^ 2)
+                return sum(parent(W) .^ 2)
             end
 
             pts_flat = vcat([collect(p) for p in points]...)
@@ -514,7 +572,7 @@ end
                         W = RadialBasisFunctions._build_weights(
                             ℒ, pts_vec, pts_vec, adjl, basis
                         )
-                        return sum(W.nzval .^ 2)
+                        return sum(parent(W) .^ 2)
                     end
 
                     pts_flat = vcat([collect(p) for p in points]...)
@@ -537,7 +595,7 @@ end
                         W = RadialBasisFunctions._build_weights(
                             ℒ, pts_vec, pts_vec, adjl, basis
                         )
-                        return sum(W.nzval .^ 2)
+                        return sum(parent(W) .^ 2)
                     end
 
                     pts_flat = vcat([collect(p) for p in points]...)

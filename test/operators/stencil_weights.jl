@@ -6,6 +6,7 @@ using KernelAbstractions: CPU
 using LinearAlgebra
 using SparseArrays
 using Random: MersenneTwister, randperm
+using StaticArraysCore
 using Test
 
 rng = MersenneTwister(123)
@@ -139,4 +140,67 @@ end
     W_adapted = Adapt.adapt(CPU(), W)
     @test W_adapted isa StencilWeights
     @test W_adapted.vals === W.vals && W_adapted.idx === W.idx
+end
+
+# ============================================================================
+# Operator integration: weights produced by the build pipeline
+# ============================================================================
+
+pts = map(_ -> SVector{2}(rand(rng, 2)), 1:50)
+
+# Square-grid Hermite fixture: boundary = points on the unit-square edge. Normals are
+# dummies — Dirichlet conditions ignore them.
+n_grid = 6
+h = n_grid - 1
+grid = vec([SVector{2}(i / h, j / h) for i in 0:h, j in 0:h])
+is_b = map(p -> p[1] == 0 || p[1] == 1 || p[2] == 0 || p[2] == 1, grid)
+bcs = [RBF.Dirichlet() for _ in 1:count(is_b)]
+bnormals = [SVector{2}(1.0, 0.0) for _ in 1:count(is_b)]
+
+@testset "Operator weights are StencilWeights" begin
+    op = partial(pts, 1, 1)
+    @test op.weights isa StencilWeights
+    @test all(Int32.(op.adjl[i]) == op.weights.idx[:, i] for i in eachindex(op.adjl))
+    @test SparseMatrixCSC(op) == sparse(op)
+    @test SparseMatrixCSC(op) isa SparseMatrixCSC
+
+    grad = gradient(pts, PHS(3; poly_deg = 2))
+    @test grad.weights isa NTuple{2, <:StencilWeights}
+    @test grad.weights[1].idx === grad.weights[2].idx
+end
+
+@testset "Dirichlet columns act as identity" begin
+    op = laplacian(grid; hermite = (is_boundary = is_b, bc = bcs, normals = bnormals))
+    z = randn(rng, length(grid))
+    u = op(z)
+    b_idx = findall(is_b)
+    @test u[b_idx] == z[b_idx]
+
+    S = sparse(op)
+    @test all(nnz(S[i, :]) == 1 for i in b_idx)
+    @test all(S[i, i] == 1.0 for i in b_idx)
+    # ELL columns for Dirichlet points carry the identity in slot 1, zero pads below
+    @test all(iszero, parent(op.weights)[2:end, b_idx])
+end
+
+@testset "Rectangular regrid weights" begin
+    xe = map(_ -> SVector{2}(rand(rng, 2)), 1:20)
+    r = regrid(pts, xe)
+    @test size(r.weights) == (length(xe), length(pts))
+    z = randn(rng, length(pts))
+    @test r(z) ≈ sparse(r) * z
+end
+
+@testset "Ragged adjacency list is rejected" begin
+    ragged = [collect(1:5) for _ in eachindex(pts)]
+    ragged[1] = collect(1:4)
+    @test_throws ArgumentError laplacian(pts; adjl = ragged)
+end
+
+@testset "Hermite requires matching eval points" begin
+    @test_throws ArgumentError laplacian(
+        grid;
+        hermite = (is_boundary = is_b, bc = bcs, normals = bnormals),
+        eval_points = grid[1:10],
+    )
 end

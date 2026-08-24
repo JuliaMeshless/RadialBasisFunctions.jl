@@ -2,6 +2,7 @@ using Test
 using StaticArraysCore
 using LinearAlgebra
 using Statistics
+using SparseArrays: sparse
 using RadialBasisFunctions
 import RadialBasisFunctions as RBF
 
@@ -67,7 +68,7 @@ import RadialBasisFunctions as RBF
         rhs_error = abs.(rhs - laplacian_result)
         @test maximum(rhs_error) < 1.0e-10
 
-        solution = L_op.weights \ rhs
+        solution = sparse(L_op) \ rhs
 
         solution_error = solution - u_values
         max_error = maximum(abs.(solution_error))

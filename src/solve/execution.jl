@@ -1,6 +1,5 @@
 using KernelAbstractions
 using KernelAbstractions: @kernel, @index, CPU
-using SparseArrays: sparse, sparsevec
 using LinearAlgebra: Symmetric
 
 # ============================================================================
@@ -8,64 +7,15 @@ using LinearAlgebra: Symmetric
 # ============================================================================
 
 """
-    allocate_sparse_arrays(TD, k, N_eval, num_ops, adjl, boundary_data, global_to_boundary)
+    allocate_ell(TD, k, N_eval, num_ops)
 
-Allocate sparse matrix arrays for COO format sparse matrix construction.
-Exactly counts non-zeros: interior points get k entries, Dirichlet points get 1 entry.
+Allocate ELL (stencil-wise) weight storage: one dense `k × N_eval` value matrix per
+operator component and a shared `k × N_eval` `Int32` neighbor-index matrix.
 """
-function allocate_sparse_arrays(
-        TD, k::Int, N_eval::Int, num_ops::Int, adjl, boundary_data::BoundaryData,
-        global_to_boundary::Vector{Int},
-    )
-    # Count exact non-zeros needed
-    total_nnz, row_offsets = count_nonzeros(
-        adjl, boundary_data.is_boundary, boundary_data.boundary_conditions,
-        global_to_boundary,
-    )
-
-    I = Vector{Int}(undef, total_nnz)
-    J = Vector{Int}(undef, total_nnz)
-    V = Matrix{TD}(undef, total_nnz, num_ops)
-
-    return I, J, V, row_offsets
-end
-
-"""
-    count_nonzeros(adjl, is_boundary, boundary_conditions)
-
-Count exact number of non-zero entries for optimized allocation.
-Returns (total_nnz, row_offsets) where row_offsets[i] is the starting position for row i.
-"""
-function count_nonzeros(
-        adjl, is_boundary::Vector{Bool}, boundary_conditions::Vector{<:BoundaryCondition},
-        global_to_boundary::Vector{Int} = construct_global_to_boundary(is_boundary),
-    )
-    N_eval = length(adjl)
-    row_offsets = Vector{Int}(undef, N_eval + 1)
-
-    total_nnz = 0
-    row_offsets[1] = 1  # 1-based indexing
-
-    for eval_idx in 1:N_eval
-        if is_boundary[eval_idx]
-            boundary_idx = global_to_boundary[eval_idx]
-            bc = boundary_conditions[boundary_idx]
-            if is_dirichlet(bc)
-                # Dirichlet: only diagonal element
-                total_nnz += 1
-            else
-                # Neumann/Robin: full stencil
-                total_nnz += length(adjl[eval_idx])
-            end
-        else
-            # Interior: full stencil
-            total_nnz += length(adjl[eval_idx])
-        end
-
-        row_offsets[eval_idx + 1] = total_nnz + 1
-    end
-
-    return total_nnz, row_offsets
+function allocate_ell(TD, k::Int, N_eval::Int, num_ops::Int)
+    vals_list = [Matrix{TD}(undef, k, N_eval) for _ in 1:num_ops]
+    idx = Matrix{Int32}(undef, k, N_eval)
+    return vals_list, idx
 end
 
 """
@@ -93,24 +43,20 @@ function construct_global_to_boundary(is_boundary::Vector{Bool})
 end
 
 # ============================================================================
-# Sparse Matrix Construction
+# Weight Assembly
 # ============================================================================
 
 """
-    _construct_sparse(I, J, V, N_eval, N_data, num_ops)
+    _assemble_weights(vals_list, idx, N_data, num_ops)
 
-Construct sparse matrix/vector from COO arrays.
-# Future GPU support: convert to device-sparse format here (see #88)
+Wrap the filled ELL buffers into [`StencilWeights`](@ref) — one per operator component,
+all sharing the same neighbor-index matrix.
 """
-function _construct_sparse(I, J, V, N_eval, N_data, num_ops)
+function _assemble_weights(vals_list, idx, N_data, num_ops)
     if num_ops == 1
-        return sparse(I, J, V[:, 1], N_eval, N_data)
+        return StencilWeights(vals_list[1], idx, N_data)
     else
-        if N_eval == 1
-            return ntuple(i -> sparsevec(J, V[:, i], N_data), num_ops)
-        else
-            return ntuple(i -> sparse(I, J, V[:, i], N_eval, N_data), num_ops)
-        end
+        return ntuple(o -> StencilWeights(vals_list[o], idx, N_data), num_ops)
     end
 end
 
@@ -149,28 +95,34 @@ function build_weights_kernel(
 
     TD = eltype(first(data))
     k = length(first(adjl))
+    if any(neighbors -> length(neighbors) != k, adjl)
+        throw(
+            ArgumentError(
+                "stencil-wise (ELL) weight storage requires a uniform stencil size; " *
+                    "adjl contains stencils of differing lengths"
+            )
+        )
+    end
     nmon = binomial(length(first(data)) + basis.poly_deg, basis.poly_deg)
     num_ops = _num_ops(ℒrbf)
     N_eval = length(eval_points)
 
     global_to_boundary = construct_global_to_boundary(boundary_data.is_boundary)
 
-    # Allocate sparse arrays
-    I, J, V, row_offsets = allocate_sparse_arrays(
-        TD, k, N_eval, num_ops, adjl, boundary_data, global_to_boundary
-    )
+    # Allocate ELL weight storage
+    vals_list, idx = allocate_ell(TD, k, N_eval, num_ops)
 
     # Calculate batches
     n_batches = ceil(Int, N_eval / batch_size)
 
     # Launch kernel
     launch_kernel!(
-        I, J, V, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
-        boundary_data, global_to_boundary, row_offsets, batch_size, N_eval, n_batches,
+        vals_list, idx, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
+        boundary_data, global_to_boundary, batch_size, N_eval, n_batches,
         k, nmon, num_ops, device,
     )
 
-    return _construct_sparse(I, J, V, N_eval, length(data), num_ops)
+    return _assemble_weights(vals_list, idx, length(data), num_ops)
 end
 
 # ============================================================================
@@ -184,8 +136,8 @@ Launch parallel CPU kernel for weight computation.
 Handles Dirichlet/Interior/Hermite stencil classification via dispatch.
 """
 function launch_kernel!(
-        I, J, V, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
-        boundary_data::BoundaryData, global_to_boundary, row_offsets,
+        vals_list, idx, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
+        boundary_data::BoundaryData, global_to_boundary,
         batch_size, N_eval, n_batches, k, nmon, num_ops, device,
     )
     TD = eltype(first(data))
@@ -195,10 +147,10 @@ function launch_kernel!(
     batch_hermite_datas = [HermiteStencilData{TD}(k, dim, nmon) for _ in 1:n_batches]
 
     @kernel function weight_kernel(
-            I, J, V, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
+            vals_list, idx, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
             is_boundary, boundary_conditions, normals,
             batch_hermite_datas, global_to_boundary,
-            row_offsets, batch_size, N_eval, nmon, k, num_ops, TD,
+            batch_size, N_eval, nmon, k, num_ops, TD,
         )
         batch_idx = @index(Global)
         hermite_data = batch_hermite_datas[batch_idx]
@@ -212,7 +164,6 @@ function launch_kernel!(
         λ = _prepare_buffer(ℒrbf, TD, n)
 
         for eval_idx in start_idx:end_idx
-            start_pos = row_offsets[eval_idx]
             neighbors = adjl[eval_idx]
             eval_point = eval_points[eval_idx]
 
@@ -222,8 +173,8 @@ function launch_kernel!(
             )
 
             if stype isa DirichletStencil
-                # Identity row: only diagonal is 1.0
-                fill_dirichlet_entry!(I, J, V, eval_idx, start_pos, num_ops)
+                # Identity row: weight 1 at slot 1, zero pads sharing the same index
+                fill_dirichlet_column!(vals_list, idx, eval_idx, k, num_ops)
                 continue
             end
 
@@ -248,17 +199,17 @@ function launch_kernel!(
                 )
             end
 
-            # Store weights in sparse arrays
-            fill_entries!(I, J, V, weights, eval_idx, neighbors, start_pos, k, num_ops)
+            # Store weights in the ELL columns
+            fill_entries!(vals_list, idx, weights, eval_idx, neighbors, k, num_ops)
         end
     end
 
     kernel! = weight_kernel(device)
     kernel!(
-        I, J, V, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
+        vals_list, idx, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
         boundary_data.is_boundary, boundary_data.boundary_conditions,
         boundary_data.normals, batch_hermite_datas, global_to_boundary,
-        row_offsets, batch_size, N_eval, nmon, k, num_ops, TD;
+        batch_size, N_eval, nmon, k, num_ops, TD;
         ndrange = n_batches, workgroupsize = 1,
     )
     return KernelAbstractions.synchronize(device)
@@ -275,29 +226,36 @@ end
     return start_idx, end_idx
 end
 
-"""Fill sparse matrix entries using indexed storage (row_offsets)"""
+"""Write one stencil's weights into its ELL column"""
 @inline function fill_entries!(
-        I, J, V, weights, eval_idx::Int, neighbors, start_pos::Int, k::Int, num_ops::Int
+        vals_list, idx, weights, eval_idx::Int, neighbors, k::Int, num_ops::Int
     )
     return @inbounds for local_idx in 1:k
-        pos = start_pos + local_idx - 1
-        I[pos] = eval_idx
-        J[pos] = neighbors[local_idx]
+        idx[local_idx, eval_idx] = Int32(neighbors[local_idx])
         if num_ops == 1
-            V[pos, 1] = weights[local_idx]
+            vals_list[1][local_idx, eval_idx] = weights[local_idx]
         else
             for op in 1:num_ops
-                V[pos, op] = weights[local_idx, op]
+                vals_list[op][local_idx, eval_idx] = weights[local_idx, op]
             end
         end
     end
 end
 
-"""Fill Dirichlet identity row for optimized allocation"""
-@inline function fill_dirichlet_entry!(I, J, V, eval_idx::Int, start_pos::Int, num_ops::Int)
-    I[start_pos] = eval_idx
-    J[start_pos] = eval_idx
+"""
+Fill a Dirichlet identity column: weight 1 at slot 1, zero pads elsewhere. All slots
+carry the eval point's own index (in-bounds; Dirichlet stencils require
+`eval_points === data`), so duplicate-combining `sparse` conversion collapses the column
+to a single identity entry.
+"""
+@inline function fill_dirichlet_column!(vals_list, idx, eval_idx::Int, k::Int, num_ops::Int)
+    @inbounds for local_idx in 1:k
+        idx[local_idx, eval_idx] = Int32(eval_idx)
+        for op in 1:num_ops
+            vals_list[op][local_idx, eval_idx] = zero(eltype(vals_list[op]))
+        end
+    end
     return @inbounds for op in 1:num_ops
-        V[start_pos, op] = one(eltype(V))
+        vals_list[op][1, eval_idx] = one(eltype(vals_list[op]))
     end
 end

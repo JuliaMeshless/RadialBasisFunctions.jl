@@ -4,7 +4,7 @@
 Operator for the divergence of a vector field (∇⋅u = ∑ᵢ ∂uᵢ/∂xᵢ).
 
 Takes a vector field (Matrix N×D) as input and produces a scalar field (Vector N).
-Weights are stored as `NTuple{Dim, SparseMatrixCSC}`, one partial derivative matrix
+Weights are stored as `NTuple{Dim, StencilWeights}`, one partial derivative matrix
 per spatial dimension, reusing the Jacobian weight-building infrastructure.
 """
 struct Divergence{Dim} <: AbstractJacobianOperator{Dim, 0} end
@@ -24,19 +24,6 @@ function _eval_op(op::RadialBasisOperator{<:Divergence}, y::AbstractVector, x::A
         mul!(y, op.weights[d], view(x, :, d), one(T), one(T))
     end
     return y
-end
-
-# SparseVector weights (single eval point)
-function _eval_op(
-        op::RadialBasisOperator{<:Divergence, <:NTuple{<:Any, <:SparseVector}},
-        x::AbstractMatrix,
-    )
-    D = length(op.weights)
-    result = dot(op.weights[1], view(x, :, 1))
-    for d in 2:D
-        result += dot(op.weights[d], view(x, :, d))
-    end
-    return result
 end
 
 # ============================================================================

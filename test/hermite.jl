@@ -14,7 +14,6 @@ using StaticArraysCore
 using RadialBasisFunctions
 using RadialBasisFunctions: Dirichlet, Neumann, Robin
 import RadialBasisFunctions as RBF
-using SparseArrays
 
 @testset "Hermite Integration Tests" begin
 

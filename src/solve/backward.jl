@@ -483,40 +483,48 @@ end
 # =============================================================================
 
 """
-    extract_stencil_cotangent!(Δw, ΔW, eval_idx, neighbors, k)
+    extract_stencil_cotangent!(Δw, ΔW, eval_idx, k)
 
-Fill the caller-owned buffer `Δw` with a single stencil's cotangent from a dense matrix
-cotangent. Used by the Enzyme extension. The caller pre-zeros `Δw`; every RBF row is written
-here, so no internal reset is needed.
+Fill the caller-owned buffer `Δw` with a single stencil's cotangent — column `eval_idx`
+of the stencil-major (`k × N_eval`) cotangent matrix `ΔW` (the tangent of
+`parent(::StencilWeights)`). Used by both the Enzyme and Mooncake extensions.
 """
 function extract_stencil_cotangent!(
-        Δw::AbstractMatrix{T}, ΔW::AbstractMatrix{T}, eval_idx::Int, neighbors::Vector{Int}, k::Int
+        Δw::AbstractMatrix{T}, ΔW::AbstractMatrix{T}, eval_idx::Int, k::Int
     ) where {T}
-    for (local_idx, global_idx) in enumerate(neighbors)
-        Δw[local_idx, 1] = ΔW[eval_idx, global_idx]
+    @inbounds for local_idx in 1:k
+        Δw[local_idx, 1] = ΔW[local_idx, eval_idx]
     end
     return Δw
 end
 
 """
-    extract_stencil_cotangent_from_nzval!(Δw, ΔW_nzval, W, eval_idx, neighbors, k)
+    accumulate_eval_pullback!(Δx, W, Δy)
 
-Fill the caller-owned buffer `Δw` with a single stencil's cotangent from a sparse-matrix
-nzval gradient. Used by the Mooncake extension where gradients are stored in fdata.nzval.
-Only entries found in the sparse structure are written, so the caller must pre-zero `Δw`.
+Accumulate the input cotangent of an operator application `y = W * x` into `Δx`:
+`Δx += Wᵀ Δy`. Shared by the Enzyme and Mooncake eval rules. The `StencilWeights`
+method is a serial scatter over the stencil graph (deterministic; Dirichlet pad slots
+contribute zero); the generic method covers the sparse fallback (`VirtualPartial`).
 """
-function extract_stencil_cotangent_from_nzval!(
-        Δw::AbstractMatrix{T}, ΔW_nzval::Vector{T}, W::SparseMatrixCSC, eval_idx::Int, neighbors::Vector{Int}, k::Int
-    ) where {T}
-    for (local_idx, global_idx) in enumerate(neighbors)
-        col_start = W.colptr[global_idx]
-        col_end = W.colptr[global_idx + 1] - 1
-        for pos in col_start:col_end
-            if W.rowval[pos] == eval_idx
-                Δw[local_idx, 1] = ΔW_nzval[pos]
-                break
-            end
+function accumulate_eval_pullback!(
+        Δx::AbstractVector, W::AbstractMatrix, Δy::AbstractVector
+    )
+    Δx .+= W' * Δy
+    return Δx
+end
+
+function accumulate_eval_pullback!(
+        Δx::AbstractVector, W::StencilWeights, Δy::AbstractVector
+    )
+    vals = W.vals
+    idx = W.idx
+    k, n = size(vals)
+    @inbounds for i in 1:n
+        Δyi = Δy[i]
+        iszero(Δyi) && continue
+        for l in 1:k
+            Δx[idx[l, i]] = muladd(vals[l, i], Δyi, Δx[idx[l, i]])
         end
     end
-    return Δw
+    return Δx
 end

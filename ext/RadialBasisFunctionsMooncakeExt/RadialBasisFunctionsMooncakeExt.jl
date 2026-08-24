@@ -19,10 +19,9 @@ using Mooncake
 using Mooncake: CoDual, NoFData, NoRData, primal, zero_fcodual
 using StaticArraysCore: SVector
 using LinearAlgebra: Symmetric, bunchkaufman!
-using SparseArrays: SparseMatrixCSC
 
 # Import types and functions we need
-import RadialBasisFunctions: _eval_op, RadialBasisOperator, Interpolator
+import RadialBasisFunctions: _eval_op, RadialBasisOperator, Interpolator, StencilWeights
 import RadialBasisFunctions: AbstractPHS, IMQ, Gaussian
 import RadialBasisFunctions: AbstractRadialBasis, Jacobian
 import RadialBasisFunctions: _build_weights, Partial, Laplacian, MonomialBasis, _optype
@@ -31,8 +30,8 @@ import RadialBasisFunctions: _interpolator_constructor_backward, _build_collocat
 
 # Import backward pass support from main package
 import RadialBasisFunctions: _forward_with_cache
-import RadialBasisFunctions: extract_stencil_cotangent_from_nzval!, _get_grad_funcs
-import RadialBasisFunctions: run_build_weights_pullback
+import RadialBasisFunctions: extract_stencil_cotangent!, _get_grad_funcs
+import RadialBasisFunctions: run_build_weights_pullback, accumulate_eval_pullback!
 
 # Import gradient function
 const ∇ = RadialBasisFunctions.∇
@@ -105,7 +104,7 @@ function Mooncake.rrule!!(
     y_codual = zero_fcodual(y)
 
     function eval_op_pb!!(::NoRData)
-        x.dx .+= operator.weights' * y_codual.dx
+        accumulate_eval_pullback!(x.dx, operator.weights, y_codual.dx)
         return NoRData(), NoRData(), NoRData()
     end
 
@@ -131,7 +130,7 @@ function Mooncake.rrule!!(
     function eval_op_vec_pb!!(::NoRData)
         Δy = y_codual.dx
         for d in 1:D
-            x.dx .+= operator.weights[d]' * view(Δy, :, d)
+            accumulate_eval_pullback!(x.dx, operator.weights[d], view(Δy, :, d))
         end
         return NoRData(), NoRData(), NoRData()
     end
@@ -155,7 +154,7 @@ function Mooncake.rrule!!(
     y_codual = zero_fcodual(y)
 
     function op_call_pb!!(::NoRData)
-        x.dx .+= operator.weights' * y_codual.dx
+        accumulate_eval_pullback!(x.dx, operator.weights, y_codual.dx)
         return NoRData(), NoRData()
     end
 
@@ -177,7 +176,7 @@ function Mooncake.rrule!!(
     function op_call_vec_pb!!(::NoRData)
         Δy = y_codual.dx
         for d in 1:D
-            x.dx .+= operator.weights[d]' * view(Δy, :, d)
+            accumulate_eval_pullback!(x.dx, operator.weights[d], view(Δy, :, d))
         end
         return NoRData(), NoRData()
     end
@@ -312,16 +311,18 @@ Create shared pullback closure that runs `run_build_weights_pullback` and accumu
 gradients into Mooncake fdata. Returns ε gradient value for basis rdata construction.
 """
 function _mooncake_build_weights_pullback(
-        W_fdata, W, data, eval_points, cache, adj, pts, eval_pts, bas, mon, ℒ,
+        W_fdata, data, eval_points, cache, adj, pts, eval_pts, bas, mon, ℒ,
         ::Type{OpType}, dim_space,
     ) where {OpType}
     grad_Lφ_x, grad_Lφ_xi = _get_grad_funcs(OpType, bas, ℒ)
 
     function _shared_pb!!(ΔW_rdata)
-        ΔW_nzval = W_fdata.data.nzval
+        # Structural tangent of StencilWeights: the value-matrix cotangent is the fdata's
+        # `vals` field (stencil-major, k × N_eval); the Int32 index matrix has no tangent.
+        ΔW_vals = W_fdata.data.vals
 
         Δdata_raw, Δeval_raw, Δε_acc = run_build_weights_pullback(
-            (Δw, eval_idx, neighbors, k) -> extract_stencil_cotangent_from_nzval!(Δw, ΔW_nzval, W, eval_idx, neighbors, k),
+            (Δw, eval_idx, neighbors, k) -> extract_stencil_cotangent!(Δw, ΔW_vals, eval_idx, k),
             cache, adj, eval_pts, pts, bas, mon, ℒ, OpType,
             grad_Lφ_x, grad_Lφ_xi
         )
@@ -351,7 +352,7 @@ function Mooncake.rrule!!(
     ℒ, pts, eval_pts, adj, bas = primal(op), primal(data), primal(eval_points), primal(adjl), primal(basis)
     OpType = _optype(ℒ)
     W, W_codual, cache, mon, dim_space = _mooncake_build_weights_forward(ℒ, pts, eval_pts, adj, bas, OpType)
-    shared_pb!! = _mooncake_build_weights_pullback(W_codual.dx, W, data, eval_points, cache, adj, pts, eval_pts, bas, mon, ℒ, OpType, dim_space)
+    shared_pb!! = _mooncake_build_weights_pullback(W_codual.dx, data, eval_points, cache, adj, pts, eval_pts, bas, mon, ℒ, OpType, dim_space)
 
     function pb!!(ΔW_rdata)
         shared_pb!!(ΔW_rdata)
@@ -373,7 +374,7 @@ function Mooncake.rrule!!(
     ℒ, pts, eval_pts, adj, bas = primal(op), primal(data), primal(eval_points), primal(adjl), primal(basis)
     OpType = _optype(ℒ)
     W, W_codual, cache, mon, dim_space = _mooncake_build_weights_forward(ℒ, pts, eval_pts, adj, bas, OpType)
-    shared_pb!! = _mooncake_build_weights_pullback(W_codual.dx, W, data, eval_points, cache, adj, pts, eval_pts, bas, mon, ℒ, OpType, dim_space)
+    shared_pb!! = _mooncake_build_weights_pullback(W_codual.dx, data, eval_points, cache, adj, pts, eval_pts, bas, mon, ℒ, OpType, dim_space)
     TD = eltype(first(pts))
 
     function pb!!(ΔW_rdata)

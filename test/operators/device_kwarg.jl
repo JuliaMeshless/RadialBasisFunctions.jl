@@ -58,7 +58,7 @@ end
     original_weights = copy(op.weights)
 
     # Corrupt weights and verify update restores them
-    op.weights .= 0.0
+    parent(op.weights) .= 0.0
     update_weights!(op)
     @test op.weights ≈ original_weights
     @test is_cache_valid(op)
@@ -145,6 +145,7 @@ end
     # Adapt with identity (CPU → CPU)
     adapted = Adapt.adapt(CPU(), op)
     @test adapted isa RadialBasisOperator
+    @test adapted.weights isa StencilWeights
     @test adapted(z) ≈ result
     @test adapted.data === op.data
     @test adapted.adjl === op.adjl
@@ -158,6 +159,8 @@ end
 
     adapted = Adapt.adapt(CPU(), op)
     @test adapted isa RadialBasisOperator
+    @test adapted.weights[1] isa StencilWeights
+    @test adapted.weights[1].idx === adapted.weights[2].idx
     @test adapted(z) ≈ result
     @test adapted.data === op.data
     @test adapted.adjl === op.adjl
@@ -168,6 +171,8 @@ end
     result = op(z)
     adapted = Adapt.adapt(CPU(), op)
     @test adapted isa RadialBasisOperator
+    @test adapted.weights[1] isa StencilWeights
+    @test adapted.weights[1].idx === adapted.weights[2].idx
     @test adapted(z) ≈ result
     @test adapted.data === op.data
     @test adapted.adjl === op.adjl

@@ -1,5 +1,4 @@
 using RadialBasisFunctions
-using SparseArrays: SparseVector
 using StaticArraysCore
 using Statistics
 using HaltonSequences
@@ -94,15 +93,16 @@ end
     eval_pt = [SVector{2}(0.5, 0.5)]
     op = hessian(points; eval_points = eval_pt, basis = PHS(3; poly_deg = 4))
 
-    @test op.weights[1] isa SparseVector
+    @test op.weights[1] isa StencilWeights
+    @test size(op.weights[1]) == (1, N)
     @test length(op.weights) == 3
 
     Hu = op(u)
-    @test Hu isa Matrix
-    @test size(Hu) == (2, 2)
-    @test Hu[1, 2] ≈ Hu[2, 1] atol = 1.0e-12
-    @test abs(Hu[1, 1] - H11(SVector(0.5, 0.5))) < 0.5
-    @test abs(Hu[1, 2] - H12(SVector(0.5, 0.5))) < 0.5
+    @test Hu isa Array{<:Any, 3}
+    @test size(Hu) == (1, 2, 2)
+    @test Hu[1, 1, 2] ≈ Hu[1, 2, 1] atol = 1.0e-12
+    @test abs(Hu[1, 1, 1] - H11(SVector(0.5, 0.5))) < 0.5
+    @test abs(Hu[1, 1, 2] - H12(SVector(0.5, 0.5))) < 0.5
 end
 
 @testset "3D Hessian" begin
@@ -136,11 +136,11 @@ end
     eval_pt = [SVector{2}(0.5, 0.5)]
     op = hessian(points; eval_points = eval_pt, basis = PHS(3; poly_deg = 4))
     Hu = op(u_vec)
-    @test Hu isa Array{<:Any, 3}
-    @test size(Hu) == (2, 2, 2)
+    @test Hu isa Array{<:Any, 4}
+    @test size(Hu) == (1, 2, 2, 2)
     # Symmetry
-    @test Hu[1, 1, 2] ≈ Hu[1, 2, 1] atol = 1.0e-12
-    @test Hu[2, 1, 2] ≈ Hu[2, 2, 1] atol = 1.0e-12
+    @test Hu[1, 1, 1, 2] ≈ Hu[1, 1, 2, 1] atol = 1.0e-12
+    @test Hu[1, 2, 1, 2] ≈ Hu[1, 2, 2, 1] atol = 1.0e-12
 end
 
 @testset "Hessian in-place - Vector field" begin
@@ -191,7 +191,8 @@ end
     eval_pt = [SVector{2}(0.5, 0.5)]
     op = hessian(points; eval_points = eval_pt, basis = PHS(3; poly_deg = 4))
 
-    @test op.weights[1] isa SparseVector
+    @test op.weights[1] isa StencilWeights
+    @test size(op.weights[1]) == (1, N)
 
     u_tensor = Array{Float64, 3}(undef, N, 2, 2)
     u_tensor[:, 1, 1] .= u1
@@ -201,17 +202,17 @@ end
 
     Hu = op(u_tensor)
 
-    @test Hu isa Array{<:Any, 4}
-    @test size(Hu) == (2, 2, 2, 2)
+    @test Hu isa Array{<:Any, 5}
+    @test size(Hu) == (1, 2, 2, 2, 2)
 
     # Channel (2,1): H(x²+y²) at (0.5,0.5) → diag = 2, off-diag = 0
-    @test abs(Hu[2, 1, 1, 1] - 2.0) < 0.5
-    @test abs(Hu[2, 1, 1, 2]) < 0.5
-    @test abs(Hu[2, 1, 2, 2] - 2.0) < 0.5
+    @test abs(Hu[1, 2, 1, 1, 1] - 2.0) < 0.5
+    @test abs(Hu[1, 2, 1, 1, 2]) < 0.5
+    @test abs(Hu[1, 2, 1, 2, 2] - 2.0) < 0.5
 
     # Symmetry
-    @test Hu[1, 1, 1, 2] ≈ Hu[1, 1, 2, 1] atol = 1.0e-12
-    @test Hu[2, 1, 1, 2] ≈ Hu[2, 1, 2, 1] atol = 1.0e-12
+    @test Hu[1, 1, 1, 1, 2] ≈ Hu[1, 1, 1, 2, 1] atol = 1.0e-12
+    @test Hu[1, 2, 1, 1, 2] ≈ Hu[1, 2, 1, 2, 1] atol = 1.0e-12
 end
 
 @testset "update_weights! rank-2" begin

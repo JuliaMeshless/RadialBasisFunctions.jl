@@ -56,9 +56,11 @@ end
 
 Shared stencil iteration loop for _build_weights pullback across all AD backends.
 
-`ΔW_extractor(eval_idx, neighbors, k)` is a callable that returns the stencil cotangent
-matrix `Δw` given the eval index, neighbor list, and stencil size. This abstracts over
-the different ways each AD framework stores cotangents (dense matrix, nzval vector, etc.).
+`ΔW_extractor(Δw, eval_idx, neighbors, k)` is a callable that fills the stencil cotangent
+buffer `Δw` given the eval index, neighbor list, and stencil size. Both backends store
+cotangents as the stencil-major (`k × N_eval`) tangent of `parent(::StencilWeights)`, so
+the extractors are column copies; the callable indirection remains so a backend with a
+different layout can still plug in.
 """
 function build_weights_pullback_loop!(
         Δdata::Vector{Vector{T}},
@@ -87,8 +89,8 @@ function build_weights_pullback_loop!(
         eval_point = eval_points[eval_idx]
         stencil_cache = cache.stencil_caches[eval_idx]
 
-        # Extract this stencil's cotangent into the reused buffer. Pre-zero: the Mooncake
-        # extractor only writes entries present in the sparse structure.
+        # Extract this stencil's cotangent into the reused buffer (pre-zeroed so an
+        # extractor writing fewer than k rows stays correct).
         fill!(ws.Δw, zero(T))
         ΔW_extractor(ws.Δw, eval_idx, neighbors, k)
 

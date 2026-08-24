@@ -4,7 +4,7 @@
 Operator for the symmetric strain rate tensor εᵢⱼ = ½(∂uᵢ/∂xⱼ + ∂uⱼ/∂xᵢ).
 
 Takes a vector field (Matrix N×D) as input and produces a symmetric tensor
-(Array N_eval×D×D). Weights are stored as `NTuple{Dim, SparseMatrixCSC}`,
+(Array N_eval×D×D). Weights are stored as `NTuple{Dim, StencilWeights}`,
 reusing the Jacobian weight-building infrastructure.
 """
 struct StrainRate{Dim} <: AbstractJacobianOperator{Dim, 0} end
@@ -35,29 +35,6 @@ function _eval_op(
         end
     end
     return y
-end
-
-# SparseVector weights (single eval point)
-function _eval_op(
-        op::RadialBasisOperator{<:StrainRate, <:NTuple{<:Any, <:SparseVector}},
-        x::AbstractMatrix,
-    )
-    D = length(op.weights)
-    T = promote_type(eltype(x), eltype(first(op.weights)))
-    out = similar(x, T, D, D)
-    half = T(0.5)
-    n_unique = _num_sym(D)
-    @inbounds for k in 1:n_unique
-        i, j = _kth_sym_pair(k, D)
-        if i == j
-            out[i, i] = dot(op.weights[i], view(x, :, i))
-        else
-            val = half * (dot(op.weights[j], view(x, :, i)) + dot(op.weights[i], view(x, :, j)))
-            out[i, j] = val
-            out[j, i] = val
-        end
-    end
-    return out
 end
 
 # ============================================================================

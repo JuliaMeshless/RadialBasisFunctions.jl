@@ -21,10 +21,10 @@ using Enzyme
 using EnzymeCore
 using EnzymeCore.EnzymeRules
 using LinearAlgebra
-using SparseArrays
 
 # Import internal functions
-import RadialBasisFunctions: _eval_op, RadialBasisOperator, Interpolator
+import RadialBasisFunctions: _eval_op, RadialBasisOperator, Interpolator, StencilWeights
+import RadialBasisFunctions: accumulate_eval_pullback!
 import RadialBasisFunctions: IMQ, Gaussian, _tangent_basis
 import RadialBasisFunctions: AbstractRadialBasis, Jacobian
 import RadialBasisFunctions: _build_weights, Partial, Laplacian, _optype
@@ -131,7 +131,7 @@ function EnzymeRules.reverse(
     shadow = tape
     Δy = _extract_dret_with_shadow(dret, shadow)
     # Pullback: Δx = W' * Δy
-    x.dval .+= op.val.weights' * Δy
+    accumulate_eval_pullback!(x.dval, op.val.weights, Δy)
     return (nothing, nothing)
 end
 
@@ -162,7 +162,7 @@ function EnzymeRules.reverse(
     Δy = _extract_dret_with_shadow(dret, shadow)
     # Pullback: Δx = Σ_d W[d]' * Δy[:,d]
     for d in 1:D
-        x.dval .+= operator.weights[d]' * view(Δy, :, d)
+        accumulate_eval_pullback!(x.dval, operator.weights[d], view(Δy, :, d))
     end
     return (nothing, nothing)
 end
@@ -193,7 +193,7 @@ function EnzymeRules.reverse(
     )
     shadow = tape
     Δy = _extract_dret_with_shadow(dret, shadow)
-    x.dval .+= op.val.weights' * Δy
+    accumulate_eval_pullback!(x.dval, op.val.weights, Δy)
     return (nothing,)
 end
 
@@ -222,7 +222,7 @@ function EnzymeRules.reverse(
     shadow = tape
     Δy = _extract_dret_with_shadow(dret, shadow)
     for d in 1:D
-        x.dval .+= operator.weights[d]' * view(Δy, :, d)
+        accumulate_eval_pullback!(x.dval, operator.weights[d], view(Δy, :, d))
     end
     return (nothing,)
 end
@@ -460,15 +460,18 @@ import RadialBasisFunctions: run_build_weights_pullback
 # Helper functions
 # =============================================================================
 
-# For Duplicated/DuplicatedNoNeed return types, we need to allocate a shadow
-function _make_shadow_for_return(::Type{<:EnzymeCore.Duplicated}, W::SparseMatrixCSC)
-    return SparseMatrixCSC(W.m, W.n, copy(W.colptr), copy(W.rowval), zeros(eltype(W), length(W.nzval)))
+# For Duplicated/DuplicatedNoNeed return types, we need to allocate a shadow.
+# The StencilWeights shadow zeros the value matrix but ALIASES the primal's frozen Int32
+# index matrix — matching Enzyme's own make_zero convention (copy_if_inactive=Val(false))
+# for guaranteed-inactive arrays; nothing ever writes shadow indices.
+function _make_shadow_for_return(::Type{<:EnzymeCore.Duplicated}, W::StencilWeights)
+    return StencilWeights(zero(W.vals), W.idx, W.n_data)
 end
 function _make_shadow_for_return(::Type{<:EnzymeCore.Duplicated}, y::AbstractArray)
     return zero(y)
 end
-function _make_shadow_for_return(::Type{<:EnzymeCore.DuplicatedNoNeed}, W::SparseMatrixCSC)
-    return SparseMatrixCSC(W.m, W.n, copy(W.colptr), copy(W.rowval), zeros(eltype(W), length(W.nzval)))
+function _make_shadow_for_return(::Type{<:EnzymeCore.DuplicatedNoNeed}, W::StencilWeights)
+    return StencilWeights(zero(W.vals), W.idx, W.n_data)
 end
 function _make_shadow_for_return(::Type{<:EnzymeCore.DuplicatedNoNeed}, y::AbstractArray)
     return zero(y)
@@ -484,6 +487,7 @@ _primal_type(::Type{<:EnzymeCore.Const{T}}) where {T} = T
 # Helper to extract cotangent from dret (differs between Active and Duplicated return)
 _extract_dret_with_shadow(dret::EnzymeCore.Active, _shadow) = dret.val
 _extract_dret_with_shadow(::Type, shadow::AbstractArray) = shadow
+_extract_dret_with_shadow(::Type, shadow::StencilWeights) = shadow
 _extract_dret_with_shadow(::Type, ::Nothing) = nothing
 
 # Helper to construct Enzyme tangent for basis types. Uses the non-validating
@@ -531,8 +535,9 @@ function _enzyme_run_pullback_loop(dret, tape, OpType)
 
     grad_Lφ_x, grad_Lφ_xi = _get_grad_funcs(OpType, basis_val, op_cached)
 
+    ΔW_vals = parent(ΔW)
     return run_build_weights_pullback(
-        (Δw, eval_idx, neighbors, k) -> extract_stencil_cotangent!(Δw, ΔW, eval_idx, neighbors, k),
+        (Δw, eval_idx, neighbors, k) -> extract_stencil_cotangent!(Δw, ΔW_vals, eval_idx, k),
         cache, adjl_val, eval_points_val, data_val, basis_val, mon, op_cached, OpType,
         grad_Lφ_x, grad_Lφ_xi
     )

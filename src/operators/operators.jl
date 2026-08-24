@@ -284,48 +284,6 @@ function _eval_op(
     return out
 end
 
-# Rank-1 operator with SparseVector weights (single eval point)
-function _eval_op(
-        op::RadialBasisOperator{<:AbstractOperator{1}, <:NTuple{<:Any, <:SparseVector}},
-        x::AbstractVector,
-    )
-    D = length(op.weights)
-    T = promote_type(eltype(x), eltype(first(op.weights)))
-    out = similar(x, T, D)
-    @inbounds for d in 1:D
-        out[d] = dot(op.weights[d], x)
-    end
-    return out
-end
-
-function _eval_op(
-        op::RadialBasisOperator{<:AbstractOperator{1}, <:NTuple{<:Any, <:SparseVector}},
-        x::AbstractMatrix,
-    )
-    D = length(op.weights)
-    D_in = size(x, 2)
-    T = promote_type(eltype(x), eltype(first(op.weights)))
-    out = similar(x, T, D_in, D)
-    @inbounds for d in 1:D, d_in in 1:D_in
-        out[d_in, d] = dot(op.weights[d], view(x, :, d_in))
-    end
-    return out
-end
-
-function _eval_op(
-        op::RadialBasisOperator{<:AbstractOperator{1}, <:NTuple{<:Any, <:SparseVector}},
-        x::AbstractArray,
-    )
-    D = length(op.weights)
-    trailing_dims = size(x)[2:end]
-    T = promote_type(eltype(x), eltype(first(op.weights)))
-    out = similar(x, T, trailing_dims..., D)
-    @inbounds for idx in CartesianIndices(trailing_dims), d in 1:D
-        out[idx, d] = dot(op.weights[d], view(x, :, idx))
-    end
-    return out
-end
-
 # In-place: Scalar field → Matrix
 function _eval_op(
         op::RadialBasisOperator{<:AbstractOperator{1}}, y::AbstractMatrix, x::AbstractVector
@@ -353,7 +311,7 @@ end
 
 # ============================================================================
 # Rank-2 operator evaluation (e.g., Hessian)
-# Weights: NTuple{D*(D+1)/2, SparseMatrixCSC} — upper-triangular entries only
+# Weights: NTuple{D*(D+1)/2, StencilWeights} — upper-triangular entries only
 # Symmetric (j,i) entries filled via copyto! (O(N) vs O(nnz) for duplicate mul!)
 # ============================================================================
 
@@ -411,63 +369,6 @@ function _eval_op(
         mul!(view(out, :, idx, i, j), op.weights[k], view(x, :, idx))
         if i != j
             copyto!(view(out, :, idx, j, i), view(out, :, idx, i, j))
-        end
-    end
-    return out
-end
-
-# Rank-2 operator with SparseVector weights (single eval point)
-function _eval_op(
-        op::RadialBasisOperator{<:AbstractOperator{2}, <:NTuple{<:Any, <:SparseVector}},
-        x::AbstractVector,
-    )
-    n_unique = length(op.weights)
-    D = _dim_from_sym(n_unique)
-    T = promote_type(eltype(x), eltype(first(op.weights)))
-    out = similar(x, T, D, D)
-    @inbounds for k in 1:n_unique
-        i, j = _kth_sym_pair(k, D)
-        out[i, j] = dot(op.weights[k], x)
-        if i != j
-            out[j, i] = out[i, j]
-        end
-    end
-    return out
-end
-
-function _eval_op(
-        op::RadialBasisOperator{<:AbstractOperator{2}, <:NTuple{<:Any, <:SparseVector}},
-        x::AbstractMatrix,
-    )
-    n_unique = length(op.weights)
-    D = _dim_from_sym(n_unique)
-    D_in = size(x, 2)
-    T = promote_type(eltype(x), eltype(first(op.weights)))
-    out = similar(x, T, D_in, D, D)
-    @inbounds for k in 1:n_unique, d_in in 1:D_in
-        i, j = _kth_sym_pair(k, D)
-        out[d_in, i, j] = dot(op.weights[k], view(x, :, d_in))
-        if i != j
-            out[d_in, j, i] = out[d_in, i, j]
-        end
-    end
-    return out
-end
-
-function _eval_op(
-        op::RadialBasisOperator{<:AbstractOperator{2}, <:NTuple{<:Any, <:SparseVector}},
-        x::AbstractArray,
-    )
-    n_unique = length(op.weights)
-    D = _dim_from_sym(n_unique)
-    trailing_dims = size(x)[2:end]
-    T = promote_type(eltype(x), eltype(first(op.weights)))
-    out = similar(x, T, trailing_dims..., D, D)
-    @inbounds for idx in CartesianIndices(trailing_dims), k in 1:n_unique
-        i, j = _kth_sym_pair(k, D)
-        out[idx, i, j] = dot(op.weights[k], view(x, :, idx))
-        if i != j
-            out[idx, j, i] = out[idx, i, j]
         end
     end
     return out
@@ -559,17 +460,35 @@ Base.eltype(op::RadialBasisOperator) = eltype(op.weights)
 """
     weights(op::RadialBasisOperator)
 
-Return the stencil weights of `op` — a sparse matrix for scalar-valued (rank-0) operators,
-or a tuple of sparse matrices for gradient-family operators. Rebuilds the weights first if
-the cache is stale.
+Return the stencil weights of `op` — a [`StencilWeights`](@ref) (dense stencil-wise ELL
+storage) for scalar-valued (rank-0) operators, or a tuple of `StencilWeights` for
+gradient-family operators. Rebuilds the weights first if the cache is stale.
 
-This is the supported accessor for downstream assembly (e.g. building a global PDE system
-matrix); prefer it over reaching into the `weights` field directly.
+This is the supported accessor over reaching into the `weights` field directly. For a
+`SparseMatrixCSC` (global system assembly, external sparse libraries), use `sparse(op)`.
 """
 function weights(op::RadialBasisOperator)
     !is_cache_valid(op) && update_weights!(op)
     return op.weights
 end
+
+"""
+    sparse(op::RadialBasisOperator)
+    SparseMatrixCSC(op::RadialBasisOperator)
+
+Convert the operator's weights to a `SparseMatrixCSC` — or a tuple of them for
+gradient-family operators — for global PDE system assembly or interop with sparse linear
+algebra libraries. Rebuilds the weights first if the cache is stale.
+"""
+function SparseArrays.sparse(op::RadialBasisOperator)
+    !is_cache_valid(op) && update_weights!(op)
+    return _to_sparse(op.weights)
+end
+
+SparseArrays.SparseMatrixCSC(op::RadialBasisOperator) = sparse(op)
+
+_to_sparse(w::AbstractMatrix) = sparse(w)
+_to_sparse(w::Tuple) = map(_to_sparse, w)
 
 # LinearAlgebra methods - divergence (dot with gradient operator)
 function LinearAlgebra.:⋅(
@@ -584,7 +503,8 @@ end
     update_weights!(op::RadialBasisOperator)
 
 Rebuild the stencil weights of `op` from its current `data` and `eval_points`, then mark
-the weight cache as valid.
+the weight cache as valid. For `StencilWeights` storage this is a pure in-place write of
+the value matrix — no sparse reassembly.
 """
 function update_weights!(op::RadialBasisOperator)
     op.weights .= _build_weights(op.ℒ, op)
@@ -601,15 +521,34 @@ function update_weights!(op::RadialBasisOperator{<:AbstractOperator, <:Tuple})
     return nothing
 end
 
+function update_weights!(op::RadialBasisOperator{<:AbstractOperator, <:StencilWeights})
+    copyto!(op.weights, _build_weights(op.ℒ, op))
+    validate_cache!(op)
+    return nothing
+end
+
+function update_weights!(
+        op::RadialBasisOperator{<:AbstractOperator, <:NTuple{N, <:StencilWeights}}
+    ) where {N}
+    new_weights = _build_weights(op.ℒ, op)
+    for i in 1:N
+        copyto!(op.weights[i], new_weights[i])
+    end
+    validate_cache!(op)
+    return nothing
+end
+
 # ============================================================================
 # Adapt.jl support (GPU array conversion)
 # ============================================================================
 
+# The stored device is refreshed from the adapted weights so evaluation dispatches to the
+# backend the weights actually live on after e.g. `cu(op)`.
 function Adapt.adapt_structure(to, op::RadialBasisOperator)
     adapted_weights = Adapt.adapt(to, op.weights)
     return RadialBasisOperator(
         op.ℒ, adapted_weights, op.data, op.eval_points, op.adjl, op.basis,
-        is_cache_valid(op); device = op.device,
+        is_cache_valid(op); device = get_backend(adapted_weights),
     )
 end
 
@@ -617,7 +556,7 @@ function Adapt.adapt_structure(to, op::RadialBasisOperator{<:AbstractOperator, <
     adapted_weights = map(w -> Adapt.adapt(to, w), op.weights)
     return RadialBasisOperator(
         op.ℒ, adapted_weights, op.data, op.eval_points, op.adjl, op.basis,
-        is_cache_valid(op); device = op.device,
+        is_cache_valid(op); device = get_backend(first(adapted_weights)),
     )
 end
 

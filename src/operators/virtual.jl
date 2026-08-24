@@ -70,10 +70,13 @@ function _build_weights(ℒ::VirtualPartial, data, eval_points, adjl, basis; dev
 
     k = length(first(adjl))
     self_adjl = find_neighbors(data, eval_points, k)
-    self = _build_weights(Regrid(), data, eval_points, self_adjl, basis; device = device)
+    # The two Regrid builds use different adjacency lists, so their union sparsity (up to
+    # 2k entries per row) cannot live in one ELL structure — VirtualPartial keeps sparse
+    # weight storage and evaluates through the generic sparse paths.
+    self = sparse(_build_weights(Regrid(), data, eval_points, self_adjl, basis; device = device))
     shifted = ℒ.backward ? eval_points .- Ref(dx) : eval_points .+ Ref(dx)
     shifted_adjl = find_neighbors(data, shifted, k)
-    other = _build_weights(Regrid(), data, shifted, shifted_adjl, basis; device = device)
+    other = sparse(_build_weights(Regrid(), data, shifted, shifted_adjl, basis; device = device))
 
     return if ℒ.backward
         (self .- other) ./ ℒ.Δ

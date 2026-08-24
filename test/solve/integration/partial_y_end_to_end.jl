@@ -2,6 +2,7 @@ using Test
 using StaticArraysCore
 using LinearAlgebra
 using Statistics
+using SparseArrays: sparse
 using RadialBasisFunctions
 import RadialBasisFunctions as RBF
 
@@ -78,7 +79,7 @@ partial_y_func(x, y) = 2.0 * y
             partial_y_func, domain_2d, is_boundary, boundary_conditions, normals, RBF
         )
 
-        solution = Dy_op.weights \ rhs
+        solution = sparse(Dy_op) \ rhs
 
         solution_error = solution - u_values
         max_error = maximum(abs.(solution_error))
