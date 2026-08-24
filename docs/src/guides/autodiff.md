@@ -133,7 +133,7 @@ grad = DI.gradient(loss_gauss, backend, x)
 
 ## Differentiating Weight Construction
 
-For advanced use cases like mesh optimization or shape parameter tuning, you can differentiate through the weight construction process using the internal `_build_weights` function.
+For advanced use cases like mesh optimization or shape parameter tuning, you can differentiate through the weight construction process using the internal `_build_weights` function. It returns a `StencilWeights`, whose dense matrix of stencil weight values is accessed with `parent(W)`.
 
 ```@example autodiff
 points_weights = [SVector{2}(0.1 + 0.8 * i / 5, 0.1 + 0.8 * j / 5) for i in 1:5 for j in 1:5]
@@ -146,7 +146,7 @@ basis = PHS(3; poly_deg=2)
 function loss_weights(pts)
     pts_vec = [SVector{2}(pts[2*i-1], pts[2*i]) for i in 1:N_weights]
     W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
-    return sum(W.nzval .^ 2)
+    return sum(parent(W) .^ 2)
 end
 
 pts_flat = reduce(vcat, points_weights)
@@ -163,7 +163,7 @@ basis_imq = IMQ(1.0; poly_deg=2)
 function loss_weights_lap(pts)
     pts_vec = [SVector{2}(pts[2*i-1], pts[2*i]) for i in 1:N_weights]
     W = RadialBasisFunctions._build_weights(ℒ_lap, pts_vec, pts_vec, adjl, basis_imq)
-    return sum(W.nzval .^ 2)
+    return sum(parent(W) .^ 2)
 end
 
 grad = DI.gradient(loss_weights_lap, backend, pts_flat)

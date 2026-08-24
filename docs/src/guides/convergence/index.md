@@ -34,11 +34,7 @@ with a polynomial term to guarantee well-posedness and polynomial reproduction:
 s(x) = \sum_{j=1}^{k} w_j \, \phi(\|x - x_j\|) + \sum_{|\alpha| \le m} c_\alpha x^\alpha
 ```
 
-Weights `wⱼ` and polynomial coefficients `c_α` are fixed by collocation plus moment
-conditions. For **global** interpolation (used by `Interpolator`) the sum runs over all
-`N` data points. For **local-stencil RBF-FD** (used by `laplacian`, `gradient`, etc.) the
-sum runs over the `k` nearest neighbors of each evaluation point, producing sparse weight
-matrices [1, 2, 3].
+Weights `wⱼ` and polynomial coefficients `c_α` are fixed by collocation plus moment conditions. For **global** interpolation (used by `Interpolator`) the sum runs over all `N` data points. For **local-stencil RBF-FD** (used by `laplacian`, `gradient`, etc.) the sum runs over the `k` nearest neighbors of each evaluation point, producing stencil-wise weight matrices (`StencilWeights`) [1, 2, 3].
 
 The package supports three RBF families:
 

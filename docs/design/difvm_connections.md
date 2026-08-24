@@ -12,11 +12,11 @@ DiFVM's central insight is that finite-volume discretization on unstructured mes
 
 RBF-FD operators follow the same pattern with a different discretization:
 
-1. **Gather** -- for each evaluation point, pull field values from k-nearest neighbors (the stencil) via the sparsity pattern of `W`
-2. **Weighted aggregation** -- multiply by precomputed stencil weights (the sparse mat-vec `W * x`)
+1. **Gather** -- for each evaluation point, pull field values from k-nearest neighbors (the stencil) via the neighbor-index matrix of `W`
+2. **Weighted aggregation** -- multiply by precomputed stencil weights (the row-parallel gather kernel behind `W * x`: `y[i] = sum_l vals[l,i] * x[idx[l,i]]`)
 3. **Output** -- the result at each eval point is the sum of weighted neighbor contributions
 
-Both systems encode irregular connectivity as **static index arrays** built once at initialization. DiFVM stores `owner`/`neighbor` edge-index arrays; RadialBasisFunctions.jl stores `adjl::Vector{Vector{Int}}` from k-NN. Both become the sparsity pattern for all subsequent computation.
+Both systems encode irregular connectivity as **static index arrays** built once at initialization. DiFVM stores `owner`/`neighbor` edge-index arrays; RadialBasisFunctions.jl stores `adjl::Vector{Vector{Int}}` from k-NN, materialized as the dense `k x N` Int32 index matrix inside `StencilWeights`. Both become the connectivity structure for all subsequent computation.
 
 ## Key Differences
 
@@ -105,16 +105,17 @@ Suppose we build a pressure Poisson step using the existing operators:
 
 ```julia
 # Forward pass
-L = laplacian(points)           # RBF-FD Laplacian operator (sparse matrix)
+L = laplacian(points)           # RBF-FD Laplacian operator (stencil-wise weights)
+L_mat = sparse(L)               # SparseMatrixCSC -- the supported path for global solves
 rhs = divergence(u_star)        # RHS from intermediate velocity
-p = cg(L.weights, rhs)          # Iterative solve -- CG since L is SPD-like
+p = cg(L_mat, rhs)              # Iterative solve -- CG since L is SPD-like
 u_new = u_star - dt * gradient(points)(p)  # Velocity correction
 ```
 
 For AD, we'd need a custom rule around the `cg` call that:
 
-1. **Forward**: runs CG normally, caches `L.weights` and the converged `p`
-2. **Backward**: given `Delta_p` (the cotangent of the pressure), solves `L.weights^T * lambda = Delta_p` using the same CG solver, then propagates `Delta_rhs = lambda` backward
+1. **Forward**: runs CG normally, caches `L_mat` and the converged `p`
+2. **Backward**: given `Delta_p` (the cotangent of the pressure), solves `L_mat' * lambda = Delta_p` using the same CG solver, then propagates `Delta_rhs = lambda` backward
 
 In Julia with the existing patterns, the Enzyme rule structure would mirror what we already have:
 
@@ -146,7 +147,7 @@ Any time the CFD solver has an **implicit step** -- pressure projection, implici
 1. **Differentiate through the iterations** -- memory-hungry, fragile, slow
 2. **Implicit function theorem** -- one extra solve of the same system, exact gradients
 
-The codebase already chose option 2 for the stencil solves. The pattern generalizes directly. The only new ingredient is that the "matrix" is now the sparse RBF-FD operator (`L.weights`) rather than a small dense collocation matrix, so the adjoint solve is iterative rather than direct.
+The codebase already chose option 2 for the stencil solves. The pattern generalizes directly. The only new ingredient is that the "matrix" is now the global RBF-FD operator (`sparse(L)`, the SparseMatrixCSC assembled from the stencil-wise weights) rather than a small dense collocation matrix, so the adjoint solve is iterative rather than direct.
 
 ### Connection to DiFVM's Architecture
 
@@ -163,7 +164,7 @@ This means the memory cost of differentiating through an entire transient simula
 
 ## The Big Picture: Path to a Differentiable RBF-FD CFD Solver
 
-RBF operators are already "graph operators" -- sparse matrices whose sparsity pattern encodes a static connectivity graph. The path to a differentiable RBF-FD CFD solver:
+RBF operators are already "graph operators" -- stencil-wise `StencilWeights` whose neighbor-index matrix encodes a static connectivity graph, with `sparse(op)` producing the global matrix when an implicit solve needs one. The path to a differentiable RBF-FD CFD solver:
 
 1. **Spatial discretization**: Already done -- `laplacian()`, `gradient()`, `partial()` operators discretize the PDE terms
 2. **Pressure projection**: Build a pressure Poisson solve using `laplacian()`, with implicit-function-theorem AD as described above

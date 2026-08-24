@@ -136,7 +136,7 @@ See [Boundary Conditions](@ref) for the full walkthrough.
 
 ## GPU Evaluation
 
-Weight computation currently runs on CPU. Once built, operators can be moved to GPU for fast evaluation:
+Weights are always **built** on CPU. Once built, `cu(op)` (via Adapt) moves the operator's `StencilWeights` — both the dense weight-value matrix and the `Int32` neighbor-index matrix — to the device, and applying the operator runs a KernelAbstractions gather kernel directly on the GPU:
 
 ```julia
 using CUDA, Adapt
@@ -144,13 +144,13 @@ using CUDA, Adapt
 # Build operator on CPU
 lap = laplacian(points)
 
-# Move to GPU for evaluation
+# Move to GPU — both the weight values and the stencil indices transfer
 lap_gpu = cu(lap)
 values_gpu = cu(values)
-result_gpu = lap_gpu(values_gpu)
+result_gpu = lap_gpu(values_gpu)  # KernelAbstractions kernel on device
 ```
 
-Full GPU weight computation is planned — see [#88](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88).
+GPU weight *building* is planned — see [#88](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88).
 
 ## Common Errors
 
@@ -161,4 +161,4 @@ Error messages, causes, and fixes are covered in [Troubleshooting](@ref).
 1. **Reuse adjacency lists** for multiple operators on same points
 2. **Use StaticArrays** (`SVector`) for best performance
 3. **Batch operations** - create operator once, apply many times
-4. **GPU for large problems** — build operators on CPU, then `cu(operator)` for GPU evaluation
+4. **GPU for large problems** — build operators on CPU, then `cu(operator)`; evaluation runs a device-native KernelAbstractions kernel
