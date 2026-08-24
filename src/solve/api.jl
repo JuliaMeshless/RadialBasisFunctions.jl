@@ -137,6 +137,18 @@ function _build_weights(
         batch_size::Int = 10,
         device = CPU(),
     )
+    # Dirichlet identity rows assume eval index i IS data index i (both classification
+    # and the stored identity entry index by eval_idx into data-length arrays), so the
+    # Hermite path requires matching point sets. Previously this combination was silently
+    # wrong or a BoundsError; now it is an explicit error.
+    if eval_points !== data && eval_points != data
+        throw(
+            ArgumentError(
+                "Hermite (boundary-condition) operators require eval_points to be the " *
+                    "same point set as data; got different point sets."
+            )
+        )
+    end
     _validate_boundary_inputs(data, is_boundary, boundary_conditions, normals)
     _check_normal_form_support(ℒrbf, basis, data, boundary_conditions, normals)
     boundary_data = BoundaryData(is_boundary, boundary_conditions, normals)

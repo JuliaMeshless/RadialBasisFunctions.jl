@@ -12,7 +12,6 @@ using LinearAlgebra
 using StaticArraysCore
 using SparseArrays
 using RadialBasisFunctions
-using RadialBasisFunctions: Dirichlet, Neumann, Robin
 import RadialBasisFunctions as RBF
 
 @testset "Solve Utils Integration Tests" begin
@@ -40,41 +39,39 @@ import RadialBasisFunctions as RBF
     eval_points_2d = [SVector(0.5, 0.5), SVector(0.25, 0.75)]
 
     @testset "Utility Function Testing" begin
-        @testset "Non-zero Counting for Sparse Allocation" begin
-            # Test count_nonzeros function with various boundary configurations
+        @testset "ELL Stencil Weight Storage" begin
+            # Weights are stored as dense ELL StencilWeights: vals/idx are k x N_eval,
+            # logical size is (N_eval, N_data)
+            k = 3
+            adjl = RBF.find_neighbors(data_1d, eval_points_1d, k)
+            ℒ = RBF.Custom{0}(basis -> (x1, x2) -> basis(x1, x2))
 
-            # Simple case: no boundaries (all interior)
-            adjl_simple = [[1, 2, 3], [2, 3, 4], [3, 4, 5]]
-            is_boundary_none = [false, false, false, false, false]
-            bcs_none = [RBF.Dirichlet() for _ in 1:0]  # No boundary conditions needed
+            weights = RBF._build_weights(ℒ, data_1d, eval_points_1d, adjl, basis_phs)
 
-            total_nnz, row_offsets = RBF.count_nonzeros(
-                adjl_simple, is_boundary_none, bcs_none
+            @test weights isa StencilWeights
+            @test size(parent(weights)) == (k, length(eval_points_1d))
+            @test size(weights) == (length(eval_points_1d), length(data_1d))
+            for i in eachindex(adjl)
+                @test Int32.(adjl[i]) == weights.idx[:, i]  # columns follow the adjacency list
+            end
+
+            # Mixed boundaries (Hermite path): Dirichlet rows collapse to a single
+            # identity entry on the diagonal when converted to CSC
+            is_boundary = [true, false, false, false, true]
+            bcs = [RBF.Dirichlet(), RBF.Dirichlet()]  # Only boundary conditions for boundary points
+            normals = [SVector(-1.0), SVector(1.0)]
+            adjl_mixed = RBF.find_neighbors(data_1d, data_1d, k)
+
+            weights_mixed = RBF._build_weights(
+                ℒ, data_1d, data_1d, adjl_mixed, basis_phs, is_boundary, bcs, normals
             )
-            nnz_per_row = [
-                row_offsets[i + 1] - row_offsets[i] for i in 1:length(adjl_simple)
-            ]
 
-            @test length(nnz_per_row) == length(adjl_simple)
-            @test length(row_offsets) == length(adjl_simple) + 1
-            @test total_nnz == sum(nnz_per_row)
-            @test all(nnz_per_row .== 3)  # All stencils have 3 points
-
-            # Complex case: mixed boundaries
-            is_boundary_mixed = [true, false, true, false, false]
-            bcs_mixed = [RBF.Dirichlet(), RBF.Neumann()]  # Only boundary conditions for boundary points
-
-            total_nnz_mixed, row_offsets_mixed = RBF.count_nonzeros(
-                adjl_simple, is_boundary_mixed, bcs_mixed
-            )
-            nnz_per_row_mixed = [
-                row_offsets_mixed[i + 1] - row_offsets_mixed[i] for
-                    i in 1:length(adjl_simple)
-            ]
-
-            @test length(nnz_per_row_mixed) == length(adjl_simple)
-            @test total_nnz_mixed == sum(nnz_per_row_mixed)
-            @test total_nnz_mixed <= total_nnz  # Dirichlet boundaries reduce non-zeros
+            @test weights_mixed isa StencilWeights
+            S = sparse(weights_mixed)
+            for i in findall(is_boundary)
+                @test nnz(S[i, :]) == 1  # Dirichlet rows have a single stored entry
+                @test S[i, i] == 1.0
+            end
         end
 
         @testset "Global to Boundary Index Mapping" begin
@@ -124,10 +121,10 @@ import RadialBasisFunctions as RBF
                 @test_nowarn weights = RBF._build_weights(ℒ, data, eval_points, adjl, basis)
 
                 weights = RBF._build_weights(ℒ, data, eval_points, adjl, basis)
-                # _build_weights returns a sparse matrix of shape (n_eval_points, n_data_points)
+                # _build_weights returns StencilWeights with logical shape (n_eval_points, n_data_points)
                 @test size(weights, 1) == length(eval_points)
                 @test size(weights, 2) == length(data)
-                @test all(isfinite.(weights.nzval))  # Check non-zero values are finite
+                @test all(isfinite, parent(weights))  # Check stencil values are finite
             end
         end
 

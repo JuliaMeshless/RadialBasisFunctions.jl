@@ -5,7 +5,6 @@ This builds weights while storing intermediate results needed for the pullback.
 =#
 
 using LinearAlgebra: Symmetric, bunchkaufman!
-using SparseArrays: sparse
 
 # Rook pivoting matches the primal solve in `_solve_system!` (assembly.jl) so the
 # AD forward pass produces bitwise-identical weights.
@@ -16,8 +15,9 @@ _stencil_factorization(A::AbstractMatrix) = bunchkaufman!(Symmetric(copy(A), :U)
 
 Forward pass that builds weights while caching intermediate results for backward pass.
 
-Returns: (W, cache) where W is the sparse weight matrix and cache contains
-per-stencil factorizations and solutions needed for the pullback.
+Returns: (W, cache) where W is the `StencilWeights` weight matrix and cache contains
+per-stencil factorizations and solutions needed for the pullback. Must produce bitwise
+the same weights as the primal build so the two paths are interchangeable.
 """
 function _forward_with_cache(
         data::AbstractVector,
@@ -39,11 +39,9 @@ function _forward_with_cache(
     # Determine number of operators (1 for scalar operators)
     num_ops = 1
 
-    # Allocate COO arrays for sparse matrix
-    nnz = k * N_eval
-    I = Vector{Int}(undef, nnz)
-    J = Vector{Int}(undef, nnz)
-    V = Vector{TD}(undef, nnz)
+    # Allocate ELL weight storage (stencil-major, same layout the pullback reads)
+    Wv = Matrix{TD}(undef, k, N_eval)
+    Jm = Matrix{Int32}(undef, k, N_eval)
 
     # Allocate stencil caches (1×1 probe pins the concrete factorization type)
     FT = typeof(_stencil_factorization(ones(TD, 1, 1)))
@@ -54,7 +52,6 @@ function _forward_with_cache(
     b = zeros(TD, n, num_ops)
 
     # Process each evaluation point
-    pos = 1
     for eval_idx in 1:N_eval
         neighbors = adjl[eval_idx]
         eval_point = eval_points[eval_idx]
@@ -77,19 +74,16 @@ function _forward_with_cache(
         F = _stencil_factorization(A_full)
         λ = F \ b
 
-        # Store in COO format
+        # Store the stencil's column of the ELL layout
         @inbounds for (local_idx, global_idx) in enumerate(neighbors)
-            I[pos] = eval_idx
-            J[pos] = global_idx
-            V[pos] = λ[local_idx, 1]
-            pos += 1
+            Wv[local_idx, eval_idx] = λ[local_idx, 1]
+            Jm[local_idx, eval_idx] = Int32(global_idx)
         end
 
         stencil_caches[eval_idx] = StencilForwardCache(copy(λ), F, k, nmon)
     end
 
-    # Construct sparse matrix
-    W = sparse(I, J, V, N_eval, N_data)
+    W = StencilWeights(Wv, Jm, N_data)
 
     # Build global cache
     cache = WeightsBuildForwardCache(stencil_caches, k, nmon, num_ops)

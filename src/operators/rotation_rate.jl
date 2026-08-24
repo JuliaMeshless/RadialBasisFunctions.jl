@@ -5,7 +5,7 @@ Operator for the anti-symmetric rotation rate tensor ωᵢⱼ = ½(∂uᵢ/∂x�
 
 Takes a vector field (Matrix N×D) as input and produces an anti-symmetric tensor
 (Array N_eval×D×D). Diagonal entries are zero. Weights are stored as
-`NTuple{Dim, SparseMatrixCSC}`, reusing the Jacobian weight-building infrastructure.
+`NTuple{Dim, StencilWeights}`, reusing the Jacobian weight-building infrastructure.
 """
 struct RotationRate{Dim} <: AbstractJacobianOperator{Dim, 0} end
 
@@ -30,23 +30,6 @@ function _eval_op(
         view(y, :, j, i) .= .-view(y, :, i, j)
     end
     return y
-end
-
-# SparseVector weights (single eval point)
-function _eval_op(
-        op::RadialBasisOperator{<:RotationRate, <:NTuple{<:Any, <:SparseVector}},
-        x::AbstractMatrix,
-    )
-    D = length(op.weights)
-    T = promote_type(eltype(x), eltype(first(op.weights)))
-    out = fill!(similar(x, T, D, D), zero(T))
-    half = T(0.5)
-    @inbounds for i in 1:D, j in (i + 1):D
-        val = half * (dot(op.weights[j], view(x, :, i)) - dot(op.weights[i], view(x, :, j)))
-        out[i, j] = val
-        out[j, i] = -val
-    end
-    return out
 end
 
 # ============================================================================

@@ -56,7 +56,7 @@ function make_build_weights_loss(ℒ, adjl, basis, N)
     return function (pts)
         pts_vec = [SVector{2}(pts[2 * i - 1], pts[2 * i]) for i in 1:N]
         W = RadialBasisFunctions._build_weights(ℒ, pts_vec, pts_vec, adjl, basis)
-        return sum(W.nzval .^ 2)
+        return sum(parent(W) .^ 2)
     end
 end
 
@@ -69,7 +69,7 @@ function make_eps_loss(ℒ, points, adjl, BasisType)
     return function (ε)
         basis = BasisType(ε; poly_deg = 2)
         W = RadialBasisFunctions._build_weights(ℒ, points, points, adjl, basis)
-        return sum(W.nzval .^ 2)
+        return sum(parent(W) .^ 2)
     end
 end
 

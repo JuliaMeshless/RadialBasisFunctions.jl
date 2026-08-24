@@ -1,5 +1,4 @@
 using RadialBasisFunctions
-using SparseArrays: SparseVector
 using StaticArraysCore
 using Statistics
 using HaltonSequences

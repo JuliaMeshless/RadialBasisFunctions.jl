@@ -6,7 +6,7 @@ Operator for the curl of a vector field (∇×u).
 - **2D**: Matrix `(N×2)` → Vector `(N)`: `∂u₂/∂x₁ − ∂u₁/∂x₂`
 - **3D**: Matrix `(N×3)` → Matrix `(N×3)`: standard curl vector
 
-Only defined for `Dim ∈ {2, 3}`. Weights are stored as `NTuple{Dim, SparseMatrixCSC}`,
+Only defined for `Dim ∈ {2, 3}`. Weights are stored as `NTuple{Dim, StencilWeights}`,
 reusing the Jacobian weight-building infrastructure.
 """
 struct Curl{Dim} <: AbstractJacobianOperator{Dim, 0}
@@ -43,27 +43,6 @@ function _eval_op(op::RadialBasisOperator{<:Curl{3}}, y::AbstractMatrix, x::Abst
     mul!(view(y, :, 3), op.weights[1], view(x, :, 2))
     mul!(view(y, :, 3), op.weights[2], view(x, :, 1), -one(T), one(T))
     return y
-end
-
-# SparseVector weights (single eval point) — 2D
-function _eval_op(
-        op::RadialBasisOperator{<:Curl{2}, <:NTuple{<:Any, <:SparseVector}},
-        x::AbstractMatrix,
-    )
-    return dot(op.weights[1], view(x, :, 2)) - dot(op.weights[2], view(x, :, 1))
-end
-
-# SparseVector weights (single eval point) — 3D
-function _eval_op(
-        op::RadialBasisOperator{<:Curl{3}, <:NTuple{<:Any, <:SparseVector}},
-        x::AbstractMatrix,
-    )
-    T = promote_type(eltype(x), eltype(first(op.weights)))
-    return SVector{3, T}(
-        dot(op.weights[2], view(x, :, 3)) - dot(op.weights[3], view(x, :, 2)),
-        dot(op.weights[3], view(x, :, 1)) - dot(op.weights[1], view(x, :, 3)),
-        dot(op.weights[1], view(x, :, 2)) - dot(op.weights[2], view(x, :, 1)),
-    )
 end
 
 # ============================================================================

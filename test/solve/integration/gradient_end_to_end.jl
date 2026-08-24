@@ -2,6 +2,7 @@ using Test
 using StaticArraysCore
 using LinearAlgebra
 using Statistics
+using SparseArrays: sparse
 using RadialBasisFunctions
 import RadialBasisFunctions as RBF
 
@@ -85,8 +86,8 @@ import RadialBasisFunctions as RBF
             target_gradient, domain_2d, is_boundary, boundary_conditions, normals, RBF
         )
 
-        solution_x = G_op.weights[1] \ rhs[1]
-        solution_y = G_op.weights[2] \ rhs[2]
+        solution_x = sparse(G_op)[1] \ rhs[1]
+        solution_y = sparse(G_op)[2] \ rhs[2]
 
         solution_x_error = solution_x - u_values
         solution_y_error = solution_y - u_values

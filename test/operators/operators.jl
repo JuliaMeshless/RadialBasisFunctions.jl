@@ -37,15 +37,15 @@ end
 @testset "Operator Update" begin
     ∂ = partial(x, 1, 1)
     correct_weights = copy(∂.weights)
-    ∂.weights .= rand(rng, size(∂.weights))
+    parent(∂.weights) .= rand(rng, size(parent(∂.weights)))
     update_weights!(∂)
     @test ∂.weights ≈ correct_weights
     @test is_cache_valid(∂)
 
     ∇ = gradient(x, PHS(3; poly_deg = 2))
     correct_weights = copy.(∇.weights)
-    ∇.weights[1] .= rand(rng, size(∇.weights[1]))
-    ∇.weights[2] .= rand(rng, size(∇.weights[2]))
+    parent(∇.weights[1]) .= rand(rng, size(parent(∇.weights[1])))
+    parent(∇.weights[2]) .= rand(rng, size(parent(∇.weights[2])))
     update_weights!(∇)
     @test ∇.weights[1] ≈ correct_weights[1]
     @test ∇.weights[2] ≈ correct_weights[2]

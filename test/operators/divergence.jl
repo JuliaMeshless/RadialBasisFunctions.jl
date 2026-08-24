@@ -3,7 +3,6 @@ using StaticArraysCore
 using Statistics
 using HaltonSequences
 using LinearAlgebra
-using SparseArrays: SparseVector
 
 include("../test_utils.jl")
 
@@ -81,10 +80,12 @@ end
     exact = cos(0.5) - sin(0.5)
 
     div_op = divergence(x; eval_points = eval_pt)
-    @test div_op.weights[1] isa SparseVector
+    @test div_op.weights[1] isa StencilWeights
+    @test size(div_op.weights[1]) == (1, N)
     result = div_op(u)
-    @test result isa Number
-    @test abs(result - exact) < 0.1
+    @test result isa AbstractVector
+    @test length(result) == 1
+    @test abs(result[1] - exact) < 0.1
 end
 
 @testset "Printing" begin
