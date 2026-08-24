@@ -21,6 +21,9 @@ export degree, dim
 include("utils.jl")
 export find_neighbors, autoselect_k, reorder_points!
 
+include("stencil_weights.jl")
+export StencilWeights
+
 include("solve/types.jl")
 export BoundaryCondition, Internal
 export α, β, is_dirichlet, is_neumann, is_robin, is_internal

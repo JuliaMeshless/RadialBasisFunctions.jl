@@ -24,6 +24,10 @@ end
     include("utils.jl")
 end
 
+@safetestset "Stencil Weights" begin
+    include("operators/stencil_weights.jl")
+end
+
 @safetestset "Operators" begin
     include("operators/operators.jl")
 end
