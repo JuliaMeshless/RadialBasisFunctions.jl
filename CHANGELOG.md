@@ -5,6 +5,26 @@ All notable changes to RadialBasisFunctions.jl are documented here.
 This project follows [Semantic Versioning](https://semver.org/). While the package is pre-1.0, minor version
 bumps may contain breaking changes, and breaking changes are made without deprecation shims.
 
+## [0.8.0] — 2026-08-24
+
+Breaking release: operator weights moved from `SparseMatrixCSC` to stencil-wise (ELL) storage, making evaluation multithreaded/GPU-capable and ~7.6× faster at N = 100k, k = 50 on 13 threads (~1.5× single-threaded). See [#156].
+
+### Breaking
+
+- **Operator weights are now `StencilWeights`, not `SparseMatrixCSC`.** The new exported type stores a dense k × N_eval value matrix (`parent(W)`, column i = eval point i's stencil in `adjl` order) plus a shared k × N_eval `Int32` neighbor-index matrix; the logical size stays `(N_eval, N_data)`. `weights(op)` returns it (or an `NTuple` of them); use the new `sparse(op)` / `SparseMatrixCSC(op)` for global system assembly and implicit solves (`sparse(op) \ rhs`). `VirtualPartial` operators keep sparse weights internally (their two stencil sets don't share one ELL structure).
+- **In-place weight mutation goes through `parent`.** `op.weights .= …` no longer works (`StencilWeights` has a fixed stencil structure and no `setindex!`); mutate `parent(op.weights)` instead. `update_weights!` now rewrites the value matrix in place with no sparse reassembly.
+- **Single-eval-point operators keep the leading eval dimension.** With `N_eval == 1`, gradient-family and Hessian-family results are `1×D` / `1×D×D` arrays (and divergence/2D-curl a length-1 vector) instead of the previously collapsed `Vector`/`Matrix`/scalar shapes, and their weight components are `1×N` `StencilWeights` instead of `SparseVector`s.
+- **AD losses over built weights read `parent`.** `sum(W.nzval .^ 2)` becomes `sum(parent(W) .^ 2)` — the cotangent lands directly in the stencil-major value matrix, which also simplified both AD extensions.
+- **Stricter input validation.** A user-supplied ragged `adjl` (stencils of differing lengths) now throws `ArgumentError` instead of silently corrupting the weight buffers, and Hermite (boundary-condition) operators require `eval_points` to be the same point set as `data` — previously that combination produced silently wrong identity rows or a `BoundsError`.
+
+### Added
+
+- `StencilWeights` ELL weight storage with a row-parallel apply kernel — `Threads.@threads` + SIMD on CPU, a KernelAbstractions kernel on GPU backends — plus adjoint apply, `Matrix`/`sparse` conversions, stencil-preserving algebra (`+`, `-`, scalar scaling, `Diagonal *`), and `Adapt` support that moves both the value and index matrices to the device, so `cu(op)` evaluation now genuinely runs on the GPU (weight *building* remains CPU-only, [#88]).
+- `sparse(op)` / `SparseMatrixCSC(op)` interop conversions. Dirichlet identity rows convert back to single-entry rows exactly as the old storage stored them.
+- Benchmarks: a `Laplacian` group comparing the ELL apply kernel against the former CSC matvec.
+
+[#156]: https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/156
+
 ## [0.7.1] — 2026-08-11
 
 ### Fixed
