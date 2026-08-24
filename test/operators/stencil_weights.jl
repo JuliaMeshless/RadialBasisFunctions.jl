@@ -1,0 +1,142 @@
+using RadialBasisFunctions
+import RadialBasisFunctions as RBF
+using Adapt
+using KernelAbstractions
+using KernelAbstractions: CPU
+using LinearAlgebra
+using SparseArrays
+using Random: MersenneTwister, randperm
+using Test
+
+rng = MersenneTwister(123)
+
+# Hand-built ELL fixture: k = 4, N_eval = 6, N_data = 8. Column 5 mimics a Dirichlet
+# boundary row — weight 1 at slot 1, zero pads all sharing the same index — to exercise
+# duplicate-index combining in getindex/Matrix/sparse.
+k, n_eval, n_data = 4, 6, 8
+vals = randn(rng, k, n_eval)
+idx = Int32.(reduce(hcat, [randperm(rng, n_data)[1:k] for _ in 1:n_eval]))
+vals[:, 5] .= [1.0, 0.0, 0.0, 0.0]
+idx[:, 5] .= Int32(5)
+W = StencilWeights(vals, idx, n_data)
+A = Matrix(W)
+
+@testset "Construction and Array Interface" begin
+    @test size(W) == (n_eval, n_data)
+    @test eltype(W) == Float64
+    @test parent(W) === vals
+
+    # getindex sums duplicate-index slots, matching sparse() combine semantics
+    S = sparse(W)
+    @test all(W[i, j] == S[i, j] for i in 1:n_eval, j in 1:n_data)
+    @test W[5, 5] == 1.0
+
+    @test_throws ArgumentError W[1, 1] = 2.0
+    @test_throws DimensionMismatch StencilWeights(vals, idx[1:(k - 1), :], n_data)
+    @test_throws ArgumentError StencilWeights(vals, idx, Int64(typemax(Int32)) + 1)
+end
+
+@testset "Conversions" begin
+    S = sparse(W)
+    @test S isa SparseMatrixCSC{Float64, Int}
+    @test size(S) == (n_eval, n_data)
+    @test Matrix(S) == A
+    @test SparseMatrixCSC(W) == S
+    # Dirichlet-style column collapses to a single identity entry
+    @test nnz(S[5, :]) == 1
+    @test S[5, 5] == 1.0
+end
+
+@testset "Matvec vs Sparse Reference" begin
+    S = sparse(W)
+    x = randn(rng, n_data)
+
+    @test W * x ≈ S * x
+    y = fill(NaN, n_eval)
+    @test mul!(y, W, x) ≈ S * x                    # β = 0 must overwrite NaN-filled y
+    y2 = randn(rng, n_eval)
+    expected = 2.5 .* (S * x) .+ 0.5 .* y2
+    @test mul!(copy(y2), W, x, 2.5, 0.5) ≈ expected
+
+    X = randn(rng, n_data, 3)
+    @test W * X ≈ S * X
+    Y = fill(NaN, n_eval, 3)
+    @test mul!(Y, W, X) ≈ S * X
+
+    # Float32 values are preserved through the kernel
+    W32 = StencilWeights(Float32.(vals), idx, n_data)
+    x32 = randn(rng, Float32, n_data)
+    @test W32 * x32 isa Vector{Float32}
+    @test W32 * x32 ≈ Float32.(Matrix(W32) * x32)
+end
+
+@testset "Adjoint Apply" begin
+    S = sparse(W)
+    v = randn(rng, n_eval)
+
+    @test W' * v ≈ S' * v
+    y = fill(NaN, n_data)
+    @test mul!(y, W', v) ≈ S' * v
+    y2 = randn(rng, n_data)
+    @test mul!(copy(y2), W', v, 2.0, 3.0) ≈ 2.0 .* (S' * v) .+ 3.0 .* y2
+    # SubArray inputs (the AD pullbacks feed matrix column views)
+    V = randn(rng, n_eval, 2)
+    @test W' * view(V, :, 1) ≈ S' * V[:, 1]
+end
+
+@testset "Algebra" begin
+    B = StencilWeights(randn(rng, k, n_eval), idx, n_data)   # shared idx object
+    C = StencilWeights(copy(B.vals), copy(idx), n_data)      # equal idx content
+
+    @test Matrix(W + B) ≈ A .+ Matrix(B)
+    @test Matrix(W - C) ≈ A .- Matrix(C)
+    @test (W + B) isa StencilWeights
+    @test Matrix(-W) ≈ -A
+    @test Matrix(2.5 * W) ≈ 2.5 .* A
+    @test Matrix(W * 2.5) ≈ 2.5 .* A
+    @test Matrix(W / 4) ≈ A ./ 4
+
+    d = randn(rng, n_eval)
+    @test Matrix(Diagonal(d) * W) ≈ Diagonal(d) * A
+    @test (Diagonal(d) * W).idx === W.idx
+
+    other_idx = Int32.(reduce(hcat, [randperm(rng, n_data)[1:k] for _ in 1:n_eval]))
+    D = StencilWeights(randn(rng, k, n_eval), other_idx, n_data)
+    @test_throws ArgumentError W + D
+    @test_throws ArgumentError W - D
+end
+
+@testset "Equality, Copy, and copyto!" begin
+    W2 = copy(W)
+    @test W2 isa StencilWeights
+    @test W2 == W
+    @test W2 ≈ W
+    @test W2 !== W && W2.vals !== W.vals
+
+    parent(W2) .= 0.0
+    @test W2 != W
+    copyto!(W2, W)
+    @test W2 == W
+
+    small = StencilWeights(randn(rng, k, n_eval - 1), idx[:, 1:(n_eval - 1)], n_data)
+    @test_throws DimensionMismatch copyto!(small, W)
+end
+
+@testset "Backslash Guardrail" begin
+    # Square, diagonally-dominant system: W \ b must match the sparse solve
+    ks, ns = 3, 5
+    sq_idx = Int32.(reduce(hcat, [circshift(1:ns, -(i - 1))[1:ks] for i in 1:ns]))
+    sq_vals = randn(rng, ks, ns)
+    sq_vals[1, :] .+= 10.0                          # slot 1 is the diagonal entry
+    Wsq = StencilWeights(sq_vals, sq_idx, ns)
+    b = randn(rng, ns)
+    @test Wsq \ b ≈ sparse(Wsq) \ b
+    @test Wsq \ b ≈ Matrix(Wsq) \ b
+end
+
+@testset "Adapt and Backend" begin
+    @test KernelAbstractions.get_backend(W) isa CPU
+    W_adapted = Adapt.adapt(CPU(), W)
+    @test W_adapted isa StencilWeights
+    @test W_adapted.vals === W.vals && W_adapted.idx === W.idx
+end
