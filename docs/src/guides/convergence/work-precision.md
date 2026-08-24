@@ -36,10 +36,9 @@ operators (see the [Laplacian section](scalar-operators.md#laplacian)).
 
 ![Laplacian: apply time vs NRMSE](../../assets/convergence/plots/work_precision_laplacian_apply.png)
 
-Apply time is 10–100× shorter than build time; once weights are built, applying the
-operator is a sparse matrix-vector product. This makes the "amortize over many applies"
-decision easy: if you apply the same operator many times (e.g., time-stepping a PDE),
-pick the highest-accuracy configuration you can afford during the one-time build.
+Apply time is 10–100× shorter than build time; once weights are built, applying the operator is a stencil-wise gather kernel, multithreaded on CPU. This makes the "amortize over many applies" decision easy: if you apply the same operator many times (e.g., time-stepping a PDE), pick the highest-accuracy configuration you can afford during the one-time build.
+
+*The apply timings in this plot were measured with the older sparse-matrix storage; the current stencil-wise kernel is faster, so treat them as an upper bound.*
 
 ## Memory footprint — Laplacian
 

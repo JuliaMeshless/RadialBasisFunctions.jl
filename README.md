@@ -24,7 +24,8 @@ RBF methods approximate functions from scattered data without requiring a mesh. 
 Beyond interpolation, it provides differential operators (Laplacian, gradient, divergence, curl, Hessian, partials, custom) that act directly on scattered data, with support for Hermite interpolation to enforce boundary conditions in PDE applications.
 
 Other things that might matter to you:
-- GPU evaluation support via [Adapt.jl](https://github.com/JuliaGPU/Adapt.jl) — build on CPU, evaluate on GPU ([full GPU tracking issue](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88))
+- Stencil-wise (ELL) weight storage with a multithreaded gather kernel for evaluation — several times faster than a sparse matrix-vector product; `sparse(op)` converts to `SparseMatrixCSC` for global system assembly and implicit solves
+- GPU evaluation via [Adapt.jl](https://github.com/JuliaGPU/Adapt.jl) — weights build on CPU, then `cu(op)` moves the operator to the device where evaluation runs as a [KernelAbstractions.jl](https://github.com/JuliaGPU/KernelAbstractions.jl) kernel ([full GPU tracking issue](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88))
 - Native autodiff rules for [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl) (recommended) and [Mooncake.jl](https://github.com/compintell/Mooncake.jl) (no generic fallbacks)
 - [Lux.jl](https://github.com/LuxDL/Lux.jl) integration — `RBFLayer` for neural networks with radial basis function activations
 - Operator algebra — combine operators with `+`, `-`, `*`

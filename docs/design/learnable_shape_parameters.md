@@ -197,7 +197,7 @@ _build_weights(...; optimize_shape=true)  [api.jl]
     |           epsilon -= lr * d_epsilon
     |       end
     |
-    +-- Store optimized lambda as sparse weights
+    +-- Store optimized lambda as stencil-wise weights (StencilWeights)
     +-- Store optimized epsilon in operator struct
     |
     v

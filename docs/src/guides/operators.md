@@ -17,11 +17,13 @@ An RBF-FD operator ``\mathcal{L}`` approximates a differential operator at a poi
 \mathcal{L}u(x_c) \approx \sum_i w_i \, u(x_i)
 ```
 
-The weights ``w_i`` are precomputed by solving a local collocation system (see [Radial Basis Functions Theory](@ref) for the full derivation). Once computed, applying the operator is just a sparse matrix-vector multiply:
+The weights ``w_i`` are precomputed by solving a local collocation system (see [Radial Basis Functions Theory](@ref) for the full derivation). Once computed, applying the operator is a matrix-vector product with the weight matrix:
 
 ```math
 \mathcal{L}\mathbf{u} = W \mathbf{u}
 ```
+
+Because every row of ``W`` has exactly `k` nonzeros (one per stencil neighbor), the weights are stored stencil-wise in ELL format ([`StencilWeights`](@ref)) and the product is evaluated as a row-parallel gather kernel, ``y_i = \sum_l \mathrm{vals}[l,i] \, x_{\mathrm{idx}[l,i]}`` — multithreaded (with SIMD) on CPU and a KernelAbstractions kernel on GPU backends. This is roughly 7.6× faster than the sparse matrix-vector product it replaced (measured at ``N = 10^5``, ``k = 50``, 13 threads).
 
 This is what `RadialBasisOperator` stores and evaluates.
 
@@ -111,7 +113,7 @@ Key fields:
 | Field | Description |
 |:---|:---|
 | `ℒ` | The operator type (e.g., `Laplacian()`) |
-| `weights` | Precomputed weight matrix (or tuple of matrices for multi-component operators) |
+| `weights` | Precomputed [`StencilWeights`](@ref) (or tuple for multi-component operators) |
 | `data` | Source points used to build stencils |
 | `eval_points` | Points where the operator is evaluated |
 | `adjl` | Adjacency list (neighbor indices per stencil) |
@@ -131,6 +133,16 @@ typeof(result)
 ```
 
 You can also force an immediate recomputation with `update_weights!`.
+
+### Getting a sparse matrix
+
+`weights(op)` returns the operator's [`StencilWeights`](@ref) — a tuple of them for gradient-family operators. When you need a standard sparse matrix, e.g. for global system assembly or an implicit solve, convert with `sparse(op)` (or `SparseMatrixCSC(op)`); this is the supported path, and the result can go straight into `sparse(op) \ rhs` or any sparse linear-algebra library:
+
+```@example operators
+using SparseArrays
+A = sparse(op)  # SparseMatrixCSC, ready for global assembly or `A \ rhs`
+typeof(A)
+```
 
 ## Basis Derivative Functors
 

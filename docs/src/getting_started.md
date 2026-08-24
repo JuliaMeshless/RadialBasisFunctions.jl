@@ -175,4 +175,4 @@ condition types and the `hermite` keyword.
 
 1. **Global interpolation**: `Interpolator` currently uses all points globally. Local collocation support (like the operators use) is planned for future releases.
 
-2. **GPU weight computation**: weight computation (stencil assembly and solve) currently runs on CPU only; a GPU-compatible dense solver is needed for full GPU support ([#88](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88)). Built operators *can* be moved to GPU for evaluation — see [GPU Evaluation](@ref) in the Quick Reference.
+2. **GPU weight computation**: weight *building* (stencil assembly and solve) currently runs on CPU only; a GPU-compatible dense solver is needed for full GPU support ([#88](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88)). Built operators *can* be moved to the device with `cu(op)` (via Adapt.jl), after which evaluation runs as a KernelAbstractions gather kernel on the GPU — see [GPU Evaluation](@ref) in the Quick Reference.
