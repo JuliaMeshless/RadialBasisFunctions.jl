@@ -257,7 +257,13 @@ if Base.find_package("Enzyme") !== nothing
         using DifferentiationInterface
         using Enzyme
 
-        backend = AutoEnzyme(; function_annotation = Enzyme.Const)
+        # Runtime activity: with learn_centers/learn_shape = false a parameter array
+        # lives in the constant state NamedTuple while its siblings are active, which
+        # Enzyme's static activity analysis cannot prove safe.
+        backend = AutoEnzyme(;
+            mode = Enzyme.set_runtime_activity(Enzyme.Reverse),
+            function_annotation = Enzyme.Const,
+        )
 
         @testset "Gaussian - all learnable" begin
             l = RBFLayer(2, 10, 1; basis_type = Gaussian)
