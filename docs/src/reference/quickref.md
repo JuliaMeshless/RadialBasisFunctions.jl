@@ -150,6 +150,8 @@ values_gpu = cu(values)
 result_gpu = lap_gpu(values_gpu)  # KernelAbstractions kernel on device
 ```
 
+The adjoint apply (`weights(op)' * x`) runs on device through the same mechanism — a transpose-map gather kernel. Known limitations: `update_weights!` on a device-adapted operator throws (weights are always built on CPU — rebuild there and re-adapt), and differentiating through a device-adapted operator is untested; keep AD workloads on CPU.
+
 GPU weight *building* is planned — see [#88](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88).
 
 ## Common Errors

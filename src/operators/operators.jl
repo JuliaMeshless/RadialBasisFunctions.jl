@@ -485,7 +485,20 @@ function SparseArrays.sparse(op::RadialBasisOperator)
     return _to_sparse(op.weights)
 end
 
-SparseArrays.SparseMatrixCSC(op::RadialBasisOperator) = sparse(op)
+# The constructor alias is restricted to scalar-weight operators so that
+# typeof(SparseMatrixCSC(op)) <: SparseMatrixCSC always holds; tuple-weight operators
+# convert via sparse(op), which returns an NTuple of sparse matrices.
+SparseArrays.SparseMatrixCSC(op::RadialBasisOperator{<:AbstractOperator, <:AbstractMatrix}) =
+    sparse(op)
+
+function SparseArrays.SparseMatrixCSC(op::RadialBasisOperator{<:AbstractOperator, <:Tuple})
+    throw(
+        ArgumentError(
+            "multi-component operators hold a tuple of weight matrices; use sparse(op) " *
+                "to get an NTuple of SparseMatrixCSC"
+        )
+    )
+end
 
 _to_sparse(w::AbstractMatrix) = sparse(w)
 _to_sparse(w::Tuple) = map(_to_sparse, w)
@@ -557,6 +570,23 @@ function Adapt.adapt_structure(to, op::RadialBasisOperator{<:AbstractOperator, <
     return RadialBasisOperator(
         op.ℒ, adapted_weights, op.data, op.eval_points, op.adjl, op.basis,
         is_cache_valid(op); device = get_backend(first(adapted_weights)),
+    )
+end
+
+# StencilWeights tuples adapt the shared idx matrix and transpose map ONCE — the naive
+# per-component map would upload D copies of identical index data to the device.
+function Adapt.adapt_structure(
+        to, op::RadialBasisOperator{<:AbstractOperator, <:NTuple{N, <:StencilWeights}}
+    ) where {N}
+    w1 = Adapt.adapt(to, op.weights[1])
+    adapted_weights = ntuple(
+        i -> i == 1 ? w1 :
+            StencilWeights(Adapt.adapt(to, op.weights[i].vals), w1.idx, w1.n_data, w1.tmap),
+        N,
+    )
+    return RadialBasisOperator(
+        op.ℒ, adapted_weights, op.data, op.eval_points, op.adjl, op.basis,
+        is_cache_valid(op); device = get_backend(w1),
     )
 end
 

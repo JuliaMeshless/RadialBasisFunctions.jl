@@ -11,6 +11,7 @@ Breaking release: operator weights moved from `SparseMatrixCSC` to stencil-wise 
 
 ### Breaking
 
+- **The Mooncake extension is removed; Enzyme is the sole supported AD backend.** The evaluation kernels are multithreaded and cannot be traced generically by reverse-mode backends, so AD support means maintained rules — and those are Enzyme's (`EnzymeRules`, loaded via the package extension). Native rules now also cover the bare weight matvec (`W * x`, `weights(op) * x`), including weight cotangents when the weights are built inside the differentiated region. In-place evaluation (`op(y, x)`, `mul!(y, op, x)`) is not differentiable — use the out-of-place forms in losses.
 - **Operator weights are now `StencilWeights`, not `SparseMatrixCSC`.** The new exported type stores a dense k × N_eval value matrix (`parent(W)`, column i = eval point i's stencil in `adjl` order) plus a shared k × N_eval `Int32` neighbor-index matrix; the logical size stays `(N_eval, N_data)`. `weights(op)` returns it (or an `NTuple` of them); use the new `sparse(op)` / `SparseMatrixCSC(op)` for global system assembly and implicit solves (`sparse(op) \ rhs`). `VirtualPartial` operators keep sparse weights internally (their two stencil sets don't share one ELL structure).
 - **In-place weight mutation goes through `parent`.** `op.weights .= …` no longer works (`StencilWeights` has a fixed stencil structure and no `setindex!`); mutate `parent(op.weights)` instead. `update_weights!` now rewrites the value matrix in place with no sparse reassembly.
 - **Single-eval-point operators keep the leading eval dimension.** With `N_eval == 1`, gradient-family and Hessian-family results are `1×D` / `1×D×D` arrays (and divergence/2D-curl a length-1 vector) instead of the previously collapsed `Vector`/`Matrix`/scalar shapes, and their weight components are `1×N` `StencilWeights` instead of `SparseVector`s.
@@ -19,10 +20,11 @@ Breaking release: operator weights moved from `SparseMatrixCSC` to stencil-wise 
 
 ### Added
 
-- `StencilWeights` ELL weight storage with a row-parallel apply kernel — `Threads.@threads` + SIMD on CPU, a KernelAbstractions kernel on GPU backends — plus adjoint apply, `Matrix`/`sparse` conversions, stencil-preserving algebra (`+`, `-`, scalar scaling, `Diagonal *`), and `Adapt` support that moves both the value and index matrices to the device, so `cu(op)` evaluation now genuinely runs on the GPU (weight *building* remains CPU-only, [#88]).
+- `StencilWeights` ELL weight storage with a row-parallel apply kernel — `Threads.@threads` + SIMD on CPU (with a serial fast path below ~4k rows), a KernelAbstractions kernel on GPU backends — plus a deterministic transpose-map adjoint apply (`W' * x` gathers through a precomputed `EllTransposeMap`; no atomics, GPU-capable, also the AD pullback path), `Matrix`/`sparse` conversions, stencil-preserving algebra (`+`, `-`, scalar scaling, `Diagonal *`; mixing with sparse matrices stays sparse), and `Adapt` support that moves the value, index, and transpose-map arrays to the device — shared once across gradient-family components — so `cu(op)` evaluation now genuinely runs on the GPU (weight *building* remains CPU-only, [#88]).
 - `sparse(op)` / `SparseMatrixCSC(op)` interop conversions. Dirichlet identity rows convert back to single-entry rows exactly as the old storage stored them.
 - Benchmarks: a `Laplacian` group comparing the ELL apply kernel against the former CSC matvec.
 
+[#88]: https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88
 [#156]: https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/156
 
 ## [0.7.1] — 2026-08-11

@@ -24,7 +24,7 @@ using LinearAlgebra
 
 # Import internal functions
 import RadialBasisFunctions: _eval_op, RadialBasisOperator, Interpolator, StencilWeights
-import RadialBasisFunctions: accumulate_eval_pullback!
+import RadialBasisFunctions: accumulate_eval_pullback!, accumulate_weight_cotangent!
 import RadialBasisFunctions: IMQ, Gaussian, _tangent_basis
 import RadialBasisFunctions: AbstractRadialBasis, Jacobian
 import RadialBasisFunctions: _build_weights, Partial, Laplacian, _optype
@@ -168,6 +168,56 @@ function EnzymeRules.reverse(
 end
 
 # =============================================================================
+# Weight Matvec Rules: W * x on StencilWeights
+# =============================================================================
+# The apply kernel is threaded, so Enzyme cannot trace it — this rule covers the bare
+# matvec seams: `weights(op) * x` and losses over built weights like
+# `sum((_build_weights(...) * v).^2)`. The weights may themselves be active (a
+# Duplicated result of the _build_weights rule), in which case the ∂W gather fires.
+
+# `weights(op)` only reads (or rebuilds) cached operator state; its result is constant
+# under differentiation, matching the op-Const convention of the eval rules. Without this
+# Enzyme's runtime-activity analysis rejects the accessor before the `*` rule can fire.
+EnzymeRules.inactive(::typeof(RadialBasisFunctions.weights), args...) = nothing
+
+const _DupOrConstW{T} = Union{EnzymeCore.Const{T}, EnzymeCore.Duplicated{T}}
+const _DupOrConstX{T} = Union{EnzymeCore.Const{T}, EnzymeCore.Duplicated{T}}
+
+function EnzymeRules.augmented_primal(
+        config::EnzymeRules.RevConfigWidth{1},
+        func::EnzymeCore.Const{typeof(*)},
+        ::Type{RT},
+        W::_DupOrConstW{<:StencilWeights},
+        x::_DupOrConstX{<:AbstractVecOrMat},
+    ) where {RT}
+    y = W.val * x.val
+    shadow = _make_shadow_for_return(RT, y)
+    # x may be mutated before the reverse pass; the ∂W gather needs its forward value
+    x_saved = W isa EnzymeCore.Duplicated ? copy(x.val) : nothing
+    tape = (shadow, x_saved)
+    return EnzymeRules.AugmentedReturn(y, shadow, tape)
+end
+
+function EnzymeRules.reverse(
+        config::EnzymeRules.RevConfigWidth{1},
+        func::EnzymeCore.Const{typeof(*)},
+        dret,
+        tape,
+        W::_DupOrConstW{<:StencilWeights},
+        x::_DupOrConstX{<:AbstractVecOrMat},
+    )
+    shadow, x_saved = tape
+    Δy = _extract_dret_with_shadow(dret, shadow)
+    if W isa EnzymeCore.Duplicated
+        accumulate_weight_cotangent!(parent(W.dval), W.val, x_saved, Δy)
+    end
+    if x isa EnzymeCore.Duplicated
+        accumulate_eval_pullback!(x.dval, W.val, Δy)
+    end
+    return (nothing, nothing)
+end
+
+# =============================================================================
 # Operator Call Rules: op(x)
 # =============================================================================
 
@@ -286,7 +336,7 @@ function EnzymeRules.reverse(
 end
 
 # =============================================================================
-# Interpolator Constructor Rule (#147; mirrors the Mooncake rrule!!)
+# Interpolator Constructor Rule (#147)
 # =============================================================================
 # Makes the constructor opaque so Enzyme never traces the linear solve. The
 # shadow Interpolator's y-field aliases y.dval; its weight fields collect
@@ -465,13 +515,13 @@ import RadialBasisFunctions: run_build_weights_pullback
 # index matrix — matching Enzyme's own make_zero convention (copy_if_inactive=Val(false))
 # for guaranteed-inactive arrays; nothing ever writes shadow indices.
 function _make_shadow_for_return(::Type{<:EnzymeCore.Duplicated}, W::StencilWeights)
-    return StencilWeights(zero(W.vals), W.idx, W.n_data)
+    return StencilWeights(zero(W.vals), W.idx, W.n_data, W.tmap)
 end
 function _make_shadow_for_return(::Type{<:EnzymeCore.Duplicated}, y::AbstractArray)
     return zero(y)
 end
 function _make_shadow_for_return(::Type{<:EnzymeCore.DuplicatedNoNeed}, W::StencilWeights)
-    return StencilWeights(zero(W.vals), W.idx, W.n_data)
+    return StencilWeights(zero(W.vals), W.idx, W.n_data, W.tmap)
 end
 function _make_shadow_for_return(::Type{<:EnzymeCore.DuplicatedNoNeed}, y::AbstractArray)
     return zero(y)
