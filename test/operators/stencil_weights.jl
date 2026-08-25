@@ -66,6 +66,7 @@ end
     @test W * X ≈ S * X
     Y = fill(NaN, n_eval, 3)
     @test mul!(Y, W, X) ≈ S * X
+    @test_throws DimensionMismatch mul!(zeros(n_eval, 3), W, randn(rng, n_data, 2))
 
     # Float32 values are preserved through the kernel
     W32 = StencilWeights(Float32.(vals), idx, n_data)
@@ -92,8 +93,17 @@ end
     @test transpose(W) * v ≈ transpose(S) * v
     @test transpose(W) * V ≈ transpose(S) * V
 
+    # In-place transpose spellings delegate to the adjoint scatter
+    yt = randn(rng, n_data)
+    @test mul!(copy(yt), transpose(W), v, 2.0, 3.0) ≈ 2.0 .* (S' * v) .+ 3.0 .* yt
+    @test mul!(fill(NaN, n_data), transpose(W), v) ≈ S' * v
+
     # Matrix cotangent accumulation used by the AD eval rules on multi-column fields
     @test RBF.accumulate_eval_pullback!(zeros(n_data, 2), W, V) ≈ S' * V
+
+    # Generic fallback for sparse weights (VirtualPartial) accumulates, never overwrites
+    Δx = randn(rng, n_data)
+    @test RBF.accumulate_eval_pullback!(copy(Δx), S, v) ≈ Δx .+ S' * v
 
     # A sparse input must still produce a DENSE product (destination keyed off the
     # weights' backing array, not the input)
@@ -117,6 +127,7 @@ end
     d = randn(rng, n_eval)
     @test Matrix(Diagonal(d) * W) ≈ Diagonal(d) * A
     @test (Diagonal(d) * W).idx === W.idx
+    @test_throws DimensionMismatch Diagonal(randn(rng, n_eval + 1)) * W
 
     other_idx = Int32.(reduce(hcat, [randperm(rng, n_data)[1:k] for _ in 1:n_eval]))
     D = StencilWeights(randn(rng, k, n_eval), other_idx, n_data)
@@ -128,6 +139,10 @@ end
     @test W + Ssp isa SparseMatrixCSC
     @test Matrix(W + Ssp) ≈ A .+ Matrix(Ssp)
     @test Matrix(Ssp - W) ≈ Matrix(Ssp) .- A
+    @test Ssp + W isa SparseMatrixCSC
+    @test Matrix(Ssp + W) ≈ Matrix(Ssp) .+ A
+    @test W - Ssp isa SparseMatrixCSC
+    @test Matrix(W - Ssp) ≈ A .- Matrix(Ssp)
 end
 
 @testset "Equality, Copy, and copyto!" begin
@@ -150,6 +165,14 @@ end
     reordered_idx = reverse(idx; dims = 1)
     other = StencilWeights(randn(rng, k, n_eval), reordered_idx, n_data)
     @test_throws ArgumentError copyto!(W2, other)
+
+    # Different stencil structures holding the same logical matrix compare via sparse
+    Wr = StencilWeights(reverse(vals; dims = 1), reordered_idx, n_data)
+    @test Wr == W
+    @test Wr ≈ W
+    Wr2 = StencilWeights(2 .* reverse(vals; dims = 1), reordered_idx, n_data)
+    @test Wr2 != W
+    @test !(Wr2 ≈ W)
 end
 
 @testset "Backslash Guardrail" begin
@@ -162,6 +185,24 @@ end
     b = randn(rng, ns)
     @test Wsq \ b ≈ sparse(Wsq) \ b
     @test Wsq \ b ≈ Matrix(Wsq) \ b
+end
+
+@testset "Threaded CPU apply paths" begin
+    # The @threads branches gate on length(y) ≥ _ELL_SERIAL_CUTOFF and nthreads() > 1;
+    # below that (and on single-thread runs) the serial SIMD loop handles the row. A
+    # square cutoff-sized operator exercises both forward and adjoint threaded loops on
+    # the multi-thread CI jobs while staying cheap enough for the single-thread ones.
+    kL, nL = 3, RBF._ELL_SERIAL_CUTOFF
+    idxL = Int32[mod1(i + l, nL) for l in 1:kL, i in 1:nL]
+    WL = StencilWeights(randn(rng, kL, nL), idxL, nL)
+    SL = sparse(WL)
+    xL = randn(rng, nL)
+    yL = randn(rng, nL)
+
+    @test WL * xL ≈ SL * xL
+    @test mul!(copy(yL), WL, xL, 2.0, 3.0) ≈ 2.0 .* (SL * xL) .+ 3.0 .* yL
+    @test WL' * xL ≈ SL' * xL
+    @test mul!(copy(yL), WL', xL, 2.0, 3.0) ≈ 2.0 .* (SL' * xL) .+ 3.0 .* yL
 end
 
 @testset "Adapt and Backend" begin
@@ -197,6 +238,9 @@ bnormals = [SVector{2}(1.0, 0.0) for _ in 1:count(is_b)]
     @test grad.weights isa NTuple{2, <:StencilWeights}
     @test grad.weights[1].idx === grad.weights[2].idx
     @test grad.weights[1].tmap === grad.weights[2].tmap
+    # Tuple-weight operators can't collapse to one matrix; only sparse(op) works
+    @test_throws ArgumentError SparseMatrixCSC(grad)
+    @test sparse(grad) isa NTuple{2, <:SparseMatrixCSC}
 
     # Algebra results share the stencil structure without rebuilding the transpose map
     scaled = 2.5 * op.weights

@@ -9,6 +9,7 @@ Matrix{T}/Vector{T} at the call site.
 
 using Test
 using StaticArraysCore
+using LinearAlgebra: mul!
 using KernelAbstractions: CPU
 using JLArrays  # JuliaGPU reference backend: device semantics (no scalar indexing) on CPU
 using RadialBasisFunctions
@@ -53,6 +54,13 @@ end
     @test size(ws.Δb) == (n, cache.num_ops)
     @test length(ws.Δlocal_data) == cache.k
     @test length(ws.Δeval_pt) == 2
+
+    # Ragged stencils are rejected on the AD forward path, mirroring the primal build
+    ragged = [copy(neighbors) for neighbors in adjl]
+    ragged[1] = ragged[1][1:(end - 1)]
+    @test_throws ArgumentError RBF._forward_with_cache(
+        data, data, ragged, basis, ℒrbf, ℒmon, mon, typeof(ℒ)
+    )
 end
 
 @testset "StencilWeights 3-arg constructor is device-safe" begin
@@ -78,4 +86,39 @@ end
     # Out-of-range neighbor indices are still rejected on the device path
     bad_idx = JLArray(Int32[N_data + 1;; 1;; 1])
     @test_throws ArgumentError RBF.StencilWeights(JLArray(ones(1, 3)), bad_idx, N_data)
+end
+
+@testset "Apply kernels on a device backend" begin
+    # The CPU suite only reaches the ::CPU fast-path methods; JLArrays' KA backend
+    # dispatches to the generic @kernel launches — forward matvec, adjoint gather, and
+    # their multi-column variants — without needing a GPU.
+    k, N_eval, N_data = 3, 8, 7
+    idx = Int32[mod1(i + l, N_data) for l in 1:k, i in 1:N_eval]
+    vals = reshape(collect(1.0:(k * N_eval)), k, N_eval)
+    W_cpu = RBF.StencilWeights(vals, idx, N_data)
+    W_dev = RBF.StencilWeights(JLArray(vals), JLArray(idx), N_data)
+
+    x = collect(1.0:N_data)
+    X = [i + 10.0 * j for i in 1:N_data, j in 1:2]
+    v = collect(1.0:N_eval)
+    V = [i + 10.0 * j for i in 1:N_eval, j in 1:2]
+
+    # Forward matvec: destination allocated on the weights' backend
+    y_dev = W_dev * JLArray(x)
+    @test y_dev isa JLArray{Float64, 1}
+    @test Array(y_dev) ≈ W_cpu * x
+
+    # β = 0 must overwrite a NaN destination; β ≠ 0 must read through (mul! contract)
+    @test Array(mul!(JLArray(fill(NaN, N_eval)), W_dev, JLArray(x))) ≈ W_cpu * x
+    fwd_scaled = 2.0 .* (W_cpu * x) .+ 3.0
+    @test Array(mul!(JLArray(ones(N_eval)), W_dev, JLArray(x), 2.0, 3.0)) ≈ fwd_scaled
+
+    # Multi-column forward: all columns launch, one synchronize
+    @test Array(W_dev * JLArray(X)) ≈ W_cpu * X
+
+    # Adjoint gather through the device-resident transpose map
+    @test Array(W_dev' * JLArray(v)) ≈ W_cpu' * v
+    @test Array(W_dev' * JLArray(V)) ≈ W_cpu' * V
+    adj_scaled = 2.0 .* (W_cpu' * v) .+ 3.0
+    @test Array(mul!(JLArray(ones(N_data)), W_dev', JLArray(v), 2.0, 3.0)) ≈ adj_scaled
 end
