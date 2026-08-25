@@ -293,3 +293,57 @@ import RadialBasisFunctions as RBF
         end
     end
 end
+
+@testset "Hermite kwargs accept generic AbstractVectors" begin
+    # The hermite inputs are annotated AbstractVector, so a BitVector `is_boundary`
+    # (what a broadcast comparison like `norm.(x) .< r` produces) and views for
+    # bc/normals must build weights identical to the concrete-Vector inputs.
+    basis = PHS(3; poly_deg = 2)
+    data = [
+        SVector(0.0, 0.0),   # boundary
+        SVector(0.15, 0.1),
+        SVector(0.2, 0.25),
+        SVector(0.3, 0.15),
+        SVector(0.4, 0.3),
+        SVector(0.5, 0.2),
+        SVector(0.6, 0.35),
+        SVector(0.7, 0.25),
+        SVector(0.75, 0.15),
+        SVector(0.85, 0.3),
+        SVector(0.9, 0.2),
+        SVector(1.0, 0.0),   # boundary
+    ]
+    is_boundary = [
+        true, false, false, false, false, false, false, false, false, false, false, true,
+    ]
+    bcs = [RBF.Dirichlet(), RBF.Dirichlet()]
+    normals = [SVector(1.0, 0.0), SVector(-1.0, 0.0)]
+
+    op_ref = laplacian(
+        data;
+        basis = basis,
+        hermite = (is_boundary = is_boundary, bc = bcs, normals = normals),
+    )
+
+    is_boundary_bit = BitVector(is_boundary)
+    @test is_boundary_bit isa BitVector
+    bcs_view = view(bcs, 1:2)
+    normals_view = view(normals, 1:2)
+
+    op_gen = laplacian(
+        data;
+        basis = basis,
+        hermite = (is_boundary = is_boundary_bit, bc = bcs_view, normals = normals_view),
+    )
+
+    # Identical deterministic build => bitwise-identical weights
+    @test op_gen.weights.vals == op_ref.weights.vals
+    @test op_gen.weights.idx == op_ref.weights.idx
+
+    # The normalizing BoundaryData constructor stores concrete Vector fields
+    bd = RBF.BoundaryData(is_boundary_bit, bcs_view, normals_view)
+    @test bd.is_boundary isa Vector{Bool}
+    @test bd.is_boundary == is_boundary
+    @test bd.boundary_conditions isa Vector{BoundaryCondition{Float64}}
+    @test bd.normals isa Vector{SVector{2, Float64}}
+end

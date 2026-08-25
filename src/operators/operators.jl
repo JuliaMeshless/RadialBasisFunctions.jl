@@ -89,8 +89,9 @@ Unified constructor with keyword arguments.
 $(KWARG_DOCS)
 - `device`: KernelAbstractions backend for weight computation (default: auto-detected from `data` via `get_backend`)
 
-The `hermite` NamedTuple has fields `is_boundary::Vector{Bool}`,
-`bc::Vector{<:BoundaryCondition}`, and `normals::Vector{<:AbstractVector}`.
+The `hermite` NamedTuple has fields `is_boundary::AbstractVector{Bool}` (a `BitVector`
+works), `bc::AbstractVector{<:BoundaryCondition}`, and
+`normals::AbstractVector{<:AbstractVector}`.
 
 # Examples
 ```julia

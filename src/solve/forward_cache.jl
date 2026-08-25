@@ -47,13 +47,15 @@ function _forward_with_cache(
     # Determine number of operators (1 for scalar operators)
     num_ops = 1
 
-    # Allocate ELL weight storage (stencil-major, same layout the pullback reads)
+    # Allocate ELL weight storage (stencil-major, same layout the pullback reads).
+    # CPU Matrix by design: the AD forward pass is a scalar-indexing loop mirroring
+    # the CPU-only primal build.
     Wv = Matrix{TD}(undef, k, N_eval)
     Jm = Matrix{Int32}(undef, k, N_eval)
 
     # Allocate stencil caches (1×1 probe pins the concrete factorization type)
     FT = typeof(_stencil_factorization(ones(TD, 1, 1)))
-    stencil_caches = Vector{StencilForwardCache{TD, Matrix{TD}, FT}}(undef, N_eval)
+    stencil_caches = Vector{StencilForwardCache{TD, typeof(Wv), FT}}(undef, N_eval)
 
     # Pre-allocate workspace outside the loop
     A_full = zeros(TD, n, n)

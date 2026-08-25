@@ -181,6 +181,21 @@ struct BoundaryData{T, V <: AbstractVector{T}}
     normals::Vector{V}
 end
 
+# Accept any AbstractVector inputs (e.g. a BitVector `is_boundary` from a broadcast
+# comparison) and normalize to the concrete Vector fields; exact-Vector inputs hit the
+# implicit constructor and are stored as-is.
+function BoundaryData(
+        is_boundary::AbstractVector{Bool},
+        boundary_conditions::AbstractVector{BoundaryCondition{T}},
+        normals::AbstractVector{V},
+    ) where {T, V <: AbstractVector{T}}
+    return BoundaryData(
+        convert(Vector{Bool}, is_boundary),
+        convert(Vector{BoundaryCondition{T}}, boundary_conditions),
+        convert(Vector{V}, normals),
+    )
+end
+
 # ============================================================================
 # Stencil Classification Types
 # ============================================================================

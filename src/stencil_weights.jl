@@ -22,12 +22,16 @@ Adapt.adapt_structure(to, m::EllTransposeMap) =
 
 # Counting sort over the (slot, eval) pairs by data-point index. Linear iteration of the
 # column-major idx matrix yields (eval column, slot) ascending order within each data
-# point — deterministic regardless of thread count.
+# point — deterministic regardless of thread count. The sort itself is a serial host
+# pass: a device idx is copied to the host once, and the finished map is copied back so
+# the resulting struct lives uniformly on idx's backend.
 function _build_transpose_map(idx::AbstractMatrix{Int32}, n_data::Int)
-    nnz = length(idx)
+    backend = KernelAbstractions.get_backend(idx)
+    idx_host = backend isa CPU ? idx : Array(idx)
+    nnz = length(idx_host)
     counts = zeros(Int32, n_data + 1)
     @inbounds for q in 1:nnz
-        counts[idx[q] + 1] += Int32(1)
+        counts[idx_host[q] + 1] += Int32(1)
     end
     offsets = Vector{Int32}(undef, n_data + 1)
     offsets[1] = Int32(1)
@@ -37,11 +41,19 @@ function _build_transpose_map(idx::AbstractMatrix{Int32}, n_data::Int)
     positions = Vector{Int32}(undef, nnz)
     cursor = copy(offsets)
     @inbounds for q in 1:nnz
-        m = idx[q]
+        m = idx_host[q]
         positions[cursor[m]] = Int32(q)
         cursor[m] += Int32(1)
     end
-    return EllTransposeMap(offsets, positions)
+    backend isa CPU && return EllTransposeMap(offsets, positions)
+    return EllTransposeMap(_to_backend(backend, offsets), _to_backend(backend, positions))
+end
+
+# Copy a host vector to `backend` via bulk copyto! (no scalar indexing).
+function _to_backend(backend, v::Vector)
+    dv = KernelAbstractions.allocate(backend, eltype(v), length(v))
+    copyto!(dv, v)
+    return dv
 end
 
 """
@@ -84,6 +96,17 @@ end
 function StencilWeights(vals::AbstractMatrix, idx::AbstractMatrix{Int32}, n_data::Integer)
     if size(vals) != size(idx)
         throw(DimensionMismatch("vals is $(size(vals)) but idx is $(size(idx))"))
+    end
+    # The apply kernels launch on get_backend(vals) and read idx/tmap inside the kernel,
+    # so a mixed-backend struct would crash at first use — reject it here.
+    if KernelAbstractions.get_backend(vals) != KernelAbstractions.get_backend(idx)
+        throw(
+            ArgumentError(
+                "vals and idx must live on the same backend; got " *
+                    "$(KernelAbstractions.get_backend(vals)) and " *
+                    "$(KernelAbstractions.get_backend(idx))"
+            )
+        )
     end
     if n_data > typemax(Int32) || length(idx) > typemax(Int32)
         throw(ArgumentError("stencil structure exceeds the Int32 index range"))
