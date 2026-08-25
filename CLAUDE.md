@@ -11,7 +11,7 @@
 - Input points must be `Vector{<:AbstractVector}` with a compile-time-inferrable dimension (e.g. `SVector{2,Float64}`) — never a `Matrix`. This is the single most common user error.
 - Operators compute weights **eagerly at construction** and cache them; use `invalidate_cache!` / `update_weights!` to force recomputation.
 - `hermite` and `eval_points` are keyword-only since v0.6.
-- Use DifferentiationInterface.jl for all AD examples in docs and tests — it unifies the Enzyme and Mooncake backends, which are loaded via extensions in `ext/`.
+- Use DifferentiationInterface.jl for all AD examples in docs and tests — Enzyme is the sole supported backend, loaded via the extension in `ext/`.
 
 ## Docs
 User-facing material lives in `docs/src/` — add examples there, not here:

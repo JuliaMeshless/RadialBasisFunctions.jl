@@ -252,12 +252,12 @@ end
     @test contains(str3, "learn_shape=false")
 end
 
-if Base.find_package("Mooncake") !== nothing
-    @testset "Gradient correctness (Mooncake)" begin
+if Base.find_package("Enzyme") !== nothing
+    @testset "Gradient correctness (Enzyme)" begin
         using DifferentiationInterface
-        using Mooncake
+        using Enzyme
 
-        backend = AutoMooncake(; config = nothing)
+        backend = AutoEnzyme(; function_annotation = Enzyme.Const)
 
         @testset "Gaussian - all learnable" begin
             l = RBFLayer(2, 10, 1; basis_type = Gaussian)

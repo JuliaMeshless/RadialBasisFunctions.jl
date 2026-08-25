@@ -4,7 +4,7 @@ Shared backward pass for Interpolator evaluation.
 Computes the gradient of the interpolator output w.r.t. the evaluation point:
   ∂f/∂x = Σᵢ wᵢ ∇φ(x, xᵢ) + Σⱼ wⱼ ∇pⱼ(x)
 
-Used by both Enzyme and Mooncake extensions.
+Used by the Enzyme extension.
 =#
 
 """
@@ -58,7 +58,7 @@ using the implicit function theorem. Since `w = A⁻¹ [y; 0]` and `A` is consta
 `A` may be the collocation matrix or a factorization of it (both extension rules pass
 the cached `BunchKaufman`; symmetric ⟹ self-adjoint, so `A⁻ᵀ = A⁻¹` holds either way).
 
-Used by both the Mooncake and Enzyme extensions.
+Used by the Enzyme extension.
 """
 function _interpolator_constructor_backward(Δrbf_weights, Δmon_weights, A, k)
     Δw = vcat(Δrbf_weights, Δmon_weights)

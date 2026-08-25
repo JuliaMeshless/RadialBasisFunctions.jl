@@ -32,7 +32,7 @@ jobs:
             - uses: julia-actions/cache@v3
             - uses: julia-actions/julia-downgrade-compat@v2
               with:
-                  skip: LinearAlgebra, Random, Statistics, SparseArrays, Test, Enzyme, EnzymeCore, Mooncake, LuxCore
+                  skip: LinearAlgebra, Random, Statistics, SparseArrays, Test, Enzyme, EnzymeCore, LuxCore
                   projects: .
                   mode: deps
             - uses: julia-actions/julia-buildpkg@v1

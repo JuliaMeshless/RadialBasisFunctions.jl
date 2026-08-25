@@ -26,7 +26,7 @@ Beyond interpolation, it provides differential operators (Laplacian, gradient, d
 Other things that might matter to you:
 - Stencil-wise (ELL) weight storage with a multithreaded gather kernel for evaluation — several times faster than a sparse matrix-vector product; `sparse(op)` converts to `SparseMatrixCSC` for global system assembly and implicit solves
 - GPU evaluation via [Adapt.jl](https://github.com/JuliaGPU/Adapt.jl) — weights build on CPU, then `cu(op)` moves the operator to the device where evaluation runs as a [KernelAbstractions.jl](https://github.com/JuliaGPU/KernelAbstractions.jl) kernel ([full GPU tracking issue](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88))
-- Native autodiff rules for [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl) (recommended) and [Mooncake.jl](https://github.com/compintell/Mooncake.jl) (no generic fallbacks)
+- Native autodiff rules for [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl) (no generic fallbacks)
 - [Lux.jl](https://github.com/LuxDL/Lux.jl) integration — `RBFLayer` for neural networks with radial basis function activations
 - Operator algebra — combine operators with `+`, `-`, `*`
 
@@ -91,7 +91,7 @@ Requires Julia 1.10 or later.
 ## Documentation
 
 - **[Getting Started](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/getting_started)** — tutorials covering interpolation, operators, and boundary conditions
-- **[Autodiff](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/guides/autodiff)** — differentiating through operators with Enzyme and Mooncake
+- **[Autodiff](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/guides/autodiff)** — differentiating through operators with Enzyme
 - **[RBF Neural Networks](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/guides/lux)** — training RBF layers with Lux.jl
 - **[Theory](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/reference/theory)** — mathematical background on RBF methods
 - **[API Reference](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/reference/api)** — full function documentation

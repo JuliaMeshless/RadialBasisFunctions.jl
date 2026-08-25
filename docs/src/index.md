@@ -26,7 +26,7 @@ features:
     details: "Laplacian, gradient, partials, directional derivatives, and custom operators — with operator algebra to combine them."
   - icon: ∂
     title: Fully Differentiable
-    details: Native AD rules for Enzyme.jl and Mooncake.jl — differentiate through operators, interpolators, and weight construction.
+    details: Native AD rules for Enzyme.jl — differentiate through operators, interpolators, and weight construction.
 ---
 ```
 
