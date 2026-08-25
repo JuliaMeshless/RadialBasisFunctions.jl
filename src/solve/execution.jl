@@ -53,10 +53,16 @@ Wrap the filled ELL buffers into [`StencilWeights`](@ref) — one per operator c
 all sharing the same neighbor-index matrix.
 """
 function _assemble_weights(vals_list, idx, N_data, num_ops)
+    first_w = StencilWeights(vals_list[1], idx, N_data)
     if num_ops == 1
-        return StencilWeights(vals_list[1], idx, N_data)
+        return first_w
     else
-        return ntuple(o -> StencilWeights(vals_list[o], idx, N_data), num_ops)
+        # All components share one idx matrix AND one transpose map
+        return ntuple(
+            o -> o == 1 ? first_w :
+                StencilWeights(vals_list[o], idx, N_data, first_w.tmap),
+            num_ops,
+        )
     end
 end
 

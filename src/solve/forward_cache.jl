@@ -31,6 +31,14 @@ function _forward_with_cache(
     ) where {Dim, Deg, ℒType}
     TD = eltype(first(data))
     k = length(first(adjl))
+    if any(neighbors -> length(neighbors) != k, adjl)
+        throw(
+            ArgumentError(
+                "stencil-wise (ELL) weight storage requires a uniform stencil size; " *
+                    "adjl contains stencils of differing lengths"
+            )
+        )
+    end
     nmon = Deg >= 0 ? binomial(Dim + Deg, Deg) : 0
     n = k + nmon
     N_eval = length(eval_points)

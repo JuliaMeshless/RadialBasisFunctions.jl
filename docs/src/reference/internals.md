@@ -107,7 +107,7 @@ The system builds ELL-format weight matrices by computing stencil weights in par
 
 **Key steps:**
 1. **Route** — Operator calls `_build_weights`, which extracts data and applies the operator to the basis
-2. **Allocate** — `allocate_ell` creates one dense `k × N_eval` value matrix per operator component plus a shared `k × N_eval` `Int32` neighbor-index matrix (a ragged `adjl` throws an `ArgumentError` — ELL storage requires a uniform stencil size)
+2. **Allocate** — `allocate_ell` creates one dense `k × N_eval` value matrix per operator component plus a shared `k × N_eval` `Int32` neighbor-index matrix (`build_weights_kernel` first rejects a ragged `adjl` with an `ArgumentError` — ELL storage requires a uniform stencil size)
 3. **Build A** — Construct the collocation matrix for each stencil's k-nearest neighbors
 4. **Build b** — Construct the RHS by applying the differential operator to the basis at the evaluation point
 5. **Solve** — Compute weights via `A \ b`
@@ -191,7 +191,7 @@ where $\mathbf{\Phi}$ is the RBF kernel matrix and $\mathbf{P}$ is the polynomia
 
 The built weights are stored stencil-wise in `StencilWeights` (defined in `src/stencil_weights.jl`): a dense `k × N_eval` value matrix `vals` — column $i$ holds the k stencil weights of evaluation point $i$, in the same order as the adjacency list — plus a `k × N_eval` `Int32` index matrix `idx` recording which data point each weight multiplies. The logical size stays `(N_eval, N_data)`, and `parent(W)` returns the dense value matrix — the supported handle for in-place mutation and for AD losses over built weights (e.g. `sum(parent(W) .^ 2)`). Gradient-family operators return a tuple of `StencilWeights` that all share one index matrix.
 
-**Evaluation is a gather, not a sparse matvec.** Applying an operator runs $y_i = \sum_{l=1}^{k} \texttt{vals}[l,i] \cdot x[\texttt{idx}[l,i]]$ — one dense length-k dot product per evaluation point, embarrassingly parallel over rows. On CPU this is a `Threads.@threads` loop with `@simd` inner dot products; on GPU backends (an operator moved to device via Adapt, e.g. `cu(op)` — both `vals` and `idx` adapt) it is a KernelAbstractions kernel. Measured against the old `SparseMatrixCSC` matvec this is roughly 7.6× faster at N = 100k, k = 50 with 13 threads, and about 1.5× faster serially (issue #156). The adjoint apply used by AD pullbacks is the corresponding scatter, $y[\texttt{idx}[l,i]] \mathrel{+}= \texttt{vals}[l,i] \cdot x_i$, run serially for determinism since evaluation points share data points.
+**Evaluation is a gather, not a sparse matvec.** Applying an operator runs $y_i = \sum_{l=1}^{k} \texttt{vals}[l,i] \cdot x[\texttt{idx}[l,i]]$ — one dense length-k dot product per evaluation point, embarrassingly parallel over rows. On CPU this is a `Threads.@threads` loop with `@simd` inner dot products; on GPU backends (an operator moved to device via Adapt, e.g. `cu(op)` — both `vals` and `idx` adapt) it is a KernelAbstractions kernel. Measured against the old `SparseMatrixCSC` matvec this is roughly 7.6× faster at N = 100k, k = 50 with 13 threads, and about 1.5× faster serially (issue #156). The adjoint apply `W' * x` (also the AD pullbacks' input-cotangent path) gathers through a precomputed transpose map (`EllTransposeMap`, a counting-sorted CSR over data points built once at construction): one work item per data point with a fixed summation order — deterministic under any thread count, no atomics, and the same kernel runs on GPU backends.
 
 **Dirichlet columns are padded.** A Dirichlet boundary row is written by `fill_dirichlet_column!` as weight 1 at slot 1 and zero pads in the remaining slots, with every slot carrying the evaluation point's own index (in-bounds by construction). Converting with `sparse(W)` combines duplicate indices, so these padded columns collapse to single-entry identity rows — exactly what the previous sparse storage produced.
 
@@ -209,6 +209,10 @@ The built weights are stored stencil-wise in `StencilWeights` (defined in `src/s
 - Batch processing to control memory usage
 - Work arrays reused within each batch
 - KernelAbstractions.jl structures the batch kernel; weight **building** is currently CPU-only (issue #88), while **evaluation** runs on GPU backends via the ELL apply kernel
+
+---
+
+## Advanced: Hermite Interpolation
 
 For problems with boundary conditions, the package supports Hermite interpolation. This is triggered by providing boundary information (`is_boundary`, `boundary_conditions`, `normals`) to the operator constructor.
 

@@ -6,18 +6,15 @@ using SparseArrays: sparse
 using Test
 import DifferentiationInterface as DI
 using Enzyme: Enzyme
-using Mooncake: Mooncake
 using Random: MersenneTwister
 
 const FD = FiniteDifferences
 
 # Backend configuration
 const ENZYME_BACKEND = DI.AutoEnzyme(; function_annotation = Enzyme.Const)
-const MOONCAKE_BACKEND = DI.AutoMooncake(; config = nothing)
 
 const AD_BACKENDS = Pair{String, Any}[
     "Enzyme" => ENZYME_BACKEND,
-    "Mooncake" => MOONCAKE_BACKEND,
 ]
 
 """
@@ -128,6 +125,36 @@ end
             for (name, backend) in AD_BACKENDS
                 @testset "$name" begin
                     test_gradient_vs_fd(loss_eval, values, backend; rtol = 1.0e-4)
+                end
+            end
+        end
+
+        @testset "Weight matvec differentiation (W * x)" begin
+            lap = laplacian(points)
+            loss_wx(v) = sum(abs2, weights(lap) * v)
+
+            for (name, backend) in AD_BACKENDS
+                @testset "$name" begin
+                    test_gradient_vs_fd(loss_wx, values, backend; rtol = 1.0e-4)
+                end
+            end
+
+            # Weights built inside the differentiated region: the ∂W gather feeds the
+            # build pullback (points cotangent through W * v)
+            adjl_wx = find_neighbors(points, 12)
+            basis_wx = PHS(3; poly_deg = 2)
+            function loss_build_apply(flat)
+                pts = [SVector{2}(flat[2i - 1], flat[2i]) for i in 1:(length(flat) ÷ 2)]
+                W = RadialBasisFunctions._build_weights(
+                    RadialBasisFunctions.Laplacian(), pts, pts, adjl_wx, basis_wx
+                )
+                return sum(abs2, W * values)
+            end
+            flat_points = collect(reinterpret(Float64, points))
+
+            for (name, backend) in AD_BACKENDS
+                @testset "$name (built weights)" begin
+                    test_gradient_vs_fd(loss_build_apply, flat_points, backend; rtol = 1.0e-4)
                 end
             end
         end
@@ -615,7 +642,6 @@ end
     # Test that extensions load correctly
     @testset "Extension Loading" begin
         @test Base.find_package("Enzyme") !== nothing
-        @test Base.find_package("Mooncake") !== nothing
         @test Base.find_package("DifferentiationInterface") !== nothing
     end
 end

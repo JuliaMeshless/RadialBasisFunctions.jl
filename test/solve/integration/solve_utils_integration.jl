@@ -72,6 +72,18 @@ import RadialBasisFunctions as RBF
                 @test nnz(S[i, :]) == 1  # Dirichlet rows have a single stored entry
                 @test S[i, i] == 1.0
             end
+
+            # Neumann rows keep the full k-entry stencil (only Dirichlet rows are padded)
+            bcs_neumann = [RBF.Dirichlet(), RBF.Neumann()]
+            weights_neumann = RBF._build_weights(
+                RBF.Laplacian(), data_1d, data_1d, adjl_mixed, basis_phs,
+                is_boundary, bcs_neumann, normals,
+            )
+            @test weights_neumann isa StencilWeights
+            @test all(isfinite, parent(weights_neumann))
+            Sn = sparse(weights_neumann)
+            @test nnz(Sn[1, :]) == 1      # Dirichlet endpoint: identity row
+            @test nnz(Sn[5, :]) == k      # Neumann endpoint: full stencil
         end
 
         @testset "Global to Boundary Index Mapping" begin

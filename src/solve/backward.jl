@@ -487,7 +487,7 @@ end
 
 Fill the caller-owned buffer `Δw` with a single stencil's cotangent — column `eval_idx`
 of the stencil-major (`k × N_eval`) cotangent matrix `ΔW` (the tangent of
-`parent(::StencilWeights)`). Used by both the Enzyme and Mooncake extensions.
+`parent(::StencilWeights)`). Used by the Enzyme extension.
 """
 function extract_stencil_cotangent!(
         Δw::AbstractMatrix{T}, ΔW::AbstractMatrix{T}, eval_idx::Int, k::Int
@@ -502,9 +502,10 @@ end
     accumulate_eval_pullback!(Δx, W, Δy)
 
 Accumulate the input cotangent of an operator application `y = W * x` into `Δx`:
-`Δx += Wᵀ Δy`. Shared by the Enzyme and Mooncake eval rules. The `StencilWeights`
-method is a serial scatter over the stencil graph (deterministic; Dirichlet pad slots
-contribute zero); the generic method covers the sparse fallback (`VirtualPartial`).
+`Δx += Wᵀ Δy`. Used by the Enzyme eval rules. For `StencilWeights` this is the
+deterministic transpose-map adjoint gather (threaded on CPU, kernel on GPU; Dirichlet pad
+slots contribute zero); the generic method covers the sparse fallback (`VirtualPartial`).
+Matrix cotangents (operators applied to multi-column fields) accumulate column-wise.
 """
 function accumulate_eval_pullback!(
         Δx::AbstractVector, W::AbstractMatrix, Δy::AbstractVector
@@ -513,18 +514,46 @@ function accumulate_eval_pullback!(
     return Δx
 end
 
+accumulate_eval_pullback!(Δx::AbstractVector, W::StencilWeights, Δy::AbstractVector) =
+    mul!(Δx, W', Δy, true, true)
+
 function accumulate_eval_pullback!(
-        Δx::AbstractVector, W::StencilWeights, Δy::AbstractVector
+        Δx::AbstractMatrix, W::AbstractMatrix, Δy::AbstractMatrix
     )
-    vals = W.vals
+    for j in axes(Δy, 2)
+        accumulate_eval_pullback!(view(Δx, :, j), W, view(Δy, :, j))
+    end
+    return Δx
+end
+
+"""
+    accumulate_weight_cotangent!(ΔWvals, W, x, Δy)
+
+Accumulate the weight cotangent of `y = W * x` into the stencil-major value-matrix
+cotangent `ΔWvals` (the tangent of `parent(W)`): `ΔW[l, i] += Δy[i] * x[idx[l, i]]` —
+a pure gather over the stencil graph. Used by the Enzyme rule for `*` on
+`StencilWeights` when the weights themselves are active.
+"""
+function accumulate_weight_cotangent!(
+        ΔWvals::AbstractMatrix, W::StencilWeights, x::AbstractVector, Δy::AbstractVector
+    )
     idx = W.idx
-    k, n = size(vals)
+    k, n = size(ΔWvals)
     @inbounds for i in 1:n
         Δyi = Δy[i]
         iszero(Δyi) && continue
         for l in 1:k
-            Δx[idx[l, i]] = muladd(vals[l, i], Δyi, Δx[idx[l, i]])
+            ΔWvals[l, i] = muladd(Δyi, x[idx[l, i]], ΔWvals[l, i])
         end
     end
-    return Δx
+    return ΔWvals
+end
+
+function accumulate_weight_cotangent!(
+        ΔWvals::AbstractMatrix, W::StencilWeights, X::AbstractMatrix, ΔY::AbstractMatrix
+    )
+    for j in axes(ΔY, 2)
+        accumulate_weight_cotangent!(ΔWvals, W, view(X, :, j), view(ΔY, :, j))
+    end
+    return ΔWvals
 end

@@ -35,6 +35,9 @@ A = Matrix(W)
     @test_throws ArgumentError W[1, 1] = 2.0
     @test_throws DimensionMismatch StencilWeights(vals, idx[1:(k - 1), :], n_data)
     @test_throws ArgumentError StencilWeights(vals, idx, Int64(typemax(Int32)) + 1)
+    # Out-of-range neighbor indices are rejected (the apply kernels index with @inbounds)
+    @test_throws ArgumentError StencilWeights(vals, fill(Int32(n_data + 1), k, n_eval), n_data)
+    @test_throws ArgumentError StencilWeights(vals, fill(Int32(0), k, n_eval), n_data)
 end
 
 @testset "Conversions" begin
@@ -83,6 +86,20 @@ end
     # SubArray inputs (the AD pullbacks feed matrix column views)
     V = randn(rng, n_eval, 2)
     @test W' * view(V, :, 1) ≈ S' * V[:, 1]
+
+    # Matrix right-hand sides and the transpose spelling (real weights: same scatter)
+    @test W' * V ≈ S' * V
+    @test transpose(W) * v ≈ transpose(S) * v
+    @test transpose(W) * V ≈ transpose(S) * V
+
+    # Matrix cotangent accumulation used by the AD eval rules on multi-column fields
+    @test RBF.accumulate_eval_pullback!(zeros(n_data, 2), W, V) ≈ S' * V
+
+    # A sparse input must still produce a DENSE product (destination keyed off the
+    # weights' backing array, not the input)
+    Ssq = sparse(randn(rng, n_data, 3))
+    @test W * Ssq isa Matrix
+    @test W * Ssq ≈ Matrix(W) * Matrix(Ssq)
 end
 
 @testset "Algebra" begin
@@ -105,6 +122,12 @@ end
     D = StencilWeights(randn(rng, k, n_eval), other_idx, n_data)
     @test_throws ArgumentError W + D
     @test_throws ArgumentError W - D
+
+    # Mixing with sparse matrices (the VirtualPartial storage) stays sparse, never dense
+    Ssp = sparse(D)
+    @test W + Ssp isa SparseMatrixCSC
+    @test Matrix(W + Ssp) ≈ A .+ Matrix(Ssp)
+    @test Matrix(Ssp - W) ≈ Matrix(Ssp) .- A
 end
 
 @testset "Equality, Copy, and copyto!" begin
@@ -121,6 +144,12 @@ end
 
     small = StencilWeights(randn(rng, k, n_eval - 1), idx[:, 1:(n_eval - 1)], n_data)
     @test_throws DimensionMismatch copyto!(small, W)
+
+    # copyto! transfers values only — a source with different stencil structure is refused
+    # rather than rewriting the frozen (possibly aliased) idx matrix
+    reordered_idx = reverse(idx; dims = 1)
+    other = StencilWeights(randn(rng, k, n_eval), reordered_idx, n_data)
+    @test_throws ArgumentError copyto!(W2, other)
 end
 
 @testset "Backslash Guardrail" begin
@@ -167,6 +196,11 @@ bnormals = [SVector{2}(1.0, 0.0) for _ in 1:count(is_b)]
     grad = gradient(pts, PHS(3; poly_deg = 2))
     @test grad.weights isa NTuple{2, <:StencilWeights}
     @test grad.weights[1].idx === grad.weights[2].idx
+    @test grad.weights[1].tmap === grad.weights[2].tmap
+
+    # Algebra results share the stencil structure without rebuilding the transpose map
+    scaled = 2.5 * op.weights
+    @test scaled.idx === op.weights.idx && scaled.tmap === op.weights.tmap
 end
 
 @testset "Dirichlet columns act as identity" begin

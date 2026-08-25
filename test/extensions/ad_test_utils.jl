@@ -1,8 +1,8 @@
 """
-Shared test utilities for AD extension tests (Enzyme + Mooncake).
+Shared test utilities for AD extension tests (Enzyme).
 
 Provides common data setup, loss function generators, and FD validation helpers
-to eliminate duplication between enzyme_ext.jl and mooncake_ext.jl.
+shared between enzyme_ext.jl and autodiff_di.jl.
 """
 
 using RadialBasisFunctions
