@@ -7,14 +7,14 @@ using LinearAlgebra: Symmetric
 # ============================================================================
 
 """
-    allocate_ell(TD, k, N_eval, num_ops)
+    allocate_ell(backend, TD, k, N_eval, num_ops)
 
-Allocate ELL (stencil-wise) weight storage: one dense `k × N_eval` value matrix per
-operator component and a shared `k × N_eval` `Int32` neighbor-index matrix.
+Allocate ELL (stencil-wise) weight storage on `backend`: one dense `k × N_eval` value
+matrix per operator component and a shared `k × N_eval` `Int32` neighbor-index matrix.
 """
-function allocate_ell(TD, k::Int, N_eval::Int, num_ops::Int)
-    vals_list = [Matrix{TD}(undef, k, N_eval) for _ in 1:num_ops]
-    idx = Matrix{Int32}(undef, k, N_eval)
+function allocate_ell(backend, TD, k::Int, N_eval::Int, num_ops::Int)
+    vals_list = [KernelAbstractions.allocate(backend, TD, k, N_eval) for _ in 1:num_ops]
+    idx = KernelAbstractions.allocate(backend, Int32, k, N_eval)
     return vals_list, idx
 end
 
@@ -25,7 +25,7 @@ Construct mapping from global indices to boundary-only indices.
 For boundary points: global_to_boundary[i] = boundary array index
 For interior points: global_to_boundary[i] = 0 (sentinel)
 """
-function construct_global_to_boundary(is_boundary::Vector{Bool})
+function construct_global_to_boundary(is_boundary::AbstractVector{Bool})
     N_tot = length(is_boundary)
     global_to_boundary = Vector{Int}(undef, N_tot)
 
@@ -116,7 +116,7 @@ function build_weights_kernel(
     global_to_boundary = construct_global_to_boundary(boundary_data.is_boundary)
 
     # Allocate ELL weight storage
-    vals_list, idx = allocate_ell(TD, k, N_eval, num_ops)
+    vals_list, idx = allocate_ell(device, TD, k, N_eval, num_ops)
 
     # Calculate batches
     n_batches = ceil(Int, N_eval / batch_size)

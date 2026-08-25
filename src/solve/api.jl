@@ -131,9 +131,9 @@ function _build_weights(
         ℒrbf,
         ℒmon,
         mon,
-        is_boundary::Vector{Bool},
-        boundary_conditions::Vector{<:BoundaryCondition},
-        normals::Vector{<:AbstractVector};
+        is_boundary::AbstractVector{Bool},
+        boundary_conditions::AbstractVector{<:BoundaryCondition},
+        normals::AbstractVector{<:AbstractVector};
         batch_size::Int = 10,
         device = CPU(),
     )
@@ -182,9 +182,9 @@ function _build_weights(
         eval_points::AbstractVector,
         adjl::AbstractVector,
         basis::AbstractRadialBasis,
-        is_boundary::Vector{Bool},
-        boundary_conditions::Vector{<:BoundaryCondition},
-        normals::Vector{<:AbstractVector};
+        is_boundary::AbstractVector{Bool},
+        boundary_conditions::AbstractVector{<:BoundaryCondition},
+        normals::AbstractVector{<:AbstractVector};
         device = CPU(),
     )
     dim = length(first(data))

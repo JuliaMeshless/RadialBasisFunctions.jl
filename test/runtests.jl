@@ -132,6 +132,7 @@ end
     include("solve/collocation_matrix.jl")
     include("solve/rhs_vector.jl")
     include("solve/hermite_stencil.jl")
+    include("solve/ell_allocation.jl")
 end
 
 @safetestset "Solve Integration Tests" begin

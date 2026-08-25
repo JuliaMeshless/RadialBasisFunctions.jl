@@ -89,7 +89,7 @@ function BackwardWorkspace(cache::WeightsBuildForwardCache{T}, data::AbstractVec
     n = k + nmon
     dim_space = length(first(data))
     P = eltype(data)
-    return BackwardWorkspace{T, P, Matrix{T}, Vector{T}}(
+    return BackwardWorkspace(
         zeros(T, n, n),
         zeros(T, n, num_ops),
         zeros(T, n, num_ops),
