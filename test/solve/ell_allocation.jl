@@ -12,6 +12,10 @@ using StaticArraysCore
 using LinearAlgebra: mul!
 using KernelAbstractions: CPU
 using JLArrays  # JuliaGPU reference backend: device semantics (no scalar indexing) on CPU
+import KernelAbstractions
+# JLArrays runs kernels synchronously but omits synchronize(::JLBackend);
+# a no-op shim lets the generic device path run under test.
+KernelAbstractions.synchronize(::JLArrays.JLBackend) = nothing
 using RadialBasisFunctions
 import RadialBasisFunctions as RBF
 
