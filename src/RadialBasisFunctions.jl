@@ -35,7 +35,7 @@ include("solve/assembly.jl")
 include("solve/execution.jl")
 include("solve/api.jl")
 
-# Backward pass support for AD (used by Enzyme and Mooncake extensions)
+# Backward pass support for AD (used by the Enzyme extension)
 include("solve/backward_cache.jl")
 include("solve/operator_second_derivatives.jl")
 include("solve/shape_parameter_derivatives.jl")

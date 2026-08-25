@@ -1,15 +1,12 @@
 # Automatic Differentiation
 
-Both operators and interpolators can be differentiated with reverse-mode AD. Two backends are supported through package extensions:
+Both operators and interpolators can be differentiated with reverse-mode AD through the **Enzyme.jl** package extension, which provides native `EnzymeRules` (`augmented_primal`/`reverse`) for every supported component.
 
-- **Enzyme.jl** - Native EnzymeRules for high-performance reverse-mode AD; the recommended default backend
-- **Mooncake.jl** - Reverse-mode AD with support for mutation; a fully supported alternative
-
-All examples use [DifferentiationInterface.jl](https://github.com/gdalle/DifferentiationInterface.jl) which provides a unified API over different AD backends.
+All examples use [DifferentiationInterface.jl](https://github.com/gdalle/DifferentiationInterface.jl), which provides a unified API over AD backends.
 
 ## Implementation Status
 
-Both backends have native AD rule implementations. Enzyme.jl uses `EnzymeRules` (`augmented_primal`/`reverse`) and Mooncake.jl uses native `rrule!!` with `@is_primitive`.
+Enzyme is the supported AD backend. The evaluation kernels are multithreaded, so they cannot be traced generically by other reverse-mode backends — differentiation goes through the provided rules. Differentiate the out-of-place forms (`op(x)`, `weights(op) * x`); the in-place forms (`op(y, x)`, `mul!(y, op, x)`) have no AD rules and are not supported under differentiation.
 
 ## Differentiating Through Operators
 
@@ -172,23 +169,14 @@ grad[1:6]
 
 ## Supported Components
 
-| Component | Enzyme | Mooncake |
-|-----------|:------:|:--------:|
-| Operator evaluation (`op(values)`) | ✓ | ✓ |
-| Interpolator construction | ✓ | ✓ |
-| Interpolator evaluation | ✓ | ✓ |
-| Basis functions (PHS, IMQ, Gaussian) | ✓ | ✓ |
-| Weight construction (`_build_weights`) | ✓ | ✓ |
-| Shape parameter (ε) differentiation | ✓ | ✓ |
+| Component | Enzyme |
+|-----------|:------:|
+| Operator evaluation (`op(values)`) | ✓ |
+| Weight matvec (`weights(op) * x`, `W * x`) | ✓ |
+| Interpolator construction | ✓ |
+| Interpolator evaluation | ✓ |
+| Basis functions (PHS, IMQ, Gaussian) | ✓ |
+| Weight construction (`_build_weights`) | ✓ |
+| Shape parameter (ε) differentiation | ✓ |
 
-## Using Mooncake Backend
-
-Switch to Mooncake by changing the backend:
-
-```julia
-import DifferentiationInterface as DI
-import Mooncake
-
-backend = DI.AutoMooncake(; config=nothing)
-grad = DI.gradient(loss, backend, values)
-```
+In-place evaluation (`op(y, x)`, `mul!(y, op, x)`) is not differentiable — use the out-of-place forms inside losses.

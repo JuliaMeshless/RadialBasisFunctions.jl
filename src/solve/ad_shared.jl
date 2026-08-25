@@ -2,7 +2,7 @@
 Shared AD utilities that depend on operator types (Partial, Laplacian).
 
 Must be included AFTER operator definitions since it dispatches on Partial/Laplacian types.
-Used by Enzyme and Mooncake extensions via import.
+Used by the Enzyme extension via import.
 =#
 
 """
@@ -127,7 +127,7 @@ end
         mon, ℒ, OpType, grad_Lφ_x, grad_Lφ_xi)
 
 Allocate cotangent buffers, run `build_weights_pullback_loop!`, and return
-`(Δdata, Δeval, Δε_acc)`. Shared by the Enzyme and Mooncake extensions.
+`(Δdata, Δeval, Δε_acc)`. Used by the Enzyme extension.
 """
 function run_build_weights_pullback(
         ΔW_extractor,
