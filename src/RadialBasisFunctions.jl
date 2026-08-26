@@ -21,6 +21,10 @@ export degree, dim
 include("utils.jl")
 export find_neighbors, autoselect_k, reorder_points!
 
+# Generic SELL-C/ELL sparse storage (self-contained; seed of a future standalone
+# package — no re-exports, use as RadialBasisFunctions.EllSparse)
+include("ellsparse/EllSparse.jl")
+
 include("stencil_weights.jl")
 export StencilWeights
 
