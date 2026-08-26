@@ -31,9 +31,11 @@ storage is bit-identical to a column-major `k × m` matrix whose column `i` hold
     (`SellMatrix{T, C, ...}`), with [`EllMatrix`](@ref) = `SellMatrix{T, 1}` as an
     alias. Layout changes are explicit via [`reslice`](@ref); [`Adapt.adapt`](@ref)
     never changes layout (a data move must not change adjoint summation order).
-  - Classic single-slice slot-major ELL is intentionally absent — `C = 32` strictly
-    dominates it on GPUs (cuSPARSE itself dropped plain ELL in favor of SELL), and
-    global-max-width padding survives as the constructor option `pad = :global`.
+  - Classic single-slice slot-major ELL is intentionally absent — it was only ever a
+    GPU format (slot-major striding is cache-hostile for CPU row applies, where
+    `C = 1` wins), and on GPUs `C = 32` strictly dominates it (cuSPARSE itself
+    dropped plain ELL in favor of SELL). Its global-max-width padding survives as
+    the constructor option `pad = :global`.
   - Structure and values are split: everything except `vals` lives in an immutable
     [`SellStructure`](@ref) that multiple matrices alias (`===`) via
     [`with_values`](@ref), so families of same-pattern matrices (e.g. gradient
