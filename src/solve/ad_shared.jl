@@ -61,6 +61,13 @@ buffer `Δw` given the eval index, neighbor list, and stencil size. Both backend
 cotangents as the stencil-major (`k × N_eval`) tangent of `parent(::StencilWeights)`, so
 the extractors are column copies; the callable indirection remains so a backend with a
 different layout can still plug in.
+
+The whole pullback path is host-pinned and stencil-major **by design**: the AD forward
+cache allocates plain `Matrix{TD}` weight buffers (mirroring the CPU-only primal
+build), this loop scalar-indexes them per stencil, and `extract_stencil_cotangent!`
+requires a host `Matrix` so a device array or device-oriented (SELL-resliced) layout
+cannot leak in silently. Device-adapted operators do not differentiate through their
+device weights — weight construction, and therefore its pullback, happens on host.
 """
 function build_weights_pullback_loop!(
         Δdata::Vector{Vector{T}},

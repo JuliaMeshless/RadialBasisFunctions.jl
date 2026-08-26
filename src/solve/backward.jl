@@ -488,9 +488,14 @@ end
 Fill the caller-owned buffer `Δw` with a single stencil's cotangent — column `eval_idx`
 of the stencil-major (`k × N_eval`) cotangent matrix `ΔW` (the tangent of
 `parent(::StencilWeights)`). Used by the Enzyme extension.
+
+`ΔW` is deliberately constrained to a host `Matrix`: the AD path is structurally
+host-pinned (the forward cache allocates `Matrix{TD}` and the pullback loop
+scalar-indexes), so a device array or a device-oriented (resliced) values layout
+leaking in here fails with a MethodError instead of silently mis-indexing.
 """
 function extract_stencil_cotangent!(
-        Δw::AbstractMatrix{T}, ΔW::AbstractMatrix{T}, eval_idx::Int, k::Int
+        Δw::AbstractMatrix{T}, ΔW::Matrix{T}, eval_idx::Int, k::Int
     ) where {T}
     @inbounds for local_idx in 1:k
         Δw[local_idx, 1] = ΔW[local_idx, eval_idx]
