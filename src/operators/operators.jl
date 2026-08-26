@@ -566,6 +566,20 @@ function Adapt.adapt_structure(to, op::RadialBasisOperator)
     )
 end
 
+# StencilWeights operators apply the orientation policy at this boundary: reslice on
+# host to the destination backend's preferred slice height (C = 32 coalesced on GPU
+# backends, C = 1 on CPU), then upload. The reslice remaps the transpose map preserving
+# sequence order, so device adjoints keep the CPU summation order.
+function Adapt.adapt_structure(
+        to, op::RadialBasisOperator{<:AbstractOperator, <:StencilWeights}
+    )
+    adapted_weights = StencilWeights(_adapt_preferring_layout(to, op.weights.ell))
+    return RadialBasisOperator(
+        op.ℒ, adapted_weights, op.data, op.eval_points, op.adjl, op.basis,
+        is_cache_valid(op); device = get_backend(adapted_weights),
+    )
+end
+
 function Adapt.adapt_structure(to, op::RadialBasisOperator{<:AbstractOperator, <:Tuple})
     adapted_weights = map(w -> Adapt.adapt(to, w), op.weights)
     return RadialBasisOperator(
@@ -574,13 +588,13 @@ function Adapt.adapt_structure(to, op::RadialBasisOperator{<:AbstractOperator, <
     )
 end
 
-# StencilWeights tuples adapt the shared structure (idx matrix + transpose map) ONCE —
-# the naive per-component map would upload D copies of identical index data to the
-# device.
+# StencilWeights tuples reslice to the destination's preferred orientation and adapt
+# the shared structure (idx matrix + transpose map) ONCE — the naive per-component map
+# would upload D copies of identical index data to the device.
 function Adapt.adapt_structure(
         to, op::RadialBasisOperator{<:AbstractOperator, <:NTuple{N, <:StencilWeights}}
     ) where {N}
-    ells = EllSparse.adapt_family(to, map(w -> w.ell, op.weights))
+    ells = _adapt_family_preferring_layout(to, map(w -> w.ell, op.weights))
     adapted_weights = map(StencilWeights, ells)
     return RadialBasisOperator(
         op.ℒ, adapted_weights, op.data, op.eval_points, op.adjl, op.basis,
