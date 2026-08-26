@@ -38,6 +38,25 @@ SUITE["Laplacian"] = let s = BenchmarkGroup()
     s
 end
 
+# SELL orientation axis: the same weights at slice height 1 (today's CPU layout) vs 32
+# (the coalesced device layout). SELL-32 losing on CPU is the axis working — the GPU
+# side of the comparison is benchmark/sell_gpu.jl (manual, needs CUDA hardware).
+# Guarded because AirspeedVelocity replays this script against baseline revisions that
+# predate the EllSparse module; never reference EllSparse names in unguarded entries.
+if isdefined(RadialBasisFunctions, :EllSparse)
+    let ES = RadialBasisFunctions.EllSparse
+        W_ell = weights(∇²)
+        A_sell1 = ES.SellMatrix(parent(W_ell), W_ell.idx, size(W_ell, 2))
+        A_sell32 = ES.reslice(A_sell1, Val(32))
+        reslice_f = ES.reslice
+        SUITE["Laplacian"]["eval (SELL-1)"] = @benchmarkable $A_sell1 * $y
+        SUITE["Laplacian"]["eval (SELL-32)"] = @benchmarkable $A_sell32 * $y
+        SUITE["Laplacian"]["adjoint (SELL-1)"] = @benchmarkable $A_sell1' * $y
+        SUITE["Laplacian"]["adjoint (CSC)"] = @benchmarkable $W_csc' * $y
+        SUITE["Laplacian"]["reslice 1->32"] = @benchmarkable $reslice_f($A_sell1, Val(32))
+    end
+end
+
 grad = gradient(x, basis)
 SUITE["Gradient"] = let s = BenchmarkGroup()
     s["build weights"] = @benchmarkable update_weights!($grad)
