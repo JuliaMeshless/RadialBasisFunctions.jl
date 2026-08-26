@@ -52,7 +52,7 @@ import RadialBasisFunctions as RBF
             @test size(parent(weights)) == (k, length(eval_points_1d))
             @test size(weights) == (length(eval_points_1d), length(data_1d))
             for i in eachindex(adjl)
-                @test Int32.(adjl[i]) == weights.idx[:, i]  # columns follow the adjacency list
+                @test Int32.(adjl[i]) == RBF._neighbor_matrix(weights)[:, i]  # columns follow the adjacency list
             end
 
             # Mixed boundaries (Hermite path): Dirichlet rows collapse to a single
