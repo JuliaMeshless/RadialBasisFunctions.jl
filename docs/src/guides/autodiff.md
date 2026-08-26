@@ -130,7 +130,7 @@ grad = DI.gradient(loss_gauss, backend, x)
 
 ## Differentiating Weight Construction
 
-For advanced use cases like mesh optimization or shape parameter tuning, you can differentiate through the weight construction process using the internal `_build_weights` function. It returns a `StencilWeights`, whose dense matrix of stencil weight values is accessed with `parent(W)`.
+For advanced use cases like mesh optimization or shape parameter tuning, you can differentiate through the weight construction process using the internal `_build_weights` function. It returns a `StencilWeights`, whose dense matrix of stencil weight values is accessed with `parent(W)`. The AD path is host-resident and stencil-major by design — weight construction (and therefore its pullback) always runs on CPU over the `k × N_eval` layout, regardless of any device orientation the applied operator's weights may use.
 
 ```@example autodiff
 points_weights = [SVector{2}(0.1 + 0.8 * i / 5, 0.1 + 0.8 * j / 5) for i in 1:5 for j in 1:5]
