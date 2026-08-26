@@ -31,8 +31,7 @@ function adapt_family(to, family::NTuple{N, SellMatrix}) where {N}
     S = first(family).structure
     all(A -> A.structure === S, family) || throw(
         ArgumentError(
-            "adapt_family requires all members to alias one structure object; " *
-                "adapt them individually otherwise"
+            "adapt_family requires all members to alias one structure object; adapt them individually otherwise"
         )
     )
     S_adapted = Adapt.adapt(to, S)

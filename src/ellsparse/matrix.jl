@@ -21,8 +21,7 @@ end
 function Base.setindex!(::SellMatrix, v, i::Int, j::Int)
     throw(
         ArgumentError(
-            "SellMatrix has a fixed sparsity structure; mutate `parent(A)` to change " *
-                "stored values, or convert with `sparse(A)` for general sparse editing."
+            "SellMatrix has a fixed sparsity structure; mutate `parent(A)` to change stored values, or convert with `sparse(A)` for general sparse editing."
         )
     )
 end

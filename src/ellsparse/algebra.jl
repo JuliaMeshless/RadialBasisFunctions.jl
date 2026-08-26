@@ -8,8 +8,7 @@
 function _check_same_structure(A::SellMatrix, B::SellMatrix)
     same_structure(A, B) || throw(
         ArgumentError(
-            "SellMatrix operands have different sparsity structures; convert with " *
-                "`sparse` for general sparse arithmetic."
+            "SellMatrix operands have different sparsity structures; convert with `sparse` for general sparse arithmetic."
         )
     )
     return nothing
