@@ -114,6 +114,10 @@ end
     A64 = sell(S; slice_height = 2, index_type = Int64)
     @test eltype(structure(A64).colind) == Int64
     @test sparse(A64) == S
+    # structure-level accessor variants agree with the matrix-level ones
+    @test slice_height(structure(A64)) == slice_height(A64) == 2
+    @test uniform_width(structure(A64)) == uniform_width(A64)
+    @test Base.IndexStyle(typeof(A64)) === IndexCartesian()
 end
 
 @testset "uniform C = 1 matrix constructor (guards ported from StencilWeights)" begin
@@ -167,4 +171,6 @@ end
     @test_throws ArgumentError sell(S; slice_height = -1)
     @test_throws ArgumentError values_matrix(SellMatrix(S, Val(2)))
     @test_throws ArgumentError values_matrix(SellMatrix(S, Val(1)))  # ragged widths
+    # CSC-path index-range guard: 144 stored entries overflow Int8's typemax of 127
+    @test_throws ArgumentError SellMatrix(sparse(ones(12, 12)), Val(1); index_type = Int8)
 end

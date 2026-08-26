@@ -67,7 +67,10 @@ end
     @test A != B
     @test isapprox(A, with_values(A, parent(A) .+ 1.0e-12); atol = 1.0e-10)
     # value-equal matrices with distinct structures compare equal via sparse
-    @test A == SellMatrix(S_ragged, Val(C == 1 ? 2 : 1))
+    B_other = SellMatrix(S_ragged, Val(C == 1 ? 2 : 1))
+    @test A == B_other
+    @test isapprox(A, with_values(B_other, parent(B_other) .+ 1.0e-12); atol = 1.0e-10)
+    @test !isapprox(A, 2.0 * B_other)
 end
 
 @testset "Diagonal scaling" begin
