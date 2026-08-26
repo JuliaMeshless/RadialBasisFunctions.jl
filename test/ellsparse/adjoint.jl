@@ -75,6 +75,8 @@ end
 
     @test_throws DimensionMismatch mul!(zeros(n + 1), A', v)
     @test_throws DimensionMismatch mul!(zeros(n), A', randn(rng, m + 1))
+    @test_throws DimensionMismatch mul!(zeros(n + 1, 3), A', V)
+    @test_throws DimensionMismatch mul!(zeros(n, 3), A', randn(rng, m + 1, 3))
 end
 
 @testset "bitwise determinism, repeated and across the cutoff" begin
@@ -136,6 +138,25 @@ end
     @test Array(A_d' * JLArray(V)) == A' * V
 end
 
+@testset "real transpose mul! forwards to the adjoint gather" begin
+    # Value-level proof on top of the Base.which dispatch pins in mul.jl: for real
+    # eltypes conj is the identity, so every transpose forwarder must produce
+    # BITWISE the adjoint result.
+    A = SellMatrix(S_ragged, Val(2))
+    m, n = size(A)
+    v = randn(rng, m)
+    y = fill(NaN, n)
+    @test mul!(y, transpose(A), v) == A' * v          # β = 0 overwrites NaN
+    y2 = randn(rng, n)
+    @test mul!(copy(y2), transpose(A), v, 2.0, -0.5) == mul!(copy(y2), A', v, 2.0, -0.5)
+    V = randn(rng, m, 3)
+    @test transpose(A) * V == A' * V
+    Y = fill(NaN, n, 3)
+    @test mul!(Y, transpose(A), V) == A' * V
+    Y2 = randn(rng, n, 3)
+    @test mul!(copy(Y2), transpose(A), V, 0.5, 2.0) == mul!(copy(Y2), A', V, 0.5, 2.0)
+end
+
 @testset "complex transpose routes through conj" begin
     Sc = sparse([1, 2, 2, 3], [2, 1, 3, 2], ComplexF64[1 + 2im, 3 - im, -2 + im, 4im], 3, 3)
     Ac = SellMatrix(Sc, Val(1))
@@ -144,4 +165,7 @@ end
     @test transpose(Ac) * v ≈ transpose(Sc) * v
     y = fill(NaN + NaN * im, 3)
     @test mul!(y, transpose(Ac), v) ≈ transpose(Sc) * v
+    y2 = randn(rng, ComplexF64, 3)
+    @test mul!(copy(y2), transpose(Ac), v, 2 - im, 0.5 + im) ≈
+        (2 - im) .* (transpose(Sc) * v) .+ (0.5 + im) .* y2
 end
