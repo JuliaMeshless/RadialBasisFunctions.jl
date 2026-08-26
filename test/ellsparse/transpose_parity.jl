@@ -23,6 +23,11 @@ end
 
 rng = MersenneTwister(11)
 
+# StencilWeights is a thin wrapper since the cut-over; its map lives in the shared
+# structure. (On the pre-cut-over revision this file pinned EllSparse's map against the
+# independent _build_transpose_map implementation; it now pins the wrapper wiring.)
+wtmap(W::StencilWeights) = structure(W.ell).tmap
+
 random_idx(rng, k, n_eval, n_data) =
     Int32.(reduce(hcat, [rand(rng, 1:n_data, k) for _ in 1:n_eval]; init = zeros(Int32, k, 0)))
 
@@ -33,8 +38,8 @@ random_idx(rng, k, n_eval, n_data) =
     W = StencilWeights(vals, idx, n_data)
     A = SellMatrix(vals, idx, n_data)
     tm = structure(A).tmap
-    @test tm.offsets == W.tmap.offsets
-    @test tm.positions == W.tmap.positions
+    @test tm.offsets == wtmap(W).offsets
+    @test tm.positions == wtmap(W).positions
     @test tm.offsets isa Vector{Int32}
     @test tm.positions isa Vector{Int32}
     @test tm.rows === nothing
@@ -48,8 +53,8 @@ end
     idx[:, 5] .= Int32(5)
     W = StencilWeights(vals, idx, n_data)
     A = SellMatrix(vals, idx, n_data)
-    @test structure(A).tmap.offsets == W.tmap.offsets
-    @test structure(A).tmap.positions == W.tmap.positions
+    @test structure(A).tmap.offsets == wtmap(W).offsets
+    @test structure(A).tmap.positions == wtmap(W).positions
 end
 
 @testset "device parity (JLArrays)" begin
@@ -61,8 +66,8 @@ end
     tm = structure(A_d).tmap
     @test tm.offsets isa JLArray{Int32, 1}
     @test tm.positions isa JLArray{Int32, 1}
-    @test Array(tm.offsets) == Array(W_d.tmap.offsets)
-    @test Array(tm.positions) == Array(W_d.tmap.positions)
+    @test Array(tm.offsets) == Array(wtmap(W_d).offsets)
+    @test Array(tm.positions) == Array(wtmap(W_d).positions)
     # and the device map matches the host map entry-for-entry
     A_h = SellMatrix(vals, idx, n_data)
     @test Array(tm.offsets) == structure(A_h).tmap.offsets
