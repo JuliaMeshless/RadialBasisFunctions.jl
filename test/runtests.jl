@@ -24,6 +24,34 @@ end
     include("utils.jl")
 end
 
+@safetestset "EllSparse - Construction" begin
+    include("ellsparse/construction.jl")
+end
+
+@safetestset "EllSparse - Transpose Map Parity" begin
+    include("ellsparse/transpose_parity.jl")
+end
+
+@safetestset "EllSparse - Forward Apply" begin
+    include("ellsparse/mul.jl")
+end
+
+@safetestset "EllSparse - Adjoint Apply" begin
+    include("ellsparse/adjoint.jl")
+end
+
+@safetestset "EllSparse - Structure Sharing" begin
+    include("ellsparse/structure_sharing.jl")
+end
+
+@safetestset "EllSparse - Conversions and Algebra" begin
+    include("ellsparse/conversions_algebra.jl")
+end
+
+@safetestset "EllSparse - Reslice" begin
+    include("ellsparse/reslice.jl")
+end
+
 @safetestset "Stencil Weights" begin
     include("operators/stencil_weights.jl")
 end
