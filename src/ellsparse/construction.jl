@@ -258,9 +258,9 @@ function _to_backend_matrix(backend, A::SellMatrix{T, C}) where {T, C}
     S = A.structure
     tm = S.tmap
     dev_tmap = tm === nothing ? nothing : TransposeMap(
-        _to_backend(backend, tm.offsets), _to_backend(backend, tm.positions),
-        tm.rows === nothing ? nothing : _to_backend(backend, tm.rows),
-    )
+            _to_backend(backend, tm.offsets), _to_backend(backend, tm.positions),
+            tm.rows === nothing ? nothing : _to_backend(backend, tm.rows),
+        )
     dev_S = SellStructure{C}(
         S.m, S.n, _to_backend(backend, Vector(S.colind)),
         _to_backend(backend, Vector(S.sliceptr)), S.width, S.padded, dev_tmap,
