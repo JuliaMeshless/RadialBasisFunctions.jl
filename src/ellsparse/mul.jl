@@ -77,7 +77,9 @@ function _uniform_ell_mul!(y, vals, colind, k, x, α, β)
         end
         return y
     end
-    # Default :dynamic schedule composes with user-level threading.
+    # Default :dynamic schedule: unlike :static it may be nested inside a caller's own
+    # threaded region and cooperates with the scheduler. Row i is written by exactly
+    # one iteration, so thread assignment never affects the values.
     Threads.@threads for i in eachindex(y)
         qb = (i - 1) * k
         acc = zero(eltype(y))
