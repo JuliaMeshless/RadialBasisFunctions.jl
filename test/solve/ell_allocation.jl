@@ -45,7 +45,9 @@ end
 
     W, cache = RBF._forward_with_cache(data, data, adjl, basis, ℒrbf, ℒmon, mon, typeof(ℒ))
 
-    @test W isa RBF.StencilWeights{Float64, Matrix{Float64}, Matrix{Int32}}
+    @test W isa RBF.StencilWeights{Float64, <:RBF.EllSparse.SellMatrix{Float64}}
+    @test parent(W) isa Matrix{Float64}
+    @test RBF._neighbor_matrix(W) isa AbstractMatrix{Int32}
     # eltype of the stencil-cache vector is derived from the actual weight buffer
     @test cache.stencil_caches isa Vector{<:RBF.StencilForwardCache{Float64, Matrix{Float64}}}
 
@@ -76,12 +78,14 @@ end
     # A device idx must not be scalar-indexed: the transpose map is built from a host
     # copy and moved back, so the whole struct lives on the device backend.
     W_dev = RBF.StencilWeights(JLArray(vals), JLArray(idx), N_data)
-    @test W_dev.vals isa JLArray{Float64, 2}
-    @test W_dev.idx isa JLArray{Int32, 2}
-    @test W_dev.tmap.offsets isa JLArray{Int32, 1}
-    @test W_dev.tmap.positions isa JLArray{Int32, 1}
-    @test Array(W_dev.tmap.offsets) == W_cpu.tmap.offsets
-    @test Array(W_dev.tmap.positions) == W_cpu.tmap.positions
+    @test parent(W_dev) isa JLArray{Float64, 2}
+    @test RBF.EllSparse.structure(W_dev.ell).colind isa JLArray{Int32, 1}
+    tm_dev = RBF.EllSparse.structure(W_dev.ell).tmap
+    tm_cpu = RBF.EllSparse.structure(W_cpu.ell).tmap
+    @test tm_dev.offsets isa JLArray{Int32, 1}
+    @test tm_dev.positions isa JLArray{Int32, 1}
+    @test Array(tm_dev.offsets) == tm_cpu.offsets
+    @test Array(tm_dev.positions) == tm_cpu.positions
 
     # Mixed-backend vals/idx would crash in the apply kernels — rejected at construction
     @test_throws ArgumentError RBF.StencilWeights(JLArray(vals), idx, N_data)

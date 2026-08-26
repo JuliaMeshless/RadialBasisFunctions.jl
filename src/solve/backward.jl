@@ -537,7 +537,7 @@ a pure gather over the stencil graph. Used by the Enzyme rule for `*` on
 function accumulate_weight_cotangent!(
         ΔWvals::AbstractMatrix, W::StencilWeights, x::AbstractVector, Δy::AbstractVector
     )
-    idx = W.idx
+    idx = _neighbor_matrix(W)
     k, n = size(ΔWvals)
     @inbounds for i in 1:n
         Δyi = Δy[i]

@@ -511,17 +511,18 @@ import RadialBasisFunctions: run_build_weights_pullback
 # =============================================================================
 
 # For Duplicated/DuplicatedNoNeed return types, we need to allocate a shadow.
-# The StencilWeights shadow zeros the value matrix but ALIASES the primal's frozen Int32
-# index matrix — matching Enzyme's own make_zero convention (copy_if_inactive=Val(false))
-# for guaranteed-inactive arrays; nothing ever writes shadow indices.
+# The StencilWeights shadow zeros the value matrix but ALIASES the primal's frozen
+# index structure (via _zero_shadow) — matching Enzyme's own make_zero convention
+# (copy_if_inactive=Val(false)) for guaranteed-inactive arrays; nothing ever writes
+# shadow indices.
 function _make_shadow_for_return(::Type{<:EnzymeCore.Duplicated}, W::StencilWeights)
-    return StencilWeights(zero(W.vals), W.idx, W.n_data, W.tmap)
+    return RadialBasisFunctions._zero_shadow(W)
 end
 function _make_shadow_for_return(::Type{<:EnzymeCore.Duplicated}, y::AbstractArray)
     return zero(y)
 end
 function _make_shadow_for_return(::Type{<:EnzymeCore.DuplicatedNoNeed}, W::StencilWeights)
-    return StencilWeights(zero(W.vals), W.idx, W.n_data, W.tmap)
+    return RadialBasisFunctions._zero_shadow(W)
 end
 function _make_shadow_for_return(::Type{<:EnzymeCore.DuplicatedNoNeed}, y::AbstractArray)
     return zero(y)

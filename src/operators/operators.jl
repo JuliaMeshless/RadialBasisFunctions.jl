@@ -574,20 +574,17 @@ function Adapt.adapt_structure(to, op::RadialBasisOperator{<:AbstractOperator, <
     )
 end
 
-# StencilWeights tuples adapt the shared idx matrix and transpose map ONCE — the naive
-# per-component map would upload D copies of identical index data to the device.
+# StencilWeights tuples adapt the shared structure (idx matrix + transpose map) ONCE —
+# the naive per-component map would upload D copies of identical index data to the
+# device.
 function Adapt.adapt_structure(
         to, op::RadialBasisOperator{<:AbstractOperator, <:NTuple{N, <:StencilWeights}}
     ) where {N}
-    w1 = Adapt.adapt(to, op.weights[1])
-    adapted_weights = ntuple(
-        i -> i == 1 ? w1 :
-            StencilWeights(Adapt.adapt(to, op.weights[i].vals), w1.idx, w1.n_data, w1.tmap),
-        N,
-    )
+    ells = EllSparse.adapt_family(to, map(w -> w.ell, op.weights))
+    adapted_weights = map(StencilWeights, ells)
     return RadialBasisOperator(
         op.ℒ, adapted_weights, op.data, op.eval_points, op.adjl, op.basis,
-        is_cache_valid(op); device = get_backend(w1),
+        is_cache_valid(op); device = get_backend(first(adapted_weights)),
     )
 end
 
