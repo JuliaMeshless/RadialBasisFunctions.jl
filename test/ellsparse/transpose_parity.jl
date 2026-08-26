@@ -27,7 +27,7 @@ random_idx(rng, k, n_eval, n_data) =
     Int32.(reduce(hcat, [rand(rng, 1:n_data, k) for _ in 1:n_eval]; init = zeros(Int32, k, 0)))
 
 @testset "host parity: k=$k, N_eval=$n_eval, N_data=$n_data" for (k, n_eval, n_data) in
-        ((4, 6, 8), (1, 1, 1), (5, 40, 12), (3, 200, 50), (4, 0, 8))
+    ((4, 6, 8), (1, 1, 1), (5, 40, 12), (3, 200, 50), (4, 0, 8))
     idx = random_idx(rng, k, n_eval, n_data)
     vals = randn(rng, k, n_eval)
     W = StencilWeights(vals, idx, n_data)
