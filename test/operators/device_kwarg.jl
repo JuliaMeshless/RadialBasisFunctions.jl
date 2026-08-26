@@ -160,7 +160,8 @@ end
     adapted = Adapt.adapt(CPU(), op)
     @test adapted isa RadialBasisOperator
     @test adapted.weights[1] isa StencilWeights
-    @test adapted.weights[1].idx === adapted.weights[2].idx
+    @test RBF.EllSparse.structure(adapted.weights[1].ell) ===
+        RBF.EllSparse.structure(adapted.weights[2].ell)
     @test adapted(z) ≈ result
     @test adapted.data === op.data
     @test adapted.adjl === op.adjl
@@ -172,7 +173,8 @@ end
     adapted = Adapt.adapt(CPU(), op)
     @test adapted isa RadialBasisOperator
     @test adapted.weights[1] isa StencilWeights
-    @test adapted.weights[1].idx === adapted.weights[2].idx
+    @test RBF.EllSparse.structure(adapted.weights[1].ell) ===
+        RBF.EllSparse.structure(adapted.weights[2].ell)
     @test adapted(z) ≈ result
     @test adapted.data === op.data
     @test adapted.adjl === op.adjl

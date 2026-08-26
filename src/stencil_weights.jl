@@ -60,6 +60,42 @@ function _neighbor_matrix(W::StencilWeights)
     return reshape(S.colind, S.width, S.m)
 end
 
+# ------------------------------------------------------------------------------------------
+# Device orientation policy. EllSparse's `adapt` never changes layout; RBF applies the
+# reslice-to-preferred-orientation policy at the OPERATOR-level Adapt boundary: reslice
+# on host to the destination backend's preferred slice height (C = 1 CPU, C = 32
+# device — coalesced), then upload. The reslice remaps the transpose map preserving
+# sequence order, so device adjoints keep the CPU summation order.
+# ------------------------------------------------------------------------------------------
+
+_slice_val(::SellMatrix{T, C}) where {T, C} = Val(C)
+
+# Probe which backend `to` adapts arrays onto (an empty upload — no data movement).
+_dest_backend(to, ::Type{T}) where {T} =
+    KernelAbstractions.get_backend(Adapt.adapt(to, Vector{T}(undef, 0)))
+
+_with_layout(ell::SellMatrix{T, C}, ::Val{C}) where {T, C} = ell
+_with_layout(ell::SellMatrix, ::Val{C}) where {C} = EllSparse.reslice(ell, Val(C))
+
+_adapt_preferring_layout(to, ell::SellMatrix{T}) where {T} = Adapt.adapt(
+    to, _with_layout(ell, EllSparse.preferred_slice_height(_dest_backend(to, T)))
+)
+
+# Reslice a same-structure family, re-aliasing every component onto ONE resliced
+# structure so the sharing survives the layout change.
+function _reslice_family(ells::NTuple{N, SellMatrix}, ::Val{C}) where {N, C}
+    EllSparse.slice_height(first(ells)) == C && return ells
+    resliced = map(e -> EllSparse.reslice(e, Val(C)), ells)
+    first_r = first(resliced)
+    return ntuple(i -> i == 1 ? first_r : with_values(first_r, parent(resliced[i])), N)
+end
+
+function _adapt_family_preferring_layout(to, ells::NTuple{N, SellMatrix}) where {N}
+    T = eltype(first(ells))
+    C = EllSparse.preferred_slice_height(_dest_backend(to, T))
+    return EllSparse.adapt_family(to, _reslice_family(ells, C))
+end
+
 # Array interface — logical shape is (N_eval, N_data)
 Base.size(W::StencilWeights) = size(W.ell)
 Base.IndexStyle(::Type{<:StencilWeights}) = IndexCartesian()
@@ -67,9 +103,12 @@ Base.IndexStyle(::Type{<:StencilWeights}) = IndexCartesian()
 """
     parent(W::StencilWeights)
 
-Return the dense `k × N_eval` weight value matrix backing `W` (zero-copy). This is the
+For host-resident weights — the only kind construction and AD produce — return the
+dense `k × N_eval` stencil-major weight value matrix backing `W` (zero-copy): the
 supported handle for reading or mutating weight values in place and for AD losses over
-built weights (e.g. `sum(parent(W) .^ 2)`).
+built weights (e.g. `sum(parent(W) .^ 2)`). Device-adapted weights return the
+device-layout values array — treat it as opaque storage and go through `copyto!`,
+`sparse`, or `Matrix` instead.
 """
 Base.parent(W::StencilWeights) = parent(W.ell)
 
@@ -88,13 +127,43 @@ Base.copy(W::StencilWeights) = StencilWeights(copy(W.ell))
 
 # The index structure is frozen after construction, so copyto! transfers values only —
 # and refuses sources with a different stencil structure rather than rewriting indices
-# (which may be aliased by operators derived through the algebra methods).
+# (which may be aliased by operators derived through the algebra methods). A destination
+# with a different orientation or backend (a device-adapted operator's weights) takes
+# the orientation-aware path instead.
 function Base.copyto!(dest::StencilWeights, src::StencilWeights)
-    if size(dest) != size(src) || length(parent(dest.ell)) != length(parent(src.ell))
+    if size(dest) != size(src)
+        throw(DimensionMismatch("destination and source StencilWeights differ in shape"))
+    end
+    same_layout = EllSparse.slice_height(dest.ell) == EllSparse.slice_height(src.ell) &&
+        KernelAbstractions.get_backend(dest.ell) == KernelAbstractions.get_backend(src.ell)
+    same_layout || return _copyvalues!(dest, src)
+    if length(parent(dest.ell)) != length(parent(src.ell))
         throw(DimensionMismatch("destination and source StencilWeights differ in shape"))
     end
     _check_same_stencils(dest, src)
     copyto!(parent(dest.ell), parent(src.ell))
+    return dest
+end
+
+# Orientation-aware value transfer (update_weights!/copyto! on device-adapted
+# operators): permute the host stencil-major values into the destination's layout on
+# host, then one bulk upload — never a scalar-indexing device loop. Structure identity
+# is guaranteed by the frozen-adjl invariant (both sides describe the same stencils);
+# sizes are checked, index contents are trusted.
+function _copyvalues!(dest::StencilWeights, src::StencilWeights)
+    if !(KernelAbstractions.get_backend(src.ell) isa CPU)
+        throw(
+            ArgumentError(
+                "copyto! into a StencilWeights with a different layout expects a " *
+                    "host-built source (weights are always constructed on host)"
+            )
+        )
+    end
+    resliced = _with_layout(src.ell, _slice_val(dest.ell))
+    if length(parent(dest.ell)) != length(parent(resliced))
+        throw(DimensionMismatch("destination and source StencilWeights differ in shape"))
+    end
+    copyto!(vec(parent(dest.ell)), Vector(vec(parent(resliced))))
     return dest
 end
 

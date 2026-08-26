@@ -13,9 +13,14 @@ using LinearAlgebra: mul!
 using KernelAbstractions: CPU
 using JLArrays  # JuliaGPU reference backend: device semantics (no scalar indexing) on CPU
 import KernelAbstractions
-# JLArrays runs kernels synchronously but omits synchronize(::JLBackend);
-# a no-op shim lets the generic device path run under test.
-KernelAbstractions.synchronize(::JLArrays.JLBackend) = nothing
+using Adapt
+using SparseArrays: sparse
+# JLArrays runs kernels synchronously but omits synchronize(::JLBackend); a no-op
+# shim lets the generic device path run under test (hasmethod-guarded: safetestsets
+# share the global method table).
+if !hasmethod(KernelAbstractions.synchronize, Tuple{JLArrays.JLBackend})
+    KernelAbstractions.synchronize(::JLArrays.JLBackend) = nothing
+end
 using RadialBasisFunctions
 import RadialBasisFunctions as RBF
 
@@ -129,4 +134,47 @@ end
     @test Array(W_dev' * JLArray(V)) ≈ W_cpu' * V
     adj_scaled = 2.0 .* (W_cpu' * v) .+ 3.0
     @test Array(mul!(JLArray(ones(N_data)), W_dev', JLArray(v), 2.0, 3.0)) ≈ adj_scaled
+end
+
+@testset "Operator Adapt applies the device orientation policy" begin
+    # Moving an operator to a device backend reslices the weights on host to the
+    # backend's preferred slice height (C = 32, the coalesced cuSPARSE orientation) and
+    # remaps the transpose map preserving sequence order — so the device adjoint is
+    # BITWISE equal to the CPU adjoint, not merely approximate.
+    side = range(0.0, 1.0; length = 6)
+    pts = [SVector(x, y) for x in side for y in side]
+    z = sin.(1.0:length(pts))
+    v = cos.(1.0:length(pts))
+    op = laplacian(pts)
+    y_host = op(z)
+
+    dev_op = Adapt.adapt(JLArray, op)
+    W_dev = dev_op.weights
+    @test RBF.EllSparse.slice_height(W_dev.ell) == 32
+    @test parent(W_dev) isa JLArray
+    # logical content is unchanged by the layout move (sparse routes through host)
+    @test sparse(W_dev) == sparse(weights(op))
+    @test Array(dev_op(JLArray(z))) ≈ y_host
+    @test Array(W_dev' * JLArray(v)) == weights(op)' * v
+
+    # a CPU destination keeps the stencil-major C = 1 orientation, zero-copy
+    cpu_op = Adapt.adapt(CPU(), op)
+    @test RBF.EllSparse.slice_height(cpu_op.weights.ell) == 1
+    @test parent(cpu_op.weights) === parent(weights(op))
+
+    # gradient family: both components resliced, sharing ONE device structure
+    grad = gradient(pts)
+    dev_grad = Adapt.adapt(JLArray, grad)
+    @test RBF.EllSparse.slice_height(dev_grad.weights[1].ell) == 32
+    @test RBF.EllSparse.structure(dev_grad.weights[1].ell) ===
+        RBF.EllSparse.structure(dev_grad.weights[2].ell)
+    @test Array(dev_grad(JLArray(z))) ≈ grad(z)
+
+    # orientation-aware copyto!: host stencil-major values are permuted into the
+    # device layout on host, then bulk-uploaded — the update_weights! path for
+    # device-adapted operators
+    W_scaled = 2.5 * weights(op)
+    copyto!(W_dev, W_scaled)
+    @test sparse(W_dev) == sparse(W_scaled)
+    @test Array(W_dev' * JLArray(v)) == W_scaled' * v
 end

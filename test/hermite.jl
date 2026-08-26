@@ -337,8 +337,8 @@ end
     )
 
     # Identical deterministic build => bitwise-identical weights
-    @test op_gen.weights.vals == op_ref.weights.vals
-    @test op_gen.weights.idx == op_ref.weights.idx
+    @test parent(op_gen.weights) == parent(op_ref.weights)
+    @test RBF._neighbor_matrix(op_gen.weights) == RBF._neighbor_matrix(op_ref.weights)
 
     # The normalizing BoundaryData constructor stores concrete Vector fields
     bd = RBF.BoundaryData(is_boundary_bit, bcs_view, normals_view)
