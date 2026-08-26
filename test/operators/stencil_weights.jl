@@ -11,6 +11,10 @@ using Test
 
 rng = MersenneTwister(123)
 
+# Structure accessor spelling for the aliasing assertions (idx + transpose map now
+# live in one shared EllSparse.SellStructure object)
+_structure(W) = RBF.EllSparse.structure(W.ell)
+
 # Hand-built ELL fixture: k = 4, N_eval = 6, N_data = 8. Column 5 mimics a Dirichlet
 # boundary row — weight 1 at slot 1, zero pads all sharing the same index — to exercise
 # duplicate-index combining in getindex/Matrix/sparse.
@@ -114,7 +118,7 @@ end
 
 @testset "Algebra" begin
     B = StencilWeights(randn(rng, k, n_eval), idx, n_data)   # shared idx object
-    C = StencilWeights(copy(B.vals), copy(idx), n_data)      # equal idx content
+    C = StencilWeights(copy(parent(B)), copy(idx), n_data)   # equal idx content
 
     @test Matrix(W + B) ≈ A .+ Matrix(B)
     @test Matrix(W - C) ≈ A .- Matrix(C)
@@ -126,7 +130,7 @@ end
 
     d = randn(rng, n_eval)
     @test Matrix(Diagonal(d) * W) ≈ Diagonal(d) * A
-    @test (Diagonal(d) * W).idx === W.idx
+    @test _structure(Diagonal(d) * W) === _structure(W)
     @test_throws DimensionMismatch Diagonal(randn(rng, n_eval + 1)) * W
 
     other_idx = Int32.(reduce(hcat, [randperm(rng, n_data)[1:k] for _ in 1:n_eval]))
@@ -150,7 +154,7 @@ end
     @test W2 isa StencilWeights
     @test W2 == W
     @test W2 ≈ W
-    @test W2 !== W && W2.vals !== W.vals
+    @test W2 !== W && parent(W2) !== parent(W)
 
     parent(W2) .= 0.0
     @test W2 != W
@@ -188,11 +192,11 @@ end
 end
 
 @testset "Threaded CPU apply paths" begin
-    # The @threads branches gate on length(y) ≥ _ELL_SERIAL_CUTOFF and nthreads() > 1;
+    # The @threads branches gate on length(y) ≥ _SELL_SERIAL_CUTOFF and nthreads() > 1;
     # below that (and on single-thread runs) the serial SIMD loop handles the row. A
     # square cutoff-sized operator exercises both forward and adjoint threaded loops on
     # the multi-thread CI jobs while staying cheap enough for the single-thread ones.
-    kL, nL = 3, RBF._ELL_SERIAL_CUTOFF
+    kL, nL = 3, RBF.EllSparse._SELL_SERIAL_CUTOFF
     idxL = Int32[mod1(i + l, nL) for l in 1:kL, i in 1:nL]
     WL = StencilWeights(randn(rng, kL, nL), idxL, nL)
     SL = sparse(WL)
@@ -209,7 +213,8 @@ end
     @test KernelAbstractions.get_backend(W) isa CPU
     W_adapted = Adapt.adapt(CPU(), W)
     @test W_adapted isa StencilWeights
-    @test W_adapted.vals === W.vals && W_adapted.idx === W.idx
+    @test parent(W_adapted) === parent(W)
+    @test _structure(W_adapted).colind === _structure(W).colind
 end
 
 # ============================================================================
@@ -230,21 +235,21 @@ bnormals = [SVector{2}(1.0, 0.0) for _ in 1:count(is_b)]
 @testset "Operator weights are StencilWeights" begin
     op = partial(pts, 1, 1)
     @test op.weights isa StencilWeights
-    @test all(Int32.(op.adjl[i]) == op.weights.idx[:, i] for i in eachindex(op.adjl))
+    @test all(Int32.(op.adjl[i]) == RBF._neighbor_matrix(op.weights)[:, i] for i in eachindex(op.adjl))
     @test SparseMatrixCSC(op) == sparse(op)
     @test SparseMatrixCSC(op) isa SparseMatrixCSC
 
     grad = gradient(pts, PHS(3; poly_deg = 2))
     @test grad.weights isa NTuple{2, <:StencilWeights}
-    @test grad.weights[1].idx === grad.weights[2].idx
-    @test grad.weights[1].tmap === grad.weights[2].tmap
+    @test _structure(grad.weights[1]) === _structure(grad.weights[2])
+    @test _structure(grad.weights[1]).tmap === _structure(grad.weights[2]).tmap
     # Tuple-weight operators can't collapse to one matrix; only sparse(op) works
     @test_throws ArgumentError SparseMatrixCSC(grad)
     @test sparse(grad) isa NTuple{2, <:SparseMatrixCSC}
 
     # Algebra results share the stencil structure without rebuilding the transpose map
     scaled = 2.5 * op.weights
-    @test scaled.idx === op.weights.idx && scaled.tmap === op.weights.tmap
+    @test _structure(scaled) === _structure(op.weights)
 end
 
 @testset "Dirichlet columns act as identity" begin

@@ -57,11 +57,9 @@ function _assemble_weights(vals_list, idx, N_data, num_ops)
     if num_ops == 1
         return first_w
     else
-        # All components share one idx matrix AND one transpose map
+        # All components share one structure object: one idx matrix AND one transpose map
         return ntuple(
-            o -> o == 1 ? first_w :
-                StencilWeights(vals_list[o], idx, N_data, first_w.tmap),
-            num_ops,
+            o -> o == 1 ? first_w : _shared_component(first_w, vals_list[o]), num_ops
         )
     end
 end
