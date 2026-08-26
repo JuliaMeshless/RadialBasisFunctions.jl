@@ -45,8 +45,7 @@ end
 # predate the EllSparse module; never reference EllSparse names in unguarded entries.
 if isdefined(RadialBasisFunctions, :EllSparse)
     let ES = RadialBasisFunctions.EllSparse
-        W_ell = weights(∇²)
-        A_sell1 = ES.SellMatrix(parent(W_ell), W_ell.idx, size(W_ell, 2))
+        A_sell1 = weights(∇²).ell          # StencilWeights wraps a SellMatrix at C = 1
         A_sell32 = ES.reslice(A_sell1, Val(32))
         reslice_f = ES.reslice
         SUITE["Laplacian"]["eval (SELL-1)"] = @benchmarkable $A_sell1 * $y
