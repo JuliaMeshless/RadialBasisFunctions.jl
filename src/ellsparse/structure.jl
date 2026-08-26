@@ -162,8 +162,7 @@ function values_matrix(A::SellMatrix{T, 1}) where {T}
     S = A.structure
     S.width > 0 || throw(
         ArgumentError(
-            "values_matrix requires a uniform stored width; this SellMatrix has " *
-                "ragged slice widths"
+            "values_matrix requires a uniform stored width; this SellMatrix has ragged slice widths"
         )
     )
     v = A.vals
@@ -183,16 +182,13 @@ A new matrix over the **same** structure object (`===`) with a different values 
 function with_values(A::SellMatrix, vals::AbstractVecOrMat)
     length(vals) == length(A.vals) || throw(
         DimensionMismatch(
-            "replacement values have length $(length(vals)); the storage holds " *
-                "$(length(A.vals))"
+            "replacement values have length $(length(vals)); the storage holds $(length(A.vals))"
         )
     )
     if KernelAbstractions.get_backend(vals) != KernelAbstractions.get_backend(A.structure.colind)
         throw(
             ArgumentError(
-                "replacement values must live on the structure's backend; got " *
-                    "$(KernelAbstractions.get_backend(vals)) vs " *
-                    "$(KernelAbstractions.get_backend(A.structure.colind))"
+                "replacement values must live on the structure's backend; got $(KernelAbstractions.get_backend(vals)) vs $(KernelAbstractions.get_backend(A.structure.colind))"
             )
         )
     end
@@ -220,8 +216,7 @@ _same_structure(::SellStructure, ::SellStructure) = false
     tm = A.structure.tmap
     tm === nothing && throw(
         ArgumentError(
-            "this SellMatrix was constructed with transpose_map = false; " *
-                "adjoint/transpose products require the transpose map"
+            "this SellMatrix was constructed with transpose_map = false; adjoint/transpose products require the transpose map"
         )
     )
     return tm

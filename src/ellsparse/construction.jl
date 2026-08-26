@@ -27,8 +27,7 @@ function SellMatrix(
     if backend != KernelAbstractions.get_backend(colind)
         throw(
             ArgumentError(
-                "vals and colind must live on the same backend; got $backend and " *
-                    "$(KernelAbstractions.get_backend(colind))"
+                "vals and colind must live on the same backend; got $backend and $(KernelAbstractions.get_backend(colind))"
             )
         )
     end
