@@ -89,7 +89,7 @@ src/solve/
 | 1 | `assembly.jl` | Pure mathematics: collocation matrix, RHS, stencil assembly |
 | 0 | `types.jl` | Shared types and arity helpers |
 
-The `StencilWeights` container itself — the ELL storage type, its `mul!` apply kernels, and the `sparse` conversion — lives outside this tree in `src/stencil_weights.jl`.
+The `StencilWeights` container itself lives outside this tree in two layers: `src/ellsparse/` holds the self-contained `EllSparse` module (generic SELL-C/ELL storage, the CPU/GPU `mul!` apply kernels, transpose-map adjoint, and conversions), and `src/stencil_weights.jl` wraps it as the thin RBF-policy type `StencilWeights`.
 
 ---
 
@@ -187,11 +187,13 @@ $$\begin{bmatrix} \mathbf{\Phi} & \mathbf{P} \\ \mathbf{P}^\top & \mathbf{0} \en
 
 where $\mathbf{\Phi}$ is the RBF kernel matrix and $\mathbf{P}$ is the polynomial augmentation matrix. The system is solved to find weights that exactly reproduce polynomials up to the specified degree.
 
-### Weight Storage: ELL Format
+### Weight Storage: ELL Format (two layers)
 
-The built weights are stored stencil-wise in `StencilWeights` (defined in `src/stencil_weights.jl`): a dense `k × N_eval` value matrix `vals` — column $i$ holds the k stencil weights of evaluation point $i$, in the same order as the adjacency list — plus a `k × N_eval` `Int32` index matrix `idx` recording which data point each weight multiplies. The logical size stays `(N_eval, N_data)`, and `parent(W)` returns the dense value matrix — the supported handle for in-place mutation and for AD losses over built weights (e.g. `sum(parent(W) .^ 2)`). Gradient-family operators return a tuple of `StencilWeights` that all share one index matrix.
+The built weights are stored stencil-wise in `StencilWeights` — since v0.8 a thin RBF-policy wrapper over the self-contained generic module `RadialBasisFunctions.EllSparse` (`src/ellsparse/`, the seed of a future standalone package). The storage is a dense `k × N_eval` value matrix — column $i$ holds the k stencil weights of evaluation point $i$, in the same order as the adjacency list — plus a frozen `Int32` index structure recording which data point each weight multiplies. The logical size stays `(N_eval, N_data)`, and `parent(W)` returns the dense value matrix — the supported handle for in-place mutation and for AD losses over built weights (e.g. `sum(parent(W) .^ 2)`). Gradient-family operators return a tuple of `StencilWeights` that all alias one `EllSparse.SellStructure` (one index matrix, one transpose map).
 
-**Evaluation is a gather, not a sparse matvec.** Applying an operator runs $y_i = \sum_{l=1}^{k} \texttt{vals}[l,i] \cdot x[\texttt{idx}[l,i]]$ — one dense length-k dot product per evaluation point, embarrassingly parallel over rows. On CPU this is a `Threads.@threads` loop with `@simd` inner dot products; on GPU backends (an operator moved to device via Adapt, e.g. `cu(op)` — both `vals` and `idx` adapt) it is a KernelAbstractions kernel. Measured against the old `SparseMatrixCSC` matvec this is roughly 7.6× faster at N = 100k, k = 50 with 13 threads, and about 1.5× faster serially (issue #156). The adjoint apply `W' * x` (also the AD pullbacks' input-cotangent path) gathers through a precomputed transpose map (`EllTransposeMap`, a counting-sorted CSR over data points built once at construction): one work item per data point with a fixed summation order — deterministic under any thread count, no atomics, and the same kernel runs on GPU backends.
+**Format decision: ELL is single-slice SELL.** `EllSparse` implements SELL-C (Sliced ELLpack) with the slice height C in the type domain; our stencil-major layout is exactly `SellMatrix{T, 1}`, and because RBF stencils have uniform length k there is zero padding — SELL and plain ELL are byte-identical here. C = 32 is the slot-major coalesced orientation cuSPARSE standardized on (`EllSparse.reslice` switches orientation explicitly; `Adapt` never changes layout). Revisit triggers for this design: ragged stencil support, real-GPU benchmark results from `benchmark/sell_gpu.jl`, and a `CuSparseMatrixSELL` wrapper landing in CUDA.jl ([JuliaGPU/CUDA.jl#2782](https://github.com/JuliaGPU/CUDA.jl/issues/2782)).
+
+**Evaluation is a gather, not a sparse matvec.** Applying an operator runs $y_i = \sum_{l=1}^{k} \texttt{vals}[l,i] \cdot x[\texttt{idx}[l,i]]$ — one dense length-k dot product per evaluation point, embarrassingly parallel over rows. On CPU this is a `Threads.@threads` loop with `@simd` inner dot products; on GPU backends (an operator moved to device via Adapt, e.g. `cu(op)` — values and index structure adapt together) it is a KernelAbstractions kernel. Measured against the old `SparseMatrixCSC` matvec this is roughly 7.6× faster at N = 100k, k = 50 with 13 threads, and about 1.5× faster serially (issue #156). The adjoint apply `W' * x` (also the AD pullbacks' input-cotangent path) gathers through a precomputed transpose map (`EllSparse.TransposeMap`, a counting-sorted per-column adjacency built once at construction): one work item per column with a fixed summation order — deterministic under any thread count, no atomics, and the same kernel runs on GPU backends.
 
 **Dirichlet columns are padded.** A Dirichlet boundary row is written by `fill_dirichlet_column!` as weight 1 at slot 1 and zero pads in the remaining slots, with every slot carrying the evaluation point's own index (in-bounds by construction). Converting with `sparse(W)` combines duplicate indices, so these padded columns collapse to single-entry identity rows — exactly what the previous sparse storage produced.
 
@@ -228,5 +230,6 @@ Hermite interpolation modifies the collocation matrix to incorporate boundary op
 | Improve parallelism or batching | `execution.jl` |
 | Add a new operator entry point | `api.jl` |
 | Understand ELL allocation | `execution.jl` → `allocate_ell` |
-| Change weight storage or the apply kernels | `src/stencil_weights.jl` → `StencilWeights`, `mul!` |
+| Change weight storage or the apply kernels | `src/ellsparse/` → `EllSparse.SellMatrix`, `mul!` |
+| Change RBF-specific weight policy | `src/stencil_weights.jl` → `StencilWeights` wrapper |
 | Debug a specific stencil | `assembly.jl` → `_build_stencil!` |

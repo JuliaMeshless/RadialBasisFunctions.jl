@@ -26,6 +26,7 @@ Beyond interpolation, it provides differential operators (Laplacian, gradient, d
 Other things that might matter to you:
 - Stencil-wise (ELL) weight storage with a multithreaded gather kernel for evaluation — several times faster than a sparse matrix-vector product; `sparse(op)` converts to `SparseMatrixCSC` for global system assembly and implicit solves
 - GPU evaluation via [Adapt.jl](https://github.com/JuliaGPU/Adapt.jl) — weights build on CPU, then `cu(op)` moves the operator to the device where evaluation runs as a [KernelAbstractions.jl](https://github.com/JuliaGPU/KernelAbstractions.jl) kernel ([full GPU tracking issue](https://github.com/JuliaMeshless/RadialBasisFunctions.jl/issues/88))
+- A self-contained generic SELL-C/ELL sparse storage module (`RadialBasisFunctions.EllSparse`) backing the weight storage — slice height in the type domain unifies the CPU (C = 1) and GPU-coalesced (C = 32) orientations, with deterministic atomics-free adjoints
 - Native autodiff rules for [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl) (no generic fallbacks)
 - [Lux.jl](https://github.com/LuxDL/Lux.jl) integration — `RBFLayer` for neural networks with radial basis function activations
 - Operator algebra — combine operators with `+`, `-`, `*`
