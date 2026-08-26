@@ -45,7 +45,9 @@ function _sell_mul!(
 end
 
 # Below this row count the tens-of-µs task-spawn floor of @threads outweighs the row
-# work, so single-row probes and small matrices take the serial SIMD loop.
+# work, so single-row probes and small matrices take the serial SIMD loop. The value is
+# an order-of-magnitude estimate, not a tuned optimum: the two cost curves are nearly
+# equal near the crossover, so its exact (machine-dependent) location barely matters.
 const _SELL_SERIAL_CUTOFF = 4096
 
 # CPU fast path for uniform unpadded C == 1: plain threads + SIMD over the contiguous
