@@ -51,6 +51,9 @@ storage is bit-identical to a column-major `k × m` matrix whose column `i` hold
     synchronize once).
   - cuSPARSE interop: their SELL uses sentinel `-1` and 0-based offsets; a future CUDA
     extension converts at the boundary.
+  - Parallel transpose-map build (a chunked counting sort with per-chunk cursors can
+    preserve the ascending-position order, but the build is a once-per-structure host
+    pass dwarfed by weight computation — not worth risking the order contract).
 """
 module EllSparse
 
