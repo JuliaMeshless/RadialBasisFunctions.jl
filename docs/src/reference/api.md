@@ -24,3 +24,12 @@ Modules = [RadialBasisFunctions]
 Public = false
 Order   = [:function, :type, :constant]
 ```
+
+## EllSparse
+
+Self-contained SELL-C/ELL sparse storage backing the stencil weight matrices. Not re-exported — reach these names as `RadialBasisFunctions.EllSparse.<name>`.
+
+```@autodocs
+Modules = [RadialBasisFunctions.EllSparse]
+Order   = [:module, :type, :function]
+```
