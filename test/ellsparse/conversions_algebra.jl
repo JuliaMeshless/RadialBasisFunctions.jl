@@ -7,10 +7,20 @@ on both sides, and the `\` guardrail through sparse.
 
 using RadialBasisFunctions
 using RadialBasisFunctions.EllSparse
+using Adapt
 using LinearAlgebra
 using SparseArrays
 using Random: MersenneTwister
 using Test
+using JLArrays
+import KernelAbstractions
+# JLArrays runs kernels synchronously but omits synchronize(::JLBackend); a no-op
+# shim lets the generic device path run under test. hasmethod-guarded: @safetestset
+# modules share the global method table, so an unguarded shim in every file would
+# overwrite the method once per testset.
+if !hasmethod(KernelAbstractions.synchronize, Tuple{JLArrays.JLBackend})
+    KernelAbstractions.synchronize(::JLArrays.JLBackend) = nothing
+end
 
 rng = MersenneTwister(67)
 
@@ -94,6 +104,35 @@ end
     d = randn(rng, m)
     @test sparse(Diagonal(d) * Au) == Diagonal(d) * sparse(Au)
     @test structure(Diagonal(d) * Au) === structure(Au)
+end
+
+# The two Diagonal paths dispatch on backend: CPU takes the explicit loops above,
+# every other backend goes through _scale_rows_kernel! / _scale_cols_kernel!. Only a
+# device run exercises those kernels at all, so a scaling bug there would otherwise
+# reach GPU users untested.
+@testset "device Diagonal scaling (JLArrays): C = $C" for C in (1, 2, 32)
+    A = SellMatrix(S_ragged, Val(C))
+    A_d = Adapt.adapt(JLArray, A)
+    d_rows = randn(rng, size(A, 1))
+    d_cols = randn(rng, size(A, 2))
+
+    # Diagonal * A has a broadcast fast path, but only for C == 1 with a uniform width.
+    # S_ragged is ragged, so width == 0 there and even C == 1 routes through _scale_rows
+    # — i.e. the device kernel. Assert it, so this stays a kernel test if the fixture
+    # ever changes. For C > 1 no fast path exists and dispatch reaches _scale_rows
+    # unconditionally.
+    C == 1 && @test structure(A).width == 0
+
+    row_d = Diagonal(d_rows) * A_d
+    col_d = A_d * Diagonal(d_cols)
+    @test row_d isa SellMatrix
+    @test col_d isa SellMatrix
+    # values only: the device structure is a separate object holding device arrays
+    @test Array(vec(parent(row_d))) == vec(parent(Diagonal(d_rows) * A))
+    @test Array(vec(parent(col_d))) == vec(parent(A * Diagonal(d_cols)))
+    # sentinel slots must survive scaling as exact zeros on device too
+    @test sparse(Adapt.adapt(Array, row_d)) == Diagonal(d_rows) * S_ragged
+    @test sparse(Adapt.adapt(Array, col_d)) == S_ragged * Diagonal(d_cols)
 end
 
 @testset "sparse mixing stays sparse (anti-densification)" begin

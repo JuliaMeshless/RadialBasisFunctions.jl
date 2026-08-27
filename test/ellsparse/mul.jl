@@ -95,6 +95,19 @@ end
     @test y_big[1:m_small] == y_small
     # repeated applies are deterministic
     @test A_big * x == y_big
+
+    # C = 1 above takes the uniform fast path (_uniform_ell_mul!); C > 1 falls to the
+    # generic slice loop, which has its own threaded branch. Reslicing keeps every row's
+    # slot sequence and values, so the same big-threaded-vs-small-serial comparison is
+    # exact. m_slice is slice-aligned so both matrices agree on slice boundaries.
+    m_slice = 512
+    A32_big = reslice(A_big, Val(32))
+    A32_small = reslice(SellMatrix(vals[:, 1:m_slice], idx[:, 1:m_slice], n), Val(32))
+    y32_big = A32_big * x
+    @test length(y32_big) >= EllSparse._SELL_SERIAL_CUTOFF  # threaded when nthreads > 1
+    @test m_slice < EllSparse._SELL_SERIAL_CUTOFF           # serial
+    @test y32_big[1:m_slice] == A32_small * x
+    @test A32_big * x == y32_big
 end
 
 @testset "inference and eltype" begin
