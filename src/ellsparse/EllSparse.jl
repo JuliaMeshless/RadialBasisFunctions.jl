@@ -29,7 +29,7 @@ storage is bit-identical to a column-major `k × m` matrix whose column `i` hold
 
   - One type covers both orientations: slice height `C` lives in the type domain
     (`SellMatrix{T, C, ...}`), with [`EllMatrix`](@ref) = `SellMatrix{T, 1}` as an
-    alias. Layout changes are explicit via [`reslice`](@ref); [`Adapt.adapt`](@ref)
+    alias. Layout changes are explicit via [`reslice`](@ref); `Adapt.adapt`
     never changes layout (a data move must not change adjoint summation order).
   - Classic single-slice slot-major ELL is intentionally absent — it was only ever a
     GPU format (slot-major striding is cache-hostile for CPU row applies, where
