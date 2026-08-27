@@ -8,6 +8,7 @@ using SparseArrays
 using Random: MersenneTwister, randperm
 using StaticArraysCore
 using Test
+using JLArrays
 
 rng = MersenneTwister(123)
 
@@ -177,6 +178,30 @@ end
     Wr2 = StencilWeights(2 .* reverse(vals; dims = 1), reordered_idx, n_data)
     @test Wr2 != W
     @test !(Wr2 ≈ W)
+end
+
+@testset "copyto! shape and backend guards" begin
+    # A different stencil width k is invisible to the (N_eval, N_data) size check and to
+    # the layout check, so the value-length guard inside the same-layout branch is the
+    # only thing between a k = 5 source and a silently truncated copy.
+    wide_idx = Int32.(reduce(hcat, [randperm(rng, n_data)[1:(k + 1)] for _ in 1:n_eval]))
+    wide = StencilWeights(randn(rng, k + 1, n_eval), wide_idx, n_data)
+    @test size(wide) == size(W)
+    @test_throws DimensionMismatch copyto!(copy(W), wide)
+
+    # A backend mismatch routes to the orientation-aware path, which permutes values on
+    # host before one bulk upload. A device-resident source has no host values to permute,
+    # so it is refused rather than scalar-indexed element by element.
+    W_dev = Adapt.adapt(JLArray, W)
+    @test !(KernelAbstractions.get_backend(W_dev) isa CPU)
+    @test_throws ArgumentError copyto!(copy(W), W_dev)
+
+    # Same orientation-aware path with a legitimate host source: the width mismatch
+    # survives the reslice into the destination layout and is caught after it.
+    dest32 = StencilWeights(RBF.EllSparse.reslice(W.ell, Val(32)))
+    @test RBF.EllSparse.slice_height(dest32.ell) == 32
+    @test size(dest32) == size(wide)
+    @test_throws DimensionMismatch copyto!(dest32, wide)
 end
 
 @testset "Backslash Guardrail" begin
