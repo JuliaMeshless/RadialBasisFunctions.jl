@@ -1,0 +1,19 @@
+# Julia's coverage instrumentation is line-based, and several constructs never register
+# a hit on the line they occupy: KernelAbstractions `@kernel function` signatures, the
+# `i = @index(Global)` line inside a kernel, and the closing `end` of `@simd` and
+# `Threads.@threads` blocks. Their bodies are counted normally, so a genuinely untested
+# kernel still shows up — but a kernel-heavy patch lands a couple of points under
+# project coverage no matter how thoroughly it is tested.
+#
+# Keep `target: auto` so coverage regressions are still caught, and give patch enough
+# threshold to absorb that fixed macro overhead rather than excluding the files (which
+# would hide real gaps in exactly the code that most needs them).
+coverage:
+    status:
+        project:
+            default:
+                threshold: 1%
+        patch:
+            default:
+                target: auto
+                threshold: 3%
