@@ -98,6 +98,18 @@ end
     A_small = SellMatrix(vals[:, 1:100], idx[:, 1:100], n)
     v_small = v[1:100]
     @test A_small' * v_small == reference_adjoint(A_small, v_small)
+
+    # The C = 1 fixture above rides the uniform gather; the rows-path adjoint has its
+    # own threaded loop. Reslicing preserves the map sequence, so the same serial
+    # oracle still applies bitwise — this is a threaded-vs-serial parity check for the
+    # generic-C branch, not a cross-layout comparison.
+    A32 = reslice(A, Val(32))
+    @test structure(A32).tmap.rows !== nothing
+    y32 = A32' * v
+    @test y32 == reference_adjoint(A32, v)
+    for _ in 1:5
+        @test A32' * v == y32
+    end
 end
 
 @testset "rows-path vs uniform-path agreement" begin
@@ -135,6 +147,32 @@ end
     # adapt preserves the map sequence, so the device gather is bitwise-equal
     @test Array(y_d) == A' * v
     V = randn(rng, size(A, 1), 2)
+    @test Array(A_d' * JLArray(V)) == A' * V
+end
+
+# The ragged fixture above stores `rows` at every C (width == 0 defeats the uniform
+# form), so it can only reach the rows kernel. A uniform stencil-shaped matrix is the
+# only way to exercise the device uniform gather, which recovers the row arithmetically
+# as (q - 1) ÷ k + 1 instead of reading it — a distinct kernel with its own indexing.
+@testset "device adjoint, uniform gather (JLArrays)" begin
+    k, m, n = 4, 9, 7
+    vals_u = randn(rng, k, m)
+    idx_u = Int32.(reduce(hcat, [rand(rng, 1:n, k) for _ in 1:m]))
+    A = SellMatrix(vals_u, idx_u, n)
+    @test structure(A).tmap.rows === nothing   # else this silently retests the rows path
+    @test structure(A).width == k
+
+    A_d = Adapt.adapt(JLArray, A)
+    @test structure(A_d).tmap.rows === nothing
+
+    v = randn(rng, m)
+    y_d = A_d' * JLArray(v)
+    @test y_d isa JLArray
+    # adapt preserves the map sequence, so the device gather is bitwise-equal to host
+    @test Array(y_d) == A' * v
+    @test Array(y_d) == reference_adjoint(A, v)
+
+    V = randn(rng, m, 2)
     @test Array(A_d' * JLArray(V)) == A' * V
 end
 
