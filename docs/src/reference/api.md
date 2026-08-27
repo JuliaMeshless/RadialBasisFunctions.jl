@@ -27,9 +27,9 @@ Order   = [:function, :type, :constant]
 
 ## EllSparse
 
-Self-contained SELL-C/ELL sparse storage backing the stencil weight matrices. Not re-exported — reach these names as `RadialBasisFunctions.EllSparse.<name>`.
+Self-contained SELL-C/ELL sparse storage backing the stencil weight matrices. Not re-exported — reach these names as `RadialBasisFunctions.EllSparse.<name>`. See the [internals](internals.md) for how it fits the weight pipeline.
 
 ```@autodocs
 Modules = [RadialBasisFunctions.EllSparse]
-Order   = [:module, :type, :function]
+Order   = [:module, :type, :function, :constant]
 ```
