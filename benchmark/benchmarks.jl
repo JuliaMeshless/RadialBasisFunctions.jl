@@ -41,11 +41,13 @@ end
 # SELL orientation axis: the same weights at slice height 1 (today's CPU layout) vs 32
 # (the coalesced device layout). SELL-32 losing on CPU is the axis working — the GPU
 # side of the comparison is benchmark/sell_gpu.jl (manual, needs CUDA hardware).
-# Guarded because AirspeedVelocity replays this script against baseline revisions that
-# predate the EllSparse module; never reference EllSparse names in unguarded entries.
-if isdefined(RadialBasisFunctions, :EllSparse)
+# Guarded because AirspeedVelocity replays this script against baseline revisions. The
+# EllSparse module landed one PR before the `.ell` field, so probe the FIELD, not the
+# module; never reference EllSparse names in unguarded entries.
+W_ell = weights(∇²)
+if isdefined(RadialBasisFunctions, :EllSparse) && hasproperty(W_ell, :ell)
     let ES = RadialBasisFunctions.EllSparse
-        A_sell1 = weights(∇²).ell          # StencilWeights wraps a SellMatrix at C = 1
+        A_sell1 = W_ell.ell                # StencilWeights wraps a SellMatrix at C = 1
         A_sell32 = ES.reslice(A_sell1, Val(32))
         reslice_f = ES.reslice
         SUITE["Laplacian"]["eval (SELL-1)"] = @benchmarkable $A_sell1 * $y
