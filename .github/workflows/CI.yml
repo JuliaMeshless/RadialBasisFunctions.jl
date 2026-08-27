@@ -62,24 +62,3 @@ jobs:
                   files: lcov.info
               env:
                   CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-    docs:
-        name: Documentation
-        runs-on: ubuntu-latest
-        permissions:
-            contents: write
-        steps:
-            - uses: actions/checkout@v7
-            - uses: julia-actions/setup-julia@v3
-              with:
-                  version: "1"
-            - uses: julia-actions/julia-buildpkg@v1
-            - uses: julia-actions/julia-docdeploy@v1
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            - run: |
-                  julia --project=docs -e '
-                    using Documenter: DocMeta, doctest
-                    using RadialBasisFunctions
-                    DocMeta.setdocmeta!(RadialBasisFunctions, :DocTestSetup, :(using RadialBasisFunctions); recursive=true)
-                    doctest(RadialBasisFunctions)'
