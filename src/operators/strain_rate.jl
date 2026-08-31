@@ -42,7 +42,7 @@ end
 # ============================================================================
 
 """
-    strain_rate(data; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl, hermite)
+    strain_rate(data; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl)
 
 Build a `RadialBasisOperator` for the symmetric strain rate tensor
 εᵢⱼ = ½(∂uᵢ/∂xⱼ + ∂uⱼ/∂xᵢ).

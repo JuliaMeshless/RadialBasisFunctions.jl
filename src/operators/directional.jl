@@ -10,7 +10,7 @@ Directional{Dim}(v) where {Dim} = Directional{Dim, typeof(v)}(v)
 
 # Primary interface using unified keyword constructor
 """
-    directional(data, v; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl, hermite)
+    directional(data, v; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl)
 
 Build a `RadialBasisOperator` for the directional derivative (∇f⋅v).
 
@@ -81,50 +81,11 @@ function _combine_directional_weights(weights, v, Dim::Int)
     end
 end
 
-# Custom _build_weights: standard (non-Hermite) path
+# Custom _build_weights: build the Jacobian, then contract with the direction vector
 function _build_weights(ℒ::Directional{Dim}, data, eval_points, adjl, basis; device = CPU()) where {Dim}
     v = ℒ.v
     _validate_directional_vector(v, Dim, length(data))
     weights = _build_weights(Jacobian{Dim}(), data, eval_points, adjl, basis; device = device)
-    return _combine_directional_weights(weights, v, Dim)
-end
-
-# Custom _build_weights: Hermite path (with boundary conditions)
-function _build_weights(
-        ℒ::Directional{Dim},
-        data::AbstractVector,
-        eval_points::AbstractVector,
-        adjl::AbstractVector,
-        basis::AbstractRadialBasis,
-        is_boundary::AbstractVector{Bool},
-        boundary_conditions::AbstractVector{<:BoundaryCondition},
-        normals::AbstractVector{<:AbstractVector};
-        device = CPU(),
-    ) where {Dim}
-    v = ℒ.v
-    _validate_directional_vector(v, Dim, length(data))
-
-    # Build jacobian weights using Hermite method
-    dim = length(first(data))
-    mon = MonomialBasis(dim, basis.poly_deg)
-    jacobian_op = Jacobian{Dim}()
-    ℒmon = jacobian_op(mon)
-    ℒrbf = jacobian_op(basis)
-
-    weights = _build_weights(
-        data,
-        eval_points,
-        adjl,
-        basis,
-        ℒrbf,
-        ℒmon,
-        mon,
-        is_boundary,
-        boundary_conditions,
-        normals;
-        device = device,
-    )
-
     return _combine_directional_weights(weights, v, Dim)
 end
 

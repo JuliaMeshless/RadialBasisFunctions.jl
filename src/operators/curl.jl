@@ -50,7 +50,7 @@ end
 # ============================================================================
 
 """
-    curl(data; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl, hermite)
+    curl(data; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl)
 
 Build a `RadialBasisOperator` for the curl (∇×u).
 

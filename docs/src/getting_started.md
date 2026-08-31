@@ -158,12 +158,6 @@ result = combined(y)
 typeof(result)
 ```
 
-## Enforcing Boundary Conditions
-
-For PDE applications, operators support Hermite interpolation to enforce Dirichlet,
-Neumann, or Robin conditions at boundary nodes. See [Boundary Conditions](@ref) for the
-condition types and the `hermite` keyword.
-
 ## Where to Next
 
 - [Operators & Type Hierarchy](@ref) — the operator system, rank semantics, and virtual operators

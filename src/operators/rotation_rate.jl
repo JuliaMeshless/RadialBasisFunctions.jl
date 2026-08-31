@@ -37,7 +37,7 @@ end
 # ============================================================================
 
 """
-    rotation_rate(data; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl, hermite)
+    rotation_rate(data; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl)
 
 Build a `RadialBasisOperator` for the anti-symmetric rotation rate tensor
 ωᵢⱼ = ½(∂uᵢ/∂xⱼ − ∂uⱼ/∂xᵢ).

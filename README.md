@@ -21,7 +21,7 @@
 
 RBF methods approximate functions from scattered data without requiring a mesh. This package focuses on **local collocation** — building stencils from k-nearest neighbors instead of coupling all N points — so it scales to large problems without dense N×N solves.
 
-Beyond interpolation, it provides differential operators (Laplacian, gradient, divergence, curl, Hessian, partials, custom) that act directly on scattered data, with support for Hermite interpolation to enforce boundary conditions in PDE applications.
+Beyond interpolation, it provides differential operators (Laplacian, gradient, divergence, curl, Hessian, partials, custom) that act directly on scattered data.
 
 Other things that might matter to you:
 - Stencil-wise (ELL) weight storage with a multithreaded gather kernel for evaluation — several times faster than a sparse matrix-vector product; `sparse(op)` converts to `SparseMatrixCSC` for global system assembly and implicit solves
@@ -87,7 +87,7 @@ Pkg.add("RadialBasisFunctions")
 Requires Julia 1.10 or later.
 
 > [!TIP]
-> The examples above use sensible defaults (`PHS(3)` basis, quadratic polynomial augmentation, auto-selected stencil size). All of these are configurable — see the **[Getting Started guide](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/getting_started)** for details on choosing a basis function, stencil size (`k`), polynomial degree, Hermite boundary conditions, and more.
+> The examples above use sensible defaults (`PHS(3)` basis, quadratic polynomial augmentation, auto-selected stencil size). All of these are configurable — see the **[Getting Started guide](https://JuliaMeshless.github.io/RadialBasisFunctions.jl/stable/getting_started)** for details on choosing a basis function, stencil size (`k`), polynomial degree, and more.
 
 ## Documentation
 

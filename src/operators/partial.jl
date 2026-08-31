@@ -11,7 +11,7 @@ end
 
 # Primary interface using unified keyword constructor
 """
-    partial(data, order, dim; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl, hermite)
+    partial(data, order, dim; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl)
 
 Build a `RadialBasisOperator` for a partial derivative.
 

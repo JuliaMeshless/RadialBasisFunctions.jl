@@ -244,4 +244,3 @@ factor.
 
 - [Building PDE Operators](@ref) — compose operators with [`@operator`](@ref)
 - [Custom Operators](@ref "Custom Operators") — the closure escape hatch for anything the macro can't express
-- [Boundary Conditions](@ref) — Hermite interpolation at boundary nodes

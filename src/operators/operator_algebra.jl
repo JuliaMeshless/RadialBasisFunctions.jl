@@ -19,33 +19,23 @@ print_op(::Identity) = "Identity (f)"
 """
     SumKernel{Fs<:Tuple}
 
-Callable summing component basis actions. Supports the standard `(x, xᵢ)` form and
-the Hermite normal form `(x, xᵢ, normal)`.
+Callable summing component basis actions.
 """
 struct SumKernel{Fs <: Tuple}
     fs::Fs
 end
 (k::SumKernel)(x, xᵢ) = sum(f -> f(x, xᵢ), k.fs)
-(k::SumKernel)(x, xᵢ, normal) = sum(f -> f(x, xᵢ, normal), k.fs)
 
 """
     ScaledKernel{T<:Number, F}
 
-Callable scaling a basis action by `α`. Supports the standard `(x, xᵢ)` form and
-the Hermite normal form `(x, xᵢ, normal)`.
+Callable scaling a basis action by `α`.
 """
 struct ScaledKernel{T <: Number, F}
     α::T
     f::F
 end
 (k::ScaledKernel)(x, xᵢ) = k.α * k.f(x, xᵢ)
-(k::ScaledKernel)(x, xᵢ, normal) = k.α * k.f(x, xᵢ, normal)
-
-# Normal-form support is determined by the wrapped actions, not the kernel methods
-function _supports_normal_form(k::SumKernel, x, n)
-    return all(f -> _supports_normal_form(f, x, n), k.fs)
-end
-_supports_normal_form(k::ScaledKernel, x, n) = _supports_normal_form(k.f, x, n)
 
 # Monomial equivalents: in-place `(b, x)` form, wrapped in ℒMonomialBasis
 struct MonomialSumKernel{Fs <: Tuple} <: Function

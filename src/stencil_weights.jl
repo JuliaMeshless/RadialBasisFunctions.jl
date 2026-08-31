@@ -21,11 +21,11 @@ The index structure is frozen after construction (`update_weights!` rewrites onl
 values), and all components of a gradient-family operator share one
 `EllSparse.SellStructure` — one index matrix and one precomputed transpose map — which
 makes the adjoint apply `W' * x` a deterministic row-parallel gather.
-Dirichlet boundary rows are padded to k slots: weight 1 at slot 1 with index
-`eval_idx`, zeros (with the same in-bounds index) elsewhere.
+A row may be padded to k slots — a single nonzero at slot 1, zeros elsewhere all
+sharing that same in-bounds index — to express an identity row in a fixed-k layout.
 
 Use [`sparse`](@ref) / `SparseMatrixCSC` to convert to a sparse matrix for global
-system assembly; duplicate padded indices combine, so Dirichlet rows convert to
+system assembly; duplicate padded indices combine, so padded rows convert to
 1-entry identity rows exactly as the previous sparse storage produced.
 """
 struct StencilWeights{T, E <: SellMatrix{T}} <: AbstractMatrix{T}
@@ -221,7 +221,7 @@ Base.:\(W::StencilWeights, b::AbstractVecOrMat) = sparse(W) \ b
 # Conversions (device-resident weights route through a host copy inside EllSparse)
 Base.Matrix(W::StencilWeights) = Matrix(W.ell)
 
-# sparse() sums duplicates, so Dirichlet-padded columns (all slots share one index)
+# sparse() sums duplicates, so padded columns (all slots share one index)
 # collapse to single identity entries; explicit zeros elsewhere are retained, matching
 # the previous COO-built storage bit-for-bit.
 SparseArrays.sparse(W::StencilWeights) = sparse(W.ell)

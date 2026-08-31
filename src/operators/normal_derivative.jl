@@ -1,5 +1,5 @@
 """
-    normal_derivative(data, normals; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl, hermite)
+    normal_derivative(data, normals; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl)
 
 Build a `RadialBasisOperator` for the normal derivative (∇f⋅n̂).
 

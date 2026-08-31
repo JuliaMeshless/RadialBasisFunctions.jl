@@ -88,50 +88,6 @@ See (Flyer, et al. - On the role of polynomials in RBF-FD approximations: I. Int
 
 The traditional Kansa approach used in most RBF methods is based on constructing a unique interpolant for all the nodes in the domain. This involves coupling all nodes in the domain simultaneously and therefore makes it a _global_ method. Such a global approach, while theoretically exact, scales poorly: the resulting dense system becomes prohibitively expensive and increasingly ill-conditioned as the number of nodes grows, particularly in 3D, due to the curse of dimensionality. Instead, RadialBasisFunctions.jl employs a _local_ approach, where each node is influenced only by its $k$ nearest neighbors.
 
-## Boundary Condition Formulations
-
-Radial Basis Functions can also be used to solve PDEs with various types of boundary conditions (Dirichlet, Neumann, Robin, etc.), when this is done in a meshless context, special considerations must be made to ensure that all local systems, including those near boundaries, remain well-posed.
-This package enables different approaches for handling boundary conditions, among them, the Hermite approach is suggested when the PDE is to be solved only at interior nodes. Furthermore, it can also be used to interpolate data near the boundary while including boundary conditions where these are known.
-
-### Hermite Approach for Boundary Stencils
-
-When a stencil is **centered around an internal node but includes boundary nodes**, standard RBF collocation can lead to ill-conditioning and singularity issues. This occurs because applying boundary operators $\mathcal{B}$ (such as normal derivatives for Neumann conditions) to the interpolation conditions breaks the symmetry of the local matrix $\mathbf{A}$.
-
-**The RBF-HFD (Hermite Finite Difference) method resolves this issue by modifying the basis functions only for stencils near boundaries.** Instead of keeping the same basis regardless of boundary conditions and applying the operator to the interpolation conditions (which creates asymmetry), the Hermite approach modifies the basis itself.
-
-For a stencil with $m_I$ internal nodes and $m_B$ boundary nodes ($m = m_I + m_B$), the approximate solution $u^h$ (the RBF interpolant) takes the form:
-
-```math
-u^h(\mathbf{x}_c) = \sum_{j=1}^{m_I} \alpha_j \phi(\lvert \mathbf{x}_c - \mathbf{x}_j \rvert) + \sum_{j=m_I+1}^{m} \alpha_j \mathcal{B}_2 \phi(\lvert \mathbf{x}_c - \mathbf{x}_j \rvert) + \sum_{k=1}^{N_p} \gamma_k p_k(\mathbf{x}_c)
-```
-
-where $\mathbf{x}_c$ is the stencil center (evaluation point), $\alpha_j$ are RBF coefficients, $\gamma_k$ are polynomial coefficients, and $\mathcal{B}_2$ denotes the boundary operator applied to the second argument of the kernel (i.e., to $\mathbf{x}_j$), and $\mathcal{B}_1$ denotes application to the first argument (i.e., to $\mathbf{x}_c$). The key insight is that **the basis function is changed** from $\phi(\cdot, \mathbf{x}_j)$ to $\mathcal{B}_2 \phi(\cdot, \mathbf{x}_j)$ for boundary nodes.
-
-The local system becomes:
-
-```math
-\left[\begin{array}{ccc}
-\mathbf{A}_{I,I} & \mathcal{B}_2\mathbf{A}_{I,B} & \mathbf{P}_I \\
-\mathcal{B}_1\mathbf{A}_{B,I} & \mathcal{B}_1\mathcal{B}_2\mathbf{A}_{B,B} & \mathcal{B}\mathbf{P}_B \\
-\mathbf{P}_I^\mathrm{T} & (\mathcal{B}\mathbf{P}_B)^\mathrm{T} & 0
-\end{array}\right]
-\left[\begin{array}{c}
-\boldsymbol{\alpha}_I \\
-\boldsymbol{\alpha}_B \\
-\boldsymbol{\gamma}
-\end{array}\right]
-=
-\left[\begin{array}{c}
-\mathbf{u}_I \\
-\mathbf{g} \\
-0
-\end{array}\right]
-```
-
-where subscripts $I$ and $B$ denote internal and boundary quantities, respectively. The matrix blocks $\mathbf{A}_{I,I}$, $\mathbf{A}_{I,B}$, $\mathbf{A}_{B,I}$, and $\mathbf{A}_{B,B}$ represent RBF evaluations between internal-internal, internal-boundary, boundary-internal, and boundary-boundary nodes. The vectors $\boldsymbol{\alpha}_I$ and $\boldsymbol{\alpha}_B$ are the RBF coefficients for internal and boundary nodes, $\boldsymbol{\gamma}$ are the polynomial coefficients, $\mathbf{u}_I$ contains function values at internal nodes, and $\mathbf{g}$ contains boundary condition values. **This system is now symmetric and positive definite** (for appropriate RBF kernels), ensuring unique solvability regardless of the boundary condition type.
-
-We remark that the Hermite approach is **only applied to stencils that include boundary nodes**. For internal stencils far from boundaries, the standard RBF formulation remains unchanged, maintaining computational efficiency where boundary effects are not present.
-
 ## Constructing an Operator
 
 In the Radial Basis Function - Finite Difference method (RBF-FD), a stencil is built to approximate derivatives using the same neighborhoods/subdomains of $N$ points.
@@ -196,74 +152,6 @@ where $\boldsymbol{\lambda}$ are treated as Lagrange multipliers and are discard
 ```
 
 where $\mathcal{L}\boldsymbol{\phi}$ is the vector of the operator applied to each RBF basis function evaluated at the stencil nodes, and $\mathcal{L}\mathbf{p}$ is the vector of the operator applied to each polynomial basis function.
-
-### Hermite Operator Construction
-
-When constructing operators for stencils near boundaries using the Hermite approach, the system is modified to:
-
-```math
-\left[\begin{array}{ccc}
-\mathbf{A}_{I,I} & \mathcal{B}_2\mathbf{A}_{I,B} & \mathbf{P}_I \\
-\mathcal{B}_1\mathbf{A}_{B,I} & \mathcal{B}_1\mathcal{B}_2\mathbf{A}_{B,B} & \mathcal{B}\mathbf{P}_B \\
-\mathbf{P}_I^\mathrm{T} & (\mathcal{B}\mathbf{P}_B)^\mathrm{T} & 0
-\end{array}\right]
-\left[\begin{array}{c}
-\mathbf{w}_I \\
-\mathbf{w}_B \\
-\boldsymbol{\lambda}
-\end{array}\right]
-=
-\left[\begin{array}{c}
-\mathcal{L}_1\boldsymbol{\phi}(\mathbf{x}_c, \mathcal{X}_I) \\
-\mathcal{L}_1\mathcal{B}_2\boldsymbol{\phi}(\mathbf{x}_c, \mathcal{X}_B) \\
-\mathcal{L}\mathbf{p}(\mathbf{x}_c)
-\end{array}\right]
-```
-
-where $\mathcal{L}_1$ denotes the differential operator applied to the first argument of the kernel, $\mathcal{X}_I$ is the set of internal nodes in the stencil, and $\mathcal{X}_B$ is the set of boundary nodes in the stencil. This yields weight vectors $\mathbf{w}_I$ and $\mathbf{w}_B$ that properly account for boundary conditions while maintaining symmetry. The global system assembly then proceeds as:
-
-```math
-\mathcal{L}u^h(\mathbf{x}_i) = \sum_{j \in \mathcal{X}_{i,I}} w_j(\mathbf{x}_i) u(\mathbf{x}_j) + \sum_{j \in \mathcal{X}_{i,B}} w_j(\mathbf{x}_i) g(\mathbf{x}_j)
-```
-
-where $g(\mathbf{x}_j)$ represents the boundary condition values at boundary nodes.
-
-### Constructing an Operator Treating Boundary Nodes as Unknowns
-
-In some applications, particularly multi-region or coupled problems, it may be advantageous to solve the governing equation at boundary nodes as well, treating **all nodes (interior and boundary) as unknowns** in the global system. When this strategy is adopted, an alternative implementation to the Hermite approach becomes available and the usual interpolation scheme can be preserved.
-
-Rather than modifying the basis functions for boundary nodes, this approach **maintains the standard RBF basis** $\{\phi(\lvert \mathbf{x} - \mathbf{x}_j \rvert)\}$ for all nodes regardless of their position.
-When treating boundary nodes as unknowns in the global system, the operator construction simplifies significantly. The key distinctions are:
-
-- **When the stencil includes boundary nodes but the evaluation point is interior**: Apply the standard RBF-FD method unchanged. Boundary neighbors contribute as regular unknowns with no special treatment.
-
-- **When the evaluation point itself is on the boundary**: Instead of modifying basis functions, modify the **right-hand side** of the local system. For a boundary point $\mathbf{x}_c$ (the stencil center) with operator $\mathcal{B}$, construct the RHS as $\mathcal{B}\boldsymbol{\phi}(\mathbf{x}_c)$ and $\mathcal{B}\mathbf{p}(\mathbf{x}_c)$ rather than using the standard differential operator.
-
-This means the collocation matrix $\mathbf{A}$ always uses the standard kernel evaluation:
-
-```math
-[\mathbf{A}]_{ij} = \phi(\lvert \mathbf{x}_i - \mathbf{x}_j \rvert)
-```
-
-maintaining symmetry trivially. The local system for a boundary evaluation point becomes:
-
-```math
-\left[\begin{array}{cc}
-\mathbf{A} & \mathbf{P} \\
-\mathbf{P}^\mathrm{T} & 0
-\end{array}\right]
-\left[\begin{array}{cc}
-\mathbf{w} \\
-\boldsymbol{\lambda}
-\end{array}\right]
-=
-\left[\begin{array}{cc}
-\mathcal{B}\boldsymbol{\phi}(\mathbf{x}_c) \\
-\mathcal{B}\mathbf{p}(\mathbf{x}_c)
-\end{array}\right]
-```
-
-This approach is **significantly simpler than the Hermite method** and stencil classification depends only on the evaluation point type, the same RBF basis is used everywhere, and interior stencils with boundary neighbors require no special treatment.
 
 ## References
 

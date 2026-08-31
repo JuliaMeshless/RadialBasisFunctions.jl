@@ -80,43 +80,6 @@ end
             @test Δx ≈ sparse(lap)' * Δy
         end
 
-        @testset "Operator eval differentiation with Hermite boundary conditions" begin
-            # 12-point domain with 2 Dirichlet boundary points (test/hermite.jl fixture)
-            data = [
-                SVector(0.0, 0.0),   # boundary
-                SVector(0.15, 0.1),  # interior
-                SVector(0.2, 0.25),  # interior
-                SVector(0.3, 0.15),  # interior
-                SVector(0.4, 0.3),   # interior
-                SVector(0.5, 0.2),   # interior
-                SVector(0.6, 0.35),  # interior
-                SVector(0.7, 0.25),  # interior
-                SVector(0.75, 0.15), # interior
-                SVector(0.85, 0.3),  # interior
-                SVector(0.9, 0.2),   # interior
-                SVector(1.0, 0.0),   # boundary
-            ]
-            is_boundary = [
-                true, false, false, false, false, false, false, false, false, false, false, true,
-            ]
-            bcs = [RadialBasisFunctions.Dirichlet(), RadialBasisFunctions.Dirichlet()]
-            normals = [SVector(1.0, 0.0), SVector(-1.0, 0.0)]
-
-            lap_h = laplacian(
-                data;
-                basis = PHS(3; poly_deg = 2),
-                hermite = (is_boundary = is_boundary, bc = bcs, normals = normals),
-            )
-            values_h = sin.(getindex.(data, 1)) .+ cos.(getindex.(data, 2))
-            loss_hermite(v) = sum(abs2, lap_h(v))
-
-            for (name, backend) in AD_BACKENDS
-                @testset "$name" begin
-                    test_gradient_vs_fd(loss_hermite, values_h, backend; rtol = 1.0e-4)
-                end
-            end
-        end
-
         @testset "Operator eval differentiation with distinct eval points" begin
             m = 20
             lap_r = laplacian(points; eval_points = points[1:m])
@@ -362,10 +325,10 @@ end
             N_3d = 64
             points_3d = [
                 SVector{3}(
-                        0.1 + 0.8 * ((i * 7 + 3) % N_3d) / N_3d,
-                        0.1 + 0.8 * ((i * 11 + 5) % N_3d) / N_3d,
-                        0.1 + 0.8 * ((i * 13 + 7) % N_3d) / N_3d,
-                    ) for i in 1:N_3d
+                    0.1 + 0.8 * ((i * 7 + 3) % N_3d) / N_3d,
+                    0.1 + 0.8 * ((i * 11 + 5) % N_3d) / N_3d,
+                    0.1 + 0.8 * ((i * 13 + 7) % N_3d) / N_3d,
+                ) for i in 1:N_3d
             ]
             adjl_3d = RadialBasisFunctions.find_neighbors(points_3d, 20)
             basis_3d = PHS(3; poly_deg = 2)
@@ -396,10 +359,10 @@ end
             N_3d_y = 64
             points_3d_y = [
                 SVector{3}(
-                        0.1 + 0.8 * ((i * 7 + 3) % N_3d_y) / N_3d_y,
-                        0.1 + 0.8 * ((i * 11 + 5) % N_3d_y) / N_3d_y,
-                        0.1 + 0.8 * ((i * 13 + 7) % N_3d_y) / N_3d_y,
-                    ) for i in 1:N_3d_y
+                    0.1 + 0.8 * ((i * 7 + 3) % N_3d_y) / N_3d_y,
+                    0.1 + 0.8 * ((i * 11 + 5) % N_3d_y) / N_3d_y,
+                    0.1 + 0.8 * ((i * 13 + 7) % N_3d_y) / N_3d_y,
+                ) for i in 1:N_3d_y
             ]
             adjl_3d_y = RadialBasisFunctions.find_neighbors(points_3d_y, 20)
             basis_3d_y = PHS(3; poly_deg = 2)
@@ -431,10 +394,10 @@ end
             N_3d_z = 64
             points_3d_z = [
                 SVector{3}(
-                        0.1 + 0.8 * ((i * 7 + 3) % N_3d_z) / N_3d_z,
-                        0.1 + 0.8 * ((i * 11 + 5) % N_3d_z) / N_3d_z,
-                        0.1 + 0.8 * ((i * 13 + 7) % N_3d_z) / N_3d_z,
-                    ) for i in 1:N_3d_z
+                    0.1 + 0.8 * ((i * 7 + 3) % N_3d_z) / N_3d_z,
+                    0.1 + 0.8 * ((i * 11 + 5) % N_3d_z) / N_3d_z,
+                    0.1 + 0.8 * ((i * 13 + 7) % N_3d_z) / N_3d_z,
+                ) for i in 1:N_3d_z
             ]
             adjl_3d_z = RadialBasisFunctions.find_neighbors(points_3d_z, 20)
             basis_3d_z = PHS(3; poly_deg = 2)

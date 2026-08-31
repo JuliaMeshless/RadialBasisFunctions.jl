@@ -5,6 +5,22 @@ All notable changes to RadialBasisFunctions.jl are documented here.
 This project follows [Semantic Versioning](https://semver.org/). While the package is pre-1.0, minor version
 bumps may contain breaking changes, and breaking changes are made without deprecation shims.
 
+## [0.9.0] — unreleased
+
+Breaking release: the Hermite (symmetric-collocation) boundary-condition path is removed. RadialBasisFunctions is now purely an operator/stencil library — it no longer carries a boundary-condition vocabulary, and it no longer takes surface normals as an operator input. Boundary conditions and their discretization belong to the consuming physics package (e.g. Macchiato.jl); geometry belongs to WhatsThePoint.jl.
+
+### Breaking
+
+- **The `hermite` keyword is removed from every operator constructor.** `laplacian(x; hermite=(is_boundary=…, bc=…, normals=…))` and the equivalent on `partial`, `mixed_partial`, `gradient`, `jacobian`, `hessian`, `directional`, `normal_derivative`, `divergence`, `curl`, `strain_rate`, `rotation_rate`, and `custom` no longer exist. Enforce boundary conditions at the assembly layer instead.
+- **The boundary-condition types are removed**: `BoundaryCondition`, `Dirichlet`, `Neumann`, `Robin`, `Internal`, and the predicates `α`, `β`, `is_dirichlet`, `is_neumann`, `is_robin`, `is_internal`. This also retires the `α`/`β` export collision with downstream physics packages.
+- **The Hermite machinery is removed**: `HermiteStencilData`, `update_hermite_stencil_data!`, `BoundaryData`, `classify_stencil`, `InteriorStencil`, `DirichletStencil`, `HermiteStencil`, and `construct_global_to_boundary`. `src/solve/types.jl` is deleted; its two surviving arity helpers moved to `src/solve/execution.jl`.
+- **The three-argument normal-form basis functors are removed** — `(op::∂{<:PHS})(x, xᵢ, normal)` and the `∇`/`∂²`/`∇²` equivalents across PHS1/3/5/7 (16 methods), along with `∂_Hermite` on the monomial basis and the `(x, xᵢ, normal)` methods on `SumKernel`/`ScaledKernel`. `∂_normal` / `∂_normal!` are kept: a normal is a direction, not a boundary condition.
+
+### Changed
+
+- `_build_collocation_matrix!`, `_build_rhs!`, and the weight kernel lost their Hermite dispatch layer, which collapsed each of `_rbf_entry`/`_poly_entry!`/`_rbf_rhs`/`_mono_rhs!` to a single method and let them inline. `src/solve/assembly.jl` goes 468 → 143 lines with no behavioral change to interior stencils.
+- Numerics are unchanged: identical weights on every non-Hermite path, verified by the full test suite.
+
 ## [0.8.0] — 2026-08-24
 
 Breaking release: operator weights moved from `SparseMatrixCSC` to stencil-wise (ELL) storage, making evaluation multithreaded/GPU-capable and ~7.6× faster at N = 100k, k = 50 on 13 threads (~1.5× single-threaded). See [#156].

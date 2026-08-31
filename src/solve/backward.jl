@@ -508,7 +508,7 @@ end
 
 Accumulate the input cotangent of an operator application `y = W * x` into `Δx`:
 `Δx += Wᵀ Δy`. Used by the Enzyme eval rules. For `StencilWeights` this is the
-deterministic transpose-map adjoint gather (threaded on CPU, kernel on GPU; Dirichlet pad
+deterministic transpose-map adjoint gather (threaded on CPU, kernel on GPU; padded
 slots contribute zero); the generic method covers the sparse fallback (`VirtualPartial`).
 Matrix cotangents (operators applied to multi-column fields) accumulate column-wise.
 """

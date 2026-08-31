@@ -16,9 +16,9 @@ rng = MersenneTwister(123)
 # live in one shared EllSparse.SellStructure object)
 _structure(W) = RBF.EllSparse.structure(W.ell)
 
-# Hand-built ELL fixture: k = 4, N_eval = 6, N_data = 8. Column 5 mimics a Dirichlet
-# boundary row — weight 1 at slot 1, zero pads all sharing the same index — to exercise
-# duplicate-index combining in getindex/Matrix/sparse.
+# Hand-built ELL fixture: k = 4, N_eval = 6, N_data = 8. Column 5 is an identity row —
+# weight 1 at slot 1, zero pads all sharing the same index — to exercise duplicate-index
+# combining in getindex/Matrix/sparse.
 k, n_eval, n_data = 4, 6, 8
 vals = randn(rng, k, n_eval)
 idx = Int32.(reduce(hcat, [randperm(rng, n_data)[1:k] for _ in 1:n_eval]))
@@ -51,7 +51,7 @@ end
     @test size(S) == (n_eval, n_data)
     @test Matrix(S) == A
     @test SparseMatrixCSC(W) == S
-    # Dirichlet-style column collapses to a single identity entry
+    # A column of repeated indices collapses to a single identity entry
     @test nnz(S[5, :]) == 1
     @test S[5, 5] == 1.0
 end
@@ -248,15 +248,6 @@ end
 
 pts = map(_ -> SVector{2}(rand(rng, 2)), 1:50)
 
-# Square-grid Hermite fixture: boundary = points on the unit-square edge. Normals are
-# dummies — Dirichlet conditions ignore them.
-n_grid = 6
-h = n_grid - 1
-grid = vec([SVector{2}(i / h, j / h) for i in 0:h, j in 0:h])
-is_b = map(p -> p[1] == 0 || p[1] == 1 || p[2] == 0 || p[2] == 1, grid)
-bcs = [RBF.Dirichlet() for _ in 1:count(is_b)]
-bnormals = [SVector{2}(1.0, 0.0) for _ in 1:count(is_b)]
-
 @testset "Operator weights are StencilWeights" begin
     op = partial(pts, 1, 1)
     @test op.weights isa StencilWeights
@@ -277,20 +268,6 @@ bnormals = [SVector{2}(1.0, 0.0) for _ in 1:count(is_b)]
     @test _structure(scaled) === _structure(op.weights)
 end
 
-@testset "Dirichlet columns act as identity" begin
-    op = laplacian(grid; hermite = (is_boundary = is_b, bc = bcs, normals = bnormals))
-    z = randn(rng, length(grid))
-    u = op(z)
-    b_idx = findall(is_b)
-    @test u[b_idx] == z[b_idx]
-
-    S = sparse(op)
-    @test all(nnz(S[i, :]) == 1 for i in b_idx)
-    @test all(S[i, i] == 1.0 for i in b_idx)
-    # ELL columns for Dirichlet points carry the identity in slot 1, zero pads below
-    @test all(iszero, parent(op.weights)[2:end, b_idx])
-end
-
 @testset "Rectangular regrid weights" begin
     xe = map(_ -> SVector{2}(rand(rng, 2)), 1:20)
     r = regrid(pts, xe)
@@ -303,12 +280,4 @@ end
     ragged = [collect(1:5) for _ in eachindex(pts)]
     ragged[1] = collect(1:4)
     @test_throws ArgumentError laplacian(pts; adjl = ragged)
-end
-
-@testset "Hermite requires matching eval points" begin
-    @test_throws ArgumentError laplacian(
-        grid;
-        hermite = (is_boundary = is_b, bc = bcs, normals = bnormals),
-        eval_points = grid[1:10],
-    )
 end

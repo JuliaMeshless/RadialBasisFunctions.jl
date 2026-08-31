@@ -26,8 +26,8 @@ end
 
 # Primary interface using unified keyword constructor
 """
-    custom(data, ℒ::Function; rank=<auto>, basis=PHS(3; poly_deg=2), eval_points=data, k, adjl, hermite)
-    custom(data, op::AbstractOperator; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl, hermite)
+    custom(data, ℒ::Function; rank=<auto>, basis=PHS(3; poly_deg=2), eval_points=data, k, adjl)
+    custom(data, op::AbstractOperator; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl)
 
 Build a `RadialBasisOperator` with a custom operator.
 

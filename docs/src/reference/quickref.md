@@ -118,22 +118,6 @@ result = interp(SVector(0.5, 0.5))
 results = interp(new_points)
 ```
 
-## Hermite Boundary Conditions
-
-| Type | Constructor | Meaning |
-|------|-------------|---------|
-| Dirichlet | `Dirichlet()` | Fixed value |
-| Neumann | `Neumann()` | Fixed normal derivative |
-| Robin | `Robin(α, β)` | $\alpha u + \beta \frac{\partial u}{\partial n}$ |
-| Internal | `Internal()` | Interior point, no condition |
-
-```julia
-using RadialBasisFunctions: Dirichlet, Neumann, Robin  # not exported
-lap = laplacian(points; hermite=(is_boundary=…, bc=…, normals=…))
-```
-
-See [Boundary Conditions](@ref) for the full walkthrough.
-
 ## GPU Evaluation
 
 Weights are always **built** on CPU. Once built, `cu(op)` (via Adapt) moves the operator's `StencilWeights` — both the dense weight-value matrix and the `Int32` neighbor-index matrix — to the device, and applying the operator runs a KernelAbstractions gather kernel directly on the GPU:

@@ -214,14 +214,6 @@ The built weights are stored stencil-wise in `StencilWeights` — since v0.8 a t
 
 ---
 
-## Advanced: Hermite Interpolation
-
-For problems with boundary conditions, the package supports Hermite interpolation. This is triggered by providing boundary information (`is_boundary`, `boundary_conditions`, `normals`) to the operator constructor.
-
-Hermite interpolation modifies the collocation matrix to incorporate boundary operators (Dirichlet, Neumann, Robin) at boundary nodes. This is an advanced feature primarily used for solving PDEs with explicit boundary conditions. Hermite operators require `eval_points` to equal `data` — the boundary classification is defined on the data points, so a differing evaluation set throws an error rather than silently producing wrong stencils.
-
----
-
 ## Navigation Guide
 
 | Want to... | Look in... |

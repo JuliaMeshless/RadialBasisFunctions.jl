@@ -39,8 +39,7 @@ const KWARG_DOCS = """
 - `basis`: RBF basis (default: `PHS(3; poly_deg=2)`)
 - `eval_points`: Evaluation points (default: `data`)
 - `k`: Stencil size (default: `autoselect_k(data, basis)`)
-- `adjl`: Adjacency list (default: computed via `find_neighbors`)
-- `hermite`: Optional NamedTuple for Hermite interpolation"""
+- `adjl`: Adjacency list (default: computed via `find_neighbors`)"""
 
 """
     struct RadialBasisOperator
@@ -77,7 +76,7 @@ end
 # ============================================================================
 
 """
-    RadialBasisOperator(ℒ, data; eval_points, basis, k, adjl, hermite, device)
+    RadialBasisOperator(ℒ, data; eval_points, basis, k, adjl, device)
 
 Unified constructor with keyword arguments.
 
@@ -88,10 +87,6 @@ Unified constructor with keyword arguments.
 # Keyword Arguments
 $(KWARG_DOCS)
 - `device`: KernelAbstractions backend for weight computation (default: auto-detected from `data` via `get_backend`)
-
-The `hermite` NamedTuple has fields `is_boundary::AbstractVector{Bool}` (a `BitVector`
-works), `bc::AbstractVector{<:BoundaryCondition}`, and
-`normals::AbstractVector{<:AbstractVector}`.
 
 # Examples
 ```julia
@@ -106,10 +101,6 @@ op = RadialBasisOperator(Laplacian(), data)
 # With different evaluation points
 op = Laplacian()(data; eval_points=eval_pts)
 
-# With Hermite boundary conditions
-op = RadialBasisOperator(Laplacian(), data;
-    hermite=(is_boundary=is_bound, bc=boundary_conds, normals=normal_vecs))
-
 # With explicit device
 using KernelAbstractions
 op = RadialBasisOperator(Laplacian(), data; device=CPU())
@@ -122,24 +113,9 @@ function RadialBasisOperator(
         basis::AbstractRadialBasis = PHS(3; poly_deg = 2),
         k::Int = autoselect_k(data, basis),
         adjl = find_neighbors(data, eval_points, k),
-        hermite::Union{Nothing, NamedTuple} = nothing,
         device = get_backend(data),
     )
-    weights = if isnothing(hermite)
-        _build_weights(ℒ, data, eval_points, adjl, basis; device = device)
-    else
-        _build_weights(
-            ℒ,
-            data,
-            eval_points,
-            adjl,
-            basis,
-            hermite.is_boundary,
-            hermite.bc,
-            hermite.normals;
-            device = device,
-        )
-    end
+    weights = _build_weights(ℒ, data, eval_points, adjl, basis; device = device)
     return RadialBasisOperator(ℒ, weights, data, eval_points, adjl, basis, true; device = device)
 end
 
@@ -521,13 +497,13 @@ the weight cache as valid. For `StencilWeights` storage this is a pure in-place 
 the value matrix — no sparse reassembly.
 """
 function update_weights!(op::RadialBasisOperator)
-    op.weights .= _build_weights(op.ℒ, op)
+    op.weights .= _build_weights(op.ℒ, op.data, op.eval_points, op.adjl, op.basis; device = op.device)
     validate_cache!(op)
     return nothing
 end
 
 function update_weights!(op::RadialBasisOperator{<:AbstractOperator, <:Tuple})
-    new_weights = _build_weights(op.ℒ, op)
+    new_weights = _build_weights(op.ℒ, op.data, op.eval_points, op.adjl, op.basis; device = op.device)
     for i in eachindex(op.weights)
         op.weights[i] .= new_weights[i]
     end
@@ -536,7 +512,7 @@ function update_weights!(op::RadialBasisOperator{<:AbstractOperator, <:Tuple})
 end
 
 function update_weights!(op::RadialBasisOperator{<:AbstractOperator, <:StencilWeights})
-    copyto!(op.weights, _build_weights(op.ℒ, op))
+    copyto!(op.weights, _build_weights(op.ℒ, op.data, op.eval_points, op.adjl, op.basis; device = op.device))
     validate_cache!(op)
     return nothing
 end
@@ -544,7 +520,7 @@ end
 function update_weights!(
         op::RadialBasisOperator{<:AbstractOperator, <:NTuple{N, <:StencilWeights}}
     ) where {N}
-    new_weights = _build_weights(op.ℒ, op)
+    new_weights = _build_weights(op.ℒ, op.data, op.eval_points, op.adjl, op.basis; device = op.device)
     for i in 1:N
         copyto!(op.weights[i], new_weights[i])
     end

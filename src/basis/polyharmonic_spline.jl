@@ -56,23 +56,10 @@ function (op::∂{<:PHS1})(x, xᵢ)
     return (x[op.dim] - xᵢ[op.dim]) / (r + avoid_inf(r))
 end
 
-function (op::∂{<:PHS1})(x, xᵢ, normal)
-    r = euclidean(x, xᵢ)
-    dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -normal[op.dim] / (r + avoid_inf(r)) +
-        dot_normal * (x[op.dim] - xᵢ[op.dim]) / (r^3 + avoid_inf(r))
-end
-
 # ∇ - gradient
 function (op::∇{<:PHS1})(x, xᵢ)
     r = euclidean(x, xᵢ)
     return (x .- xᵢ) / (r + avoid_inf(r))
-end
-
-function (op::∇{<:PHS1})(x, xᵢ, normal)
-    r = euclidean(x, xᵢ)
-    dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -normal / (r + avoid_inf(r)) + dot_normal * (x .- xᵢ) / (r^3 + avoid_inf(r))
 end
 
 # H - Hessian matrix
@@ -97,15 +84,6 @@ function (op::∂²{<:PHS1})(x, xᵢ)
     return (-(x[op.dim] - xᵢ[op.dim])^2 + r²) / (r^3 + avoid_inf(r))
 end
 
-function (op::∂²{<:PHS1})(x, xᵢ, normal)
-    r = euclidean(x, xᵢ)
-    n_d = normal[op.dim]
-    Δ_d = x[op.dim] - xᵢ[op.dim]
-    dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return (2 * n_d * Δ_d + dot_normal) / (r^3 + avoid_inf(r)) -
-        3 * Δ_d^2 * dot_normal / (r^5 + avoid_inf(r))
-end
-
 # ∇² - Laplacian: Δrᵏ = k(k+d−2)·r^(k−2) in d dimensions
 function (op::∇²{<:PHS1})(x, xᵢ)
     d = length(x)
@@ -113,12 +91,7 @@ function (op::∇²{<:PHS1})(x, xᵢ)
     return (d - 1) / (r + avoid_inf(r))
 end
 
-function (op::∇²{<:PHS1})(x, xᵢ, normal)
-    d = length(x)
-    r = euclidean(x, xᵢ)
-    dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return (d - 1) * dot_normal / (r^3 + avoid_inf(r))
-end #==============================================================================# #==============================================================================#
+#==============================================================================#
 
 #                                    PHS3                                      #
 
@@ -143,24 +116,10 @@ function (op::∂{<:PHS3})(x, xᵢ)
     return 3 * (x[op.dim] - xᵢ[op.dim]) * r
 end
 
-function (op::∂{<:PHS3})(x, xᵢ, normal)
-    r = euclidean(x, xᵢ)
-    n_d = normal[op.dim]
-    Δ_d = x[op.dim] - xᵢ[op.dim]
-    dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -3 * (n_d * r + dot_normal * Δ_d / (r + avoid_inf(r)))
-end
-
 # ∇ - gradient
 function (op::∇{<:PHS3})(x, xᵢ)
     r = euclidean(x, xᵢ)
     return 3 * (x .- xᵢ) * r
-end
-
-function (op::∇{<:PHS3})(x, xᵢ, normal)
-    r = euclidean(x, xᵢ)
-    dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -3 * (normal * r + dot_normal * (x .- xᵢ) / (r + avoid_inf(r)))
 end
 
 # H - Hessian matrix
@@ -184,16 +143,6 @@ function (op::∂²{<:PHS3})(x, xᵢ)
     return 3 * (r + (x[op.dim] - xᵢ[op.dim])^2 / (r + avoid_inf(r)))
 end
 
-function (op::∂²{<:PHS3})(x, xᵢ, normal)
-    r = euclidean(x, xᵢ)
-    r² = sqeuclidean(x, xᵢ)
-    n_d = normal[op.dim]
-    Δ_d = x[op.dim] - xᵢ[op.dim]
-    dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -3 * (2 * Δ_d * n_d + dot_normal - dot_normal * Δ_d^2 / (r² + avoid_inf(r))) /
-        (r + avoid_inf(r))
-end
-
 # ∇² - Laplacian: Δrᵏ = k(k+d−2)·r^(k−2) in d dimensions
 function (op::∇²{<:PHS3})(x, xᵢ)
     d = length(x)
@@ -201,12 +150,7 @@ function (op::∇²{<:PHS3})(x, xᵢ)
     return 3 * (d + 1) * r
 end
 
-function (op::∇²{<:PHS3})(x, xᵢ, normal)
-    d = length(x)
-    r = euclidean(x, xᵢ)
-    dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -3 * (d + 1) * dot_normal / (r + avoid_inf(r))
-end #==============================================================================# #==============================================================================#
+#==============================================================================#
 
 #                                    PHS5                                      #
 
@@ -231,24 +175,10 @@ function (op::∂{<:PHS5})(x, xᵢ)
     return 5 * (x[op.dim] - xᵢ[op.dim]) * r^3
 end
 
-function (op::∂{<:PHS5})(x, xᵢ, normal)
-    r = euclidean(x, xᵢ)
-    n_d = normal[op.dim]
-    Δ_d = x[op.dim] - xᵢ[op.dim]
-    dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -5 * (n_d * r^3 + 3 * dot_normal * Δ_d * r)
-end
-
 # ∇ - gradient
 function (op::∇{<:PHS5})(x, xᵢ)
     r = euclidean(x, xᵢ)
     return 5 * (x .- xᵢ) * r^3
-end
-
-function (op::∇{<:PHS5})(x, xᵢ, normal)
-    r = euclidean(x, xᵢ)
-    dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -5 * (normal * r^3 + 3 * dot_normal * (x .- xᵢ) * r)
 end
 
 # H - Hessian matrix
@@ -273,14 +203,6 @@ function (op::∂²{<:PHS5})(x, xᵢ)
     return 5 * r * (3 * (x[op.dim] - xᵢ[op.dim])^2 + r²)
 end
 
-function (op::∂²{<:PHS5})(x, xᵢ, normal)
-    r = euclidean(x, xᵢ)
-    n_d = normal[op.dim]
-    Δ_d = x[op.dim] - xᵢ[op.dim]
-    dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -5 * (6 * n_d * Δ_d * r + 3 * dot_normal * (r + Δ_d^2 / (r + avoid_inf(r))))
-end
-
 # ∇² - Laplacian: Δrᵏ = k(k+d−2)·r^(k−2) in d dimensions
 function (op::∇²{<:PHS5})(x, xᵢ)
     d = length(x)
@@ -288,12 +210,7 @@ function (op::∇²{<:PHS5})(x, xᵢ)
     return 5 * (d + 3) * r^3
 end
 
-function (op::∇²{<:PHS5})(x, xᵢ, normal)
-    d = length(x)
-    r = euclidean(x, xᵢ)
-    dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -15 * (d + 3) * dot_normal * r
-end #==============================================================================# #==============================================================================#
+#==============================================================================#
 
 #                                    PHS7                                      #
 
@@ -319,24 +236,10 @@ function (op::∂{<:PHS7})(x, xᵢ)
     return 7 * (x[op.dim] - xᵢ[op.dim]) * r^5
 end
 
-function (op::∂{<:PHS7})(x, xᵢ, normal)
-    r = euclidean(x, xᵢ)
-    n_d = normal[op.dim]
-    Δ_d = x[op.dim] - xᵢ[op.dim]
-    dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -7 * (n_d * r^5 + 5 * r^3 * Δ_d * dot_normal)
-end
-
 # ∇ - gradient
 function (op::∇{<:PHS7})(x, xᵢ)
     r = euclidean(x, xᵢ)
     return 7 * (x .- xᵢ) * r^5
-end
-
-function (op::∇{<:PHS7})(x, xᵢ, normal)
-    r = euclidean(x, xᵢ)
-    dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -7 * (normal * r^5 + 5 * dot_normal * (x .- xᵢ) * r^3)
 end
 
 # H - Hessian matrix
@@ -361,14 +264,6 @@ function (op::∂²{<:PHS7})(x, xᵢ)
     return 7 * r^3 * (5 * (x[op.dim] - xᵢ[op.dim])^2 + r²)
 end
 
-function (op::∂²{<:PHS7})(x, xᵢ, normal)
-    r = euclidean(x, xᵢ)
-    n_d = normal[op.dim]
-    Δ_d = x[op.dim] - xᵢ[op.dim]
-    dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -7 * (10 * n_d * Δ_d * r^3 + 5 * dot_normal * (3 * r * Δ_d^2 + r^3))
-end
-
 # ∇² - Laplacian: Δrᵏ = k(k+d−2)·r^(k−2) in d dimensions
 function (op::∇²{<:PHS7})(x, xᵢ)
     d = length(x)
@@ -376,12 +271,7 @@ function (op::∇²{<:PHS7})(x, xᵢ)
     return 7 * (d + 5) * r^5
 end
 
-function (op::∇²{<:PHS7})(x, xᵢ, normal)
-    d = length(x)
-    r = euclidean(x, xᵢ)
-    dot_normal = LinearAlgebra.dot(normal, x .- xᵢ)
-    return -35 * (d + 5) * dot_normal * r^3
-end #==============================================================================# #==============================================================================#
+#==============================================================================#
 
 #                           Keyword Constructors                               #
 

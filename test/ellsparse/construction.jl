@@ -135,7 +135,7 @@ end
     @test Base.mightalias(structure(A).colind, colind)  # zero-copy flat view
     @test A isa EllMatrix
 
-    # getindex sums duplicate-index slots (Dirichlet-style identity row)
+    # getindex sums duplicate-index slots (identity row)
     vals2 = copy(vals)
     colind2 = copy(colind)
     vals2[:, 5] .= [1.0, 0.0, 0.0, 0.0]

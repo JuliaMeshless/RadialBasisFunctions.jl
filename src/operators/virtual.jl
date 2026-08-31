@@ -85,25 +85,6 @@ function _build_weights(ℒ::VirtualPartial, data, eval_points, adjl, basis; dev
     end
 end
 
-function _build_weights(
-        ::VirtualPartial,
-        data::AbstractVector,
-        eval_points::AbstractVector,
-        adjl::AbstractVector,
-        basis::AbstractRadialBasis,
-        is_boundary::AbstractVector{Bool},
-        boundary_conditions::AbstractVector{<:BoundaryCondition},
-        normals::AbstractVector{<:AbstractVector};
-        device = CPU(),
-    )
-    throw(
-        ArgumentError(
-            "VirtualPartial does not support Hermite boundary conditions. Use partial " *
-                "with hermite=... instead.",
-        ),
-    )
-end
-
 # pretty printing
 function print_op(op::VirtualPartial)
     return "virtual ∂f/∂x$(op.dim) ($(op.backward ? "backward" : "forward") difference, Δ = $(op.Δ))"

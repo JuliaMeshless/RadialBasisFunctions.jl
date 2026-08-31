@@ -24,7 +24,6 @@ makedocs(;
             "Operators & Type Hierarchy" => "guides/operators.md",
             "Building PDE Operators" => "guides/pde_operators.md",
             "Custom Operators" => "guides/custom_operators.md",
-            "Boundary Conditions" => "guides/boundary_conditions.md",
             "Vector & Tensor Operators" => "guides/vector_calculus.md",
             "Automatic Differentiation" => "guides/autodiff.md",
             "RBF Neural Networks" => "guides/lux.md",

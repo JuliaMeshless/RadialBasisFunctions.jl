@@ -1,10 +1,9 @@
 using Test
 using StaticArraysCore
 using RadialBasisFunctions
-using RadialBasisFunctions: Dirichlet, Neumann, Robin
 import RadialBasisFunctions as RBF
 
-# 12-point 2D domain with 2 boundary points at (0,0) and (1,0), mirrors test/hermite.jl
+# 12-point 2D domain used by the neighbor/reorder tests below.
 function create_2d_domain()
     data = [
         SVector(0.0, 0.0),   # boundary
@@ -75,91 +74,6 @@ end
     perm3 = reorder_points!(points, adjl, k)
     @test isperm(perm3)
     @test points == original[perm3]
-end
-
-@testset "Hermite basis-support guard" begin
-    data, is_boundary, normals = create_2d_domain()
-    neumann = (is_boundary = is_boundary, bc = [Neumann(), Neumann()], normals = normals)
-    dirichlet = (is_boundary = is_boundary, bc = [Dirichlet(), Dirichlet()], normals = normals)
-
-    # Neumann/Robin BCs need the 3-arg normal form — only PHS implements it (issue #136)
-    @test_throws ArgumentError RadialBasisOperator(
-        Laplacian(), data; basis = IMQ(1.0; poly_deg = 2), hermite = neumann
-    )
-    @test_throws ArgumentError RadialBasisOperator(
-        Laplacian(), data; basis = Gaussian(1.0; poly_deg = 2), hermite = neumann
-    )
-    robin = (is_boundary = is_boundary, bc = [Robin(1.0, 1.0), Robin(1.0, 1.0)], normals = normals)
-    @test_throws ArgumentError RadialBasisOperator(
-        Laplacian(), data; basis = IMQ(1.0; poly_deg = 2), hermite = robin
-    )
-
-    # Tuple-valued actions (gradient family) route through the same guard
-    @test_throws ArgumentError RadialBasisOperator(
-        Jacobian{2}(), data; basis = IMQ(1.0; poly_deg = 2), hermite = neumann
-    )
-
-    # PHS supports the normal form — build must succeed and produce finite values
-    op = RadialBasisOperator(
-        Laplacian(), data; basis = PHS(3; poly_deg = 2), hermite = neumann
-    )
-    u = [x[2]^2 for x in data]  # ∂u/∂n = 0 on both boundaries
-    @test all(isfinite, op(u))
-
-    op_jac = RadialBasisOperator(
-        Jacobian{2}(), data; basis = PHS(3; poly_deg = 2), hermite = neumann
-    )
-    @test op_jac isa RadialBasisOperator
-
-    # Dirichlet-only never evaluates the normal form — IMQ/Gaussian must not trip the guard
-    op_imq = RadialBasisOperator(
-        Laplacian(), data; basis = IMQ(1.0; poly_deg = 2), hermite = dirichlet
-    )
-    @test all(isfinite, op_imq(u))
-    op_gauss = RadialBasisOperator(
-        Laplacian(), data; basis = Gaussian(1.0; poly_deg = 2), hermite = dirichlet
-    )
-    @test all(isfinite, op_gauss(u))
-end
-
-@testset "boundary input validation" begin
-    data, is_boundary, normals = create_2d_domain()
-    bc = [Neumann(), Neumann()]
-
-    # is_boundary must flag every data point
-    @test_throws DimensionMismatch RadialBasisOperator(
-        Laplacian(), data;
-        hermite = (is_boundary = is_boundary[1:5], bc = bc, normals = normals),
-    )
-    # one bc per boundary point
-    @test_throws DimensionMismatch RadialBasisOperator(
-        Laplacian(), data;
-        hermite = (is_boundary = is_boundary, bc = bc[1:1], normals = normals),
-    )
-    # one normal per boundary point
-    @test_throws DimensionMismatch RadialBasisOperator(
-        Laplacian(), data;
-        hermite = (is_boundary = is_boundary, bc = bc, normals = normals[1:1]),
-    )
-end
-
-@testset "HermiteStencilData length validation" begin
-    stencil_data = [[0.0, 0.0], [0.5, 0.0], [1.0, 0.0]]
-    bcs = [Internal(), Internal(), Internal()]
-    stencil_normals = [zeros(2) for _ in 1:3]
-
-    hd = HermiteStencilData(stencil_data, fill(false, 3), bcs, stencil_normals)
-    @test hd isa HermiteStencilData{Float64}
-
-    @test_throws DimensionMismatch HermiteStencilData(
-        stencil_data, fill(false, 2), bcs, stencil_normals
-    )
-    @test_throws DimensionMismatch HermiteStencilData(
-        stencil_data, fill(false, 3), bcs[1:2], stencil_normals
-    )
-    @test_throws DimensionMismatch HermiteStencilData(
-        stencil_data, fill(false, 3), bcs, stencil_normals[1:2]
-    )
 end
 
 @testset "Regrid action" begin

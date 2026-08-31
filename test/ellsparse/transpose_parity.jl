@@ -45,7 +45,7 @@ random_idx(rng, k, n_eval, n_data) =
     @test tm.rows === nothing
 end
 
-@testset "host parity: Dirichlet-style duplicate columns" begin
+@testset "host parity: duplicate-index columns" begin
     k, n_eval, n_data = 4, 6, 8
     idx = random_idx(rng, k, n_eval, n_data)
     vals = randn(rng, k, n_eval)

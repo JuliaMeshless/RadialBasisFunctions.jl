@@ -8,7 +8,7 @@ struct Laplacian <: AbstractOperator{0} end
 
 # Primary interface using unified keyword constructor
 """
-    laplacian(data; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl, hermite)
+    laplacian(data; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl)
 
 Build a `RadialBasisOperator` for the Laplacian operator (∇²f).
 

@@ -27,7 +27,7 @@ end
 
 # Primary interface
 """
-    hessian(data; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl, hermite)
+    hessian(data; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl)
 
 Build a `RadialBasisOperator` for computing the full Hessian matrix.
 

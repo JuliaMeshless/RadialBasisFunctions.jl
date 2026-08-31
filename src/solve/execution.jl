@@ -1,6 +1,41 @@
 using KernelAbstractions
-using KernelAbstractions: @kernel, @index, CPU
-using LinearAlgebra: Symmetric
+using KernelAbstractions: @kernel, @index, CPU, get_backend
+
+# ============================================================================
+# Entry Point
+# ============================================================================
+
+"""
+    _build_weights(ℒ, data, eval_points, adjl, basis; device = CPU())
+
+Build the stencil weights for operator `ℒ`: apply it to the RBF and monomial bases,
+then solve one local system per evaluation point.
+
+Operators needing a different construction route add a method here — see
+`Directional` (contracts Jacobian weights with a direction vector) and
+`VirtualPartial` (differences two `Regrid` builds).
+
+!!! warning "Signature is load-bearing"
+    `ext/RadialBasisFunctionsEnzymeExt` attaches `EnzymeRules.augmented_primal` and
+    `reverse` to this exact positional signature. Changing its shape silently drops
+    the AD rules and breaks shape-parameter/node-position differentiation.
+"""
+function _build_weights(ℒ, data, eval_points, adjl, basis; device = CPU())
+    mon = MonomialBasis(length(first(data)), basis.poly_deg)
+    return build_weights_kernel(
+        data, eval_points, adjl, basis, ℒ(basis), ℒ(mon), mon; device = device
+    )
+end
+
+# ============================================================================
+# Operator Arity Helpers (direct Tuple dispatch)
+# ============================================================================
+
+_num_ops(::Tuple{Vararg{Any, N}}) where {N} = N
+_num_ops(_) = 1
+
+_prepare_buffer(::Tuple{Vararg{Any, N}}, T, n) where {N} = zeros(T, n, N)
+_prepare_buffer(_, T, n) = zeros(T, n)
 
 # ============================================================================
 # Memory Allocation
@@ -16,30 +51,6 @@ function allocate_ell(backend, TD, k::Int, N_eval::Int, num_ops::Int)
     vals_list = [KernelAbstractions.allocate(backend, TD, k, N_eval) for _ in 1:num_ops]
     idx = KernelAbstractions.allocate(backend, Int32, k, N_eval)
     return vals_list, idx
-end
-
-"""
-    construct_global_to_boundary(is_boundary)
-
-Construct mapping from global indices to boundary-only indices.
-For boundary points: global_to_boundary[i] = boundary array index
-For interior points: global_to_boundary[i] = 0 (sentinel)
-"""
-function construct_global_to_boundary(is_boundary::AbstractVector{Bool})
-    N_tot = length(is_boundary)
-    global_to_boundary = Vector{Int}(undef, N_tot)
-
-    boundary_counter = 0
-    for i in 1:N_tot
-        if is_boundary[i]
-            boundary_counter += 1
-            global_to_boundary[i] = boundary_counter
-        else
-            global_to_boundary[i] = 0
-        end
-    end
-
-    return global_to_boundary
 end
 
 # ============================================================================
@@ -69,8 +80,8 @@ end
 # ============================================================================
 
 """
-    build_weights_kernel(data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
-                        boundary_data; batch_size, device)
+    build_weights_kernel(data, eval_points, adjl, basis, ℒrbf, ℒmon, mon;
+                         batch_size, device)
 
 Main orchestrator for weight computation. Currently CPU-only.
 GPU stencil solve is not yet supported — see GitHub issue #88.
@@ -82,8 +93,7 @@ function build_weights_kernel(
         basis,
         ℒrbf,
         ℒmon,
-        mon,
-        boundary_data::BoundaryData;
+        mon;
         batch_size::Int = 10,
         device = CPU(),
     )
@@ -111,8 +121,6 @@ function build_weights_kernel(
     num_ops = _num_ops(ℒrbf)
     N_eval = length(eval_points)
 
-    global_to_boundary = construct_global_to_boundary(boundary_data.is_boundary)
-
     # Allocate ELL weight storage
     vals_list, idx = allocate_ell(device, TD, k, N_eval, num_ops)
 
@@ -122,8 +130,7 @@ function build_weights_kernel(
     # Launch kernel
     launch_kernel!(
         vals_list, idx, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
-        boundary_data, global_to_boundary, batch_size, N_eval, n_batches,
-        k, nmon, num_ops, device,
+        batch_size, N_eval, n_batches, k, nmon, num_ops, device,
     )
 
     return _assemble_weights(vals_list, idx, length(data), num_ops)
@@ -136,28 +143,20 @@ end
 """
     launch_kernel!(...)
 
-Launch parallel CPU kernel for weight computation.
-Handles Dirichlet/Interior/Hermite stencil classification via dispatch.
+Launch the parallel CPU kernel for weight computation. Each batch owns its own
+workspace and solves one stencil at a time.
 """
 function launch_kernel!(
         vals_list, idx, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
-        boundary_data::BoundaryData, global_to_boundary,
         batch_size, N_eval, n_batches, k, nmon, num_ops, device,
     )
     TD = eltype(first(data))
-    dim = length(first(data))
-
-    # Pre-allocate Hermite workspace for each batch (includes polynomial workspace)
-    batch_hermite_datas = [HermiteStencilData{TD}(k, dim, nmon) for _ in 1:n_batches]
 
     @kernel function weight_kernel(
             vals_list, idx, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
-            is_boundary, boundary_conditions, normals,
-            batch_hermite_datas, global_to_boundary,
             batch_size, N_eval, nmon, k, num_ops, TD,
         )
         batch_idx = @index(Global)
-        hermite_data = batch_hermite_datas[batch_idx]
         start_idx, end_idx = calculate_batch_range(batch_idx, batch_size, N_eval)
 
         # Pre-allocate work arrays for this thread
@@ -171,37 +170,14 @@ function launch_kernel!(
             neighbors = adjl[eval_idx]
             eval_point = eval_points[eval_idx]
 
-            # Classify stencil type
-            stype = classify_stencil(
-                is_boundary, boundary_conditions, eval_idx, neighbors, global_to_boundary
-            )
-
-            if stype isa DirichletStencil
-                # Identity row: weight 1 at slot 1, zero pads sharing the same index
-                fill_dirichlet_column!(vals_list, idx, eval_idx, k, num_ops)
-                continue
-            end
-
             # Reset workspace for reuse
             fill!(A_full, zero(TD))
             fill!(b, zero(TD))
 
-            if stype isa InteriorStencil
-                # Standard interior stencil (no boundary points)
-                local_data = view(data, neighbors)
-                weights = _build_stencil!(
-                    λ, A, b, ℒrbf, ℒmon, local_data, eval_point, basis, mon, k
-                )
-            else  # HermiteStencil
-                # Mixed interior/boundary stencil
-                update_hermite_stencil_data!(
-                    hermite_data, data, neighbors, is_boundary,
-                    boundary_conditions, normals, global_to_boundary, eval_point,
-                )
-                weights = _build_stencil!(
-                    λ, A, b, ℒrbf, ℒmon, hermite_data, eval_point, basis, mon, k
-                )
-            end
+            local_data = view(data, neighbors)
+            weights = _build_stencil!(
+                λ, A, b, ℒrbf, ℒmon, local_data, eval_point, basis, mon, k
+            )
 
             # Store weights in the ELL columns
             fill_entries!(vals_list, idx, weights, eval_idx, neighbors, k, num_ops)
@@ -211,8 +187,6 @@ function launch_kernel!(
     kernel! = weight_kernel(device)
     kernel!(
         vals_list, idx, data, eval_points, adjl, basis, ℒrbf, ℒmon, mon,
-        boundary_data.is_boundary, boundary_data.boundary_conditions,
-        boundary_data.normals, batch_hermite_datas, global_to_boundary,
         batch_size, N_eval, nmon, k, num_ops, TD;
         ndrange = n_batches, workgroupsize = 1,
     )
@@ -243,23 +217,5 @@ end
                 vals_list[op][local_idx, eval_idx] = weights[local_idx, op]
             end
         end
-    end
-end
-
-"""
-Fill a Dirichlet identity column: weight 1 at slot 1, zero pads elsewhere. All slots
-carry the eval point's own index (in-bounds; Dirichlet stencils require
-`eval_points === data`), so duplicate-combining `sparse` conversion collapses the column
-to a single identity entry.
-"""
-@inline function fill_dirichlet_column!(vals_list, idx, eval_idx::Int, k::Int, num_ops::Int)
-    @inbounds for local_idx in 1:k
-        idx[local_idx, eval_idx] = Int32(eval_idx)
-        for op in 1:num_ops
-            vals_list[op][local_idx, eval_idx] = zero(eltype(vals_list[op]))
-        end
-    end
-    return @inbounds for op in 1:num_ops
-        vals_list[op][1, eval_idx] = one(eltype(vals_list[op]))
     end
 end

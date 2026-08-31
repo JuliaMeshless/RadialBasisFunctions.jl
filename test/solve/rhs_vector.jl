@@ -1,6 +1,6 @@
 """
 Unit tests for RHS vector building functions.
-Tests both standard and Hermite variants of _build_rhs!
+Tests _build_rhs!
 
 Focus: Tests the integration of operators with RHS building, not the operators themselves.
 Operator correctness is tested in test/operators/.
@@ -9,7 +9,6 @@ Operator correctness is tested in test/operators/.
 using Test
 using LinearAlgebra
 using RadialBasisFunctions
-using RadialBasisFunctions: Dirichlet, Neumann, Robin
 import RadialBasisFunctions as RBF
 
 @testset "RHS Vector Building" begin
@@ -98,58 +97,5 @@ import RadialBasisFunctions as RBF
                 @test b[k + i, dim] ≈ poly_deriv[i]
             end
         end
-    end
-
-    @testset "Hermite RHS with Dirichlet" begin
-        # Test Hermite RHS with Dirichlet boundaries (behaves like standard)
-        # Note: Full Hermite testing with Neumann/Robin is in integration tests
-        is_boundary = [false, true, false, false]
-        bcs = [Internal(), Dirichlet(), Internal(), Internal()]
-        normals = [[0.0, 0.0], [1.0, 0.0], [0.0, 0.0], [0.0, 0.0]]
-
-        hermite_data = RBF.HermiteStencilData(data_2d, is_boundary, bcs, normals)
-
-        # Use identity operator for simplicity
-        identity_op_rbf = RBF.Custom{0}(b -> (x1, x2) -> b(x1, x2))
-        identity_op_mon = RBF.Custom{0}(m -> (arr, x) -> m(arr, x))
-
-        ℒrbf = identity_op_rbf(basis)
-        ℒmon = identity_op_mon(mon)
-
-        b = zeros(Float64, n)
-
-        # Note: eval_point must be in the stencil for Hermite
-        # Use first point (interior) as eval point
-        eval_pt = data_2d[1]
-        RBF._build_rhs!(b, ℒrbf, ℒmon, hermite_data, eval_pt, basis, mon, k)
-
-        # Basic validation
-        @test size(b) == (n,)
-        @test all(isfinite.(b))
-
-        # With Dirichlet boundaries, should match standard RHS
-        b_standard = zeros(Float64, n)
-        RBF._build_rhs!(b_standard, ℒrbf, ℒmon, data_2d, eval_pt, basis, mon, k)
-        @test b ≈ b_standard
-    end
-
-    @testset "HermiteStencilData Structure" begin
-        # Test that HermiteStencilData is properly constructed
-        is_boundary = [false, true, true, false]
-        bcs = [Internal(), Dirichlet(), Neumann(), Internal()]
-        normals = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [0.0, 0.0]]
-
-        hermite_data = RBF.HermiteStencilData(data_2d, is_boundary, bcs, normals)
-
-        @test hermite_data isa RBF.HermiteStencilData{Float64}
-        @test length(hermite_data.data) == k
-        @test length(hermite_data.is_boundary) == k
-        @test length(hermite_data.boundary_conditions) == k
-        @test length(hermite_data.normals) == k
-
-        @test hermite_data.is_boundary[2] == true
-        @test hermite_data.is_boundary[3] == true
-        @test RBF.is_dirichlet(hermite_data.boundary_conditions[2])
-        @test RBF.is_neumann(hermite_data.boundary_conditions[3])
     end
 end

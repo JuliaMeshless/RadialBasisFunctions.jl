@@ -124,8 +124,3 @@ adjl = find_neighbors(x, 30)
 helm_op  = (@operator ∇² + k² * f)(x; adjl=adjl)
 aniso_op = (@operator κ_x * ∂²(1) + κ_y * ∂²(2))(x; adjl=adjl)
 ```
-
-## Boundary Conditions on PDE Operators
-
-Operators built with `@operator` accept the `hermite` keyword just like the built-ins —
-see [Boundary Conditions](@ref) for how to enforce Dirichlet, Neumann, or Robin conditions.

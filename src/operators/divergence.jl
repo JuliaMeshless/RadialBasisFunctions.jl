@@ -31,7 +31,7 @@ end
 # ============================================================================
 
 """
-    divergence(data; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl, hermite)
+    divergence(data; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl)
 
 Build a `RadialBasisOperator` for the divergence (∇⋅u).
 

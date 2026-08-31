@@ -1,5 +1,4 @@
 using RadialBasisFunctions
-using RadialBasisFunctions: Dirichlet, Neumann, Robin
 import RadialBasisFunctions as RBF
 using StaticArraysCore
 using Statistics
@@ -208,34 +207,6 @@ end
     # Unary negation
     op_neg = custom(x_macro, @operator(-∂(1)); basis = basis_macro)
     @test mean_percent_error(op_neg(y_macro), -df_dx.(x_macro)) < 5
-end
-
-@testset "custom() Hermite Boundary Conditions" begin
-    # Create a simple 1D domain for testing
-    spacing = 0.1
-    domain = [SVector{1}(x) for x in 0.0:spacing:1.0]
-    N_domain = length(domain)
-
-    # Identify boundary points (first and last)
-    is_boundary = zeros(Bool, N_domain)
-    is_boundary[1] = true
-    is_boundary[end] = true
-
-    # Set up boundary conditions (Dirichlet at both ends)
-    boundary_conditions = [RBF.Dirichlet(), RBF.Dirichlet()]
-
-    # Normals for 1D (outward pointing)
-    normals = [SVector(-1.0), SVector(1.0)]
-
-    # Test that the constructor works
-    op = custom(
-        domain,
-        basis -> (x, xᵢ) -> basis(x, xᵢ);
-        basis = PHS(3; poly_deg = 2),
-        hermite = (is_boundary = is_boundary, bc = boundary_conditions, normals = normals),
-        rank = 0,
-    )
-    @test op isa RadialBasisOperator
 end
 
 @testset "AbstractOperator functor API" begin

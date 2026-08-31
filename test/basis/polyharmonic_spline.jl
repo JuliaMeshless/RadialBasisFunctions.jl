@@ -45,32 +45,6 @@ end
         @test ∂²rbf(x₁, x₂) ≈ 4 / (5 * sqrt(5))
     end
 
-    @testset "Hermite" begin
-        normal = SVector(1.0, 1) ./ sqrt(2)  # Normalize for better numerical stability
-        dim = 1
-
-        # First derivative - functor handles both 2-arg and 3-arg calls
-        ∂rbf = RBF.∂(phs, dim)
-        @test ∂rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
-
-        # Gradient
-        ∇rbf = RBF.∇(phs)
-        @test all(
-            ∇rbf(x₁, x₂, normal) .≈ [
-                (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[1], x₂) ⋅ normal),
-                (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[2], x₂) ⋅ normal),
-            ],
-        )
-
-        # Second derivative
-        ∂²rbf = RBF.∂²(phs, dim)
-        @test ∂²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
-
-        # Laplacian
-        ∇²rbf = RBF.∇²(phs)
-        @test ∇²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
-    end
-
     @testset "Hessian" begin
         Hrbf = RBF.H(phs)
         H_val = Hrbf(x₁, x₂)
@@ -112,32 +86,6 @@ end
         @test ∂²rbf(x₁, x₂) ≈ 18 / sqrt(5)
     end
 
-    @testset "Hermite" begin
-        normal = SVector(1.0, 1) ./ sqrt(2)
-        dim = 1
-
-        # First derivative
-        ∂rbf = RBF.∂(phs, dim)
-        @test ∂rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
-
-        # Gradient
-        ∇rbf = RBF.∇(phs)
-        @test all(
-            ∇rbf(x₁, x₂, normal) .≈ [
-                (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[1], x₂) ⋅ normal),
-                (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[2], x₂) ⋅ normal),
-            ],
-        )
-
-        # Second derivative
-        ∂²rbf = RBF.∂²(phs, dim)
-        @test ∂²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
-
-        # Laplacian
-        ∇²rbf = RBF.∇²(phs)
-        @test ∇²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
-    end
-
     @testset "Hessian" begin
         Hrbf = RBF.H(phs)
         H_val = Hrbf(x₁, x₂)
@@ -177,32 +125,6 @@ end
         @test ∂rbf(x₁, x₂) ≈ -25 * sqrt(5)
         @test all(∇rbf(x₁, x₂) .≈ (-25 * sqrt(5), -50 * sqrt(5)))
         @test ∂²rbf(x₁, x₂) ≈ 40 * sqrt(5)
-    end
-
-    @testset "Hermite" begin
-        normal = SVector(1.0, 1) ./ sqrt(2)
-        dim = 1
-
-        # First derivative
-        ∂rbf = RBF.∂(phs, dim)
-        @test ∂rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
-
-        # Gradient
-        ∇rbf = RBF.∇(phs)
-        @test all(
-            ∇rbf(x₁, x₂, normal) .≈ [
-                (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[1], x₂) ⋅ normal),
-                (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[2], x₂) ⋅ normal),
-            ],
-        )
-
-        # Second derivative
-        ∂²rbf = RBF.∂²(phs, dim)
-        @test ∂²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
-
-        # Laplacian
-        ∇²rbf = RBF.∇²(phs)
-        @test ∇²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
     end
 
     @testset "Hessian" begin
@@ -259,32 +181,6 @@ end
         @test ∂rbf(x₁, x₂) ≈ -175 * sqrt(5)
         @test all(∇rbf(x₁, x₂) .≈ (-175 * sqrt(5), -350 * sqrt(5)))
         @test ∂²rbf(x₁, x₂) ≈ 350 * sqrt(5)
-    end
-
-    @testset "Hermite" begin
-        normal = SVector(1.0, 1) ./ sqrt(2)
-        dim = 1
-
-        # First derivative
-        ∂rbf = RBF.∂(phs, dim)
-        @test ∂rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂rbf(x₁, x_2), x₂) ⋅ normal)
-
-        # Gradient
-        ∇rbf = RBF.∇(phs)
-        @test all(
-            ∇rbf(x₁, x₂, normal) .≈ [
-                (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[1], x₂) ⋅ normal),
-                (FD.gradient(x_2 -> ∇rbf(x₁, x_2)[2], x₂) ⋅ normal),
-            ],
-        )
-
-        # Second derivative
-        ∂²rbf = RBF.∂²(phs, dim)
-        @test ∂²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∂²rbf(x₁, x_2), x₂) ⋅ normal)
-
-        # Laplacian
-        ∇²rbf = RBF.∇²(phs)
-        @test ∇²rbf(x₁, x₂, normal) ≈ (FD.gradient(x_2 -> ∇²rbf(x₁, x_2), x₂) ⋅ normal)
     end
 
     @testset "Hessian" begin

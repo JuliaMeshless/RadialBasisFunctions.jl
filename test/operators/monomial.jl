@@ -1,5 +1,4 @@
 using RadialBasisFunctions
-using RadialBasisFunctions: Dirichlet, Neumann, Robin
 import RadialBasisFunctions as RBF
 using StaticArraysCore
 using LinearAlgebra
@@ -104,64 +103,5 @@ end
         fd_result = grad_at_x * normal
 
         @test result ≈ fd_result
-    end
-end
-
-@testset "MonomialBasis - Hermite derivatives" begin
-    @testset "Regular vs. Normal derivatives" begin
-        # Create a 2D monomial basis of degree 2
-        mb = MonomialBasis(2, 2)
-        x = SVector(1.0, 2.0)
-
-        # Define dimension and normal vector
-        dim = 1
-        normal = SVector(1.0, 1.0) ./ sqrt(2)
-
-        # Get Hermite derivative operator
-        hermite_op = RBF.∂_Hermite(mb, dim)
-
-        # Test regular case (no normal)
-        regular_result = hermite_op(x)
-
-        # This should be equivalent to regular partial derivative
-        partial_op = RBF.∂(mb, dim)
-        expected_regular = zeros(binomial(2 + 2, 2))
-        partial_op.f(expected_regular, x)
-
-        @test regular_result ≈ expected_regular
-
-        # Test Neumann boundary case (with normal)
-        neumann_result = hermite_op(x, normal)
-
-        # This should be equivalent to normal derivative
-        normal_op = RBF.∂_normal(mb, normal)
-        expected_neumann = zeros(binomial(2 + 2, 2))
-        normal_op.f(expected_neumann, x)
-
-        @test neumann_result ≈ expected_neumann
-    end
-
-    @testset "Directional derivatives comparison" begin
-        # Create a 3D monomial basis of degree 2
-        mb = MonomialBasis(3, 2)
-        x = SVector(1.0, 2.0, 3.0)
-
-        # Try different coordinate directions
-        for dim in 1:3
-            # Get Hermite derivative in coordinate direction
-            hermite_op = RBF.∂_Hermite(mb, dim)
-
-            # Create a normal vector in that direction
-            normal = zeros(3)
-            normal[dim] = 1.0
-            normal = SVector{3}(normal)
-
-            # Calculate both ways
-            reg_result = hermite_op(x)
-            neumann_result = hermite_op(x, normal)
-
-            # They should be the same
-            @test reg_result ≈ neumann_result
-        end
     end
 end

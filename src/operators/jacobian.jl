@@ -20,7 +20,7 @@ struct Jacobian{Dim} <: AbstractJacobianOperator{Dim, 1} end
 
 # Primary interface using unified keyword constructor
 """
-    jacobian(data; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl, hermite)
+    jacobian(data; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl)
 
 Build a `RadialBasisOperator` for computing Jacobians (or gradients for scalar fields).
 

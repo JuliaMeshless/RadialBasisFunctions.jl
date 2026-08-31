@@ -126,14 +126,3 @@ maximum(abs, helm3(u) .- expected)
 
 !!! note
     Simple cases that return a single functor directly — like `basis -> ∂(basis, 1)` — don't need dual dispatch. The built-in functors already handle both basis types internally. Two methods are only needed when you compose multiple functors with arithmetic.
-
-## Boundary Conditions on Custom Operators
-
-Custom operators support Hermite interpolation via the `hermite` keyword, just like
-built-in operators:
-
-```julia
-op = my_ℒ(data; hermite=(is_boundary=is_boundary, bc=bcs, normals=normals))
-```
-
-See [Boundary Conditions](@ref) for details.

@@ -3,7 +3,7 @@
 # for users working with scalar fields.
 
 """
-    gradient(data; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl, hermite)
+    gradient(data; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl)
 
 Build a `RadialBasisOperator` for computing gradients of scalar fields.
 

@@ -47,7 +47,7 @@ S_ragged = sparse(
     @test sparse(I, J, V, m, n) == S_ragged
 end
 
-@testset "Dirichlet-style duplicate columns collapse exactly" begin
+@testset "duplicate-index columns collapse exactly" begin
     # Fixture shape from the StencilWeights characterization suite: identity row padded
     # with repeated indices — duplicates must sum to exactly {1, 0, 0, 0} → one entry.
     k, n_eval, n_data = 4, 6, 8

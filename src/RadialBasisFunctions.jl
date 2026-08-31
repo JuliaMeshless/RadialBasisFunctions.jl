@@ -28,16 +28,8 @@ include("ellsparse/EllSparse.jl")
 include("stencil_weights.jl")
 export StencilWeights
 
-include("solve/types.jl")
-export BoundaryCondition, Internal
-export α, β, is_dirichlet, is_neumann, is_robin, is_internal
-export HermiteStencilData, update_hermite_stencil_data!
-export InteriorStencil, DirichletStencil, HermiteStencil
-export classify_stencil
-
 include("solve/assembly.jl")
 include("solve/execution.jl")
-include("solve/api.jl")
 
 # Backward pass support for AD (used by the Enzyme extension)
 include("solve/backward_cache.jl")

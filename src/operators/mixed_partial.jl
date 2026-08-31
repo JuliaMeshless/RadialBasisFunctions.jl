@@ -20,7 +20,7 @@ end
 
 # Primary interface
 """
-    mixed_partial(data, dim1, dim2; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl, hermite)
+    mixed_partial(data, dim1, dim2; basis=PHS(3; poly_deg=2), eval_points=data, k, adjl)
 
 Build a `RadialBasisOperator` for the mixed partial derivative ∂²f/(∂xᵢ ∂xⱼ).
 
